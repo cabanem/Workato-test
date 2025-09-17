@@ -1,0 +1,11 @@
+.env
+.env.local
+*.gem
+/vendor/bundle/
+.bundle/
+/test/fixtures/vcr_cassettes/*.yml
+.workato/settings.yml
+*.swp
+.DS_Store
+*.log
+/tmp/

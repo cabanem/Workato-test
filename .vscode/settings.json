@@ -1,0 +1,5 @@
+{
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "editor.formatOnSave": false,
+  "ruby.lint": { "rubocop": false }
+}

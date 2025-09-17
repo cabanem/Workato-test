@@ -1,0 +1,28 @@
+{
+  "name": "${localWorkspaceFolderBasename}",
+  "image": "mcr.microsoft.com/devcontainers/ruby:3.3-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "mounts": [
+    "source=${localWorkspaceFolderBasename}-gems,target=/usr/local/bundle,type=volume",
+    "source=${localWorkspaceFolderBasename}-bashhistory,target=/commandhistory,type=volume"
+  ],
+  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y build-essential libicu-dev libmagic-dev cmake pkg-config libssl-dev && git config --global --add safe.directory ${containerWorkspaceFolder}",
+  "postCreateCommand": "bash -c 'gem install bundler workato-connector-sdk && if [ -f Gemfile ]; then bundle install || echo \"Bundle install failed, but workato-connector-sdk is installed\"; fi'",
+  "customizations": {
+    "vscode": {
+      "extensions": ["anthropic.claude-code", "github.copilot", "shopify.ruby-lsp"],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "editor.formatOnSave": false
+      }
+    }
+  },
+  "forwardPorts": [3000, 3001, 4567, 9292, 5000, 8080],
+  "remoteEnv": {
+    "HISTFILE": "/commandhistory/.bash_history",
+    "BUNDLE_APP_CONFIG": "/usr/local/bundle"
+  }
+}
