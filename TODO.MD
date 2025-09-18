@@ -270,7 +270,7 @@ Include mappings:
 - format_embeddings_batch → prepare_embedding_batch
 ```
 ---
-# Verification Prompts
+## Verification Prompts
 
 - Final Validation Prompt:
 ```
@@ -299,4 +299,85 @@ Integration Checklist:
 □ Performance acceptable
 □ Error handling works
 
+```
+
+---
+
+## Additional
+
+## 1. Remove Data Tables Dependencies from Vertex AI Connector
+- Location: Google Vertex AI connector (connectors/vertex/v2.0_proposed.rb)
+- Prompt for Claude Code:
+```
+Remove all Data Tables code from the Vertex AI connector:
+- Remove Workato Developer API connection fields (workato_api_host, workato_api_token)
+- Remove all Workato-related methods: ensure_workato_api!, workato_api_headers, workato_api_base, list_datatables, list_datatable_columns, fetch_datatable_rows, cached_table_rows, load_categories_from_table, get_cached_datatables, get_cached_table_columns, fetch_fresh_datatables, fetch_table_columns, workato_request, workato_get, workato_post
+- Clean up any remaining Data Tables references in pick_lists
+- Remove workato_datatables and workato_datatable_columns pick_lists
+- Update connection field groups to remove "Workato Developer API" section
+```
+
+## 2. Remove Deprecated Actions from Vertex AI Connector
+- Location: Google Vertex AI connector actions section (connectors/vertex/v2.0_proposed.rb)
+- Prompt for Claude Code:
+```
+Remove deprecated actions and their supporting code from Vertex AI:
+- Delete entire categorize_text action (lines 319-422 approx)
+- Remove categorize_text_input and categorize_text_output from object_definitions
+- Remove payload_for_categorize method
+- Remove rules_source_modes pick_list
+- Clean up any references to categorize_text in comments or documentation
+- Ensure ai_classify remains as the replacement with clear documentation
+```
+
+## 3. Remove Deprecated Actions from RAG Utils Connector
+- Location: RAG Utils connector (connectors/rag_utils/v2.0_proposed.rb)
+- Prompt for Claude Code:
+```
+Remove all deprecated actions and methods from RAG Utils:
+- Delete to_vertex_datapoints action (currently marked deprecated)
+- Remove any deprecated flags from remaining actions
+- Remove the build_vertex_restricts method if only used by deprecated actions
+- Clean up vertex_datapoint and vertex_datapoint_upsert object definitions if unused
+- Update any references in comments that mention deprecated functionality
+- Ensure all remaining actions have clear purpose documentation
+```
+
+## 4. Add Contract Validation to RAG Utils Actions
+- Location: RAG Utils connector execute blocks (connectors/rag_utils/v2.0_proposed.rb)
+- Prompt for Claude Code:
+```
+Add contract validation to RAG Utils actions that produce structured output:
+1. smart_chunk_text - validate output against 'chunking_result' contract
+2. clean_email_text - validate output against 'email_cleaning_result' contract  
+3. calculate_similarity - validate output against 'similarity_result' contract
+4. generate_document_metadata - validate output against 'document_metadata' contract
+5. calculate_metrics - validate output against 'metrics_result' contract
+6. check_document_changes - validate output against 'change_detection' contract
+7. classify_by_pattern - validate output against 'classification_result' contract
+
+For each action:
+- Add contract definition if missing
+- Call validate_contract before returning result
+- Use pattern: result = call(:validate_contract, connection, result, 'contract_name')
+```
+
+## 5. Update Connector Documentation
+- Location: Both connector documentation/comments (connectors/rag_utils/v2.0_proposed.rb and connectors/vertex/v2.0_proposed.rb)
+- Prompt for Claude Code:
+```
+Update inline documentation for both connectors:
+
+RAG_Utils:
+- Add header comment: "Data Preparation Layer for AI Workflows v2.0"
+- Document contract formats: cleaned_text, embedding_request, classification_response
+- Add usage examples showing data flow to Vertex AI
+- Remove any references to deprecated actions
+
+Vertex AI:
+- Add header comment: "AI Processing Layer v2.0 - Requires prepared input"
+- Document that it expects contract-compliant input from RAG_Utils
+- Add migration notes: "categorize_text removed - use ai_classify with RAG_Utils::prepare_for_ai"
+- Update ai_classify help text with integration example
+- Clean up any Data Tables references in help text
 ```

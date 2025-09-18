@@ -214,7 +214,8 @@ require 'csv'
         error("Chunk size must be > 0")        if cs <= 0
         error("Chunk overlap must be >= 0")    if co < 0
 
-        call(:chunk_text_with_overlap, input)
+        result = call(:chunk_text_with_overlap, input)
+        call(:validate_contract, connection, result, 'chunking_result')
       end
     },
 
@@ -258,8 +259,9 @@ require 'csv'
         }
       end,
 
-      execute: lambda do |_connection, input|
-        call(:process_email_text, input)
+      execute: lambda do |connection, input|
+        result = call(:process_email_text, input)
+        call(:validate_contract, connection, result, 'email_cleaning_result')
       end
     },
 
@@ -333,7 +335,8 @@ require 'csv'
         input['vector_b'] = Array(input.dig('vectors', 'vector_b'))
         error("Vectors cannot be empty") if input['vector_a'].empty? || input['vector_b'].empty?
         input['similarity_type'] = (config['similarity_method'] || 'cosine')
-        call(:compute_similarity, input, connection)
+        result = call(:compute_similarity, input, connection)
+        call(:validate_contract, connection, result, 'similarity_result')
       end
     },
 
@@ -710,8 +713,9 @@ require 'csv'
         }
       end,
 
-      execute: lambda do |_connection, input|
-        call(:extract_metadata, input)
+      execute: lambda do |connection, input|
+        result = call(:extract_metadata, input)
+        call(:validate_contract, connection, result, 'document_metadata')
       end
     },
 
@@ -761,8 +765,9 @@ require 'csv'
         }
       end,
 
-      execute: lambda do |_connection, input|
-        call(:detect_changes, input)
+      execute: lambda do |connection, input|
+        result = call(:detect_changes, input)
+        call(:validate_contract, connection, result, 'change_detection')
       end
     },
 
@@ -814,8 +819,9 @@ require 'csv'
         }
       end,
 
-      execute: lambda do |_connection, input|
-        call(:compute_metrics, input)
+      execute: lambda do |connection, input|
+        result = call(:compute_metrics, input)
+        call(:validate_contract, connection, result, 'metrics_result')
       end
     },
 
@@ -1005,7 +1011,8 @@ require 'csv'
       end,
 
       execute: lambda do |connection, input, _eis, _eos, config|
-        call(:evaluate_email_by_rules_exec, connection, input, config)
+        result = call(:evaluate_email_by_rules_exec, connection, input, config)
+        call(:validate_contract, connection, result, 'classification_result')
       end
     },
 
@@ -1202,48 +1209,6 @@ require 'csv'
         { 'jsonl' => lines.join("\n"), 'lines' => lines.length }
       end
     },
-    to_vertex_datapoints: {
-      title: "Build Vertex datapoints",
-      subtitle: "Embeddings + metadata → upsert payload",
-      description: "Produce datapoints with restricts/numericRestricts ready for Vertex upsertDatapoints.",
-      deprecated: "This action will be replaced by format_vector_datapoints in v2.0",
-      input_fields: lambda do |object_definitions|
-        [
-          { name: "embeddings", type: "array", of: "object", list_mode_toggle: true, optional: false,
-            properties: object_definitions["embedding_object"] },
-          { name: "restrict_mode", control_type: "select", default: "per_key", sticky: true,
-            pick_list: [[ "Per-key namespaces", "per_key" ], [ "Flat namespace (key=value)", "flat" ]] },
-          { name: "flat_namespace", hint: "Used when restrict_mode = flat", sticky: true },
-          { name: "promote_numeric", type: "boolean", control_type: "checkbox", default: true,
-            hint: "Turn numeric metadata into numericRestricts[EQUAL]" }
-        ]
-      end,
-      output_fields: lambda do |object_definitions|
-        [
-          { name: "datapoints", type: "array", of: "object", properties: object_definitions["vertex_datapoint_upsert"] },
-          { name: "count", type: "integer" }
-        ]
-      end,
-      execute: lambda do |_connection, input|
-        puts "DEPRECATION WARNING: to_vertex_datapoints will be replaced by format_vector_datapoints in v2.0"
-        mode = (input['restrict_mode'] || 'per_key').to_s
-        flat_ns = input['flat_namespace']
-        promote = !!input['promote_numeric']
-
-        dps = Array(input['embeddings']).map do |e|
-          meta = e['metadata'] || {}
-          restricts, numeric = call(:build_vertex_restricts, meta, (mode == 'flat' ? 'flat' : 'per_key'), flat_ns, promote)
-          {
-            'datapointId'    => e['id'],
-            'featureVector'  => Array(e['vector'] || []),
-            'restricts'      => (restricts if restricts.any?),
-            'numericRestricts' => (numeric if numeric.any?)
-          }.compact
-        end
-
-        { 'datapoints' => dps, 'count' => dps.length }
-      end
-    },
 
     # Resolve project context for a recipe
     resolve_project_context: {
@@ -1281,41 +1246,6 @@ require 'csv'
   # ==========================================
   methods: {
 
-    build_vertex_restricts: lambda do |_connection, metadata, mode, flat_ns, promote_numeric|
-      md = metadata.is_a?(Hash) ? metadata : {}
-      restricts = []
-      numeric   = []
-
-      md.each do |k, v|
-        key = k.to_s
-        case v
-        when String
-          if mode == 'flat'
-            restricts << { 'namespace' => (flat_ns || 'tags'), 'allowList' => ["#{key}=#{v}"] }
-          else
-            restricts << { 'namespace' => key, 'allowList' => [v] }
-          end
-        when Array
-          vals = v.map(&:to_s)
-          if mode == 'flat'
-            # flatten: key=val for each
-            restricts << { 'namespace' => (flat_ns || 'tags'), 'allowList' => vals.map { |s| "#{key}=#{s}" } }
-          else
-            restricts << { 'namespace' => key, 'allowList' => vals }
-          end
-        when Integer
-          if promote_numeric
-            numeric << { 'namespace' => key, 'op' => 'EQUAL', 'valueInt' => v.to_i }
-          end
-        when Float
-          if promote_numeric
-            numeric << { 'namespace' => key, 'op' => 'EQUAL', 'valueDouble' => v.to_f }
-          end
-        end
-      end
-
-      [restricts, numeric]
-    end,
 
     chunk_text_with_overlap: lambda do |input|
       text = input['text'].to_s
@@ -2779,26 +2709,6 @@ require 'csv'
       end
     },
 
-  vertex_datapoint_upsert: {
-    fields: lambda do
-      [
-        { name: "datapointId", type: "string" },
-        { name: "featureVector", type: "array", of: "number" },
-        { name: "restricts", type: "array", of: "object", properties: [
-          { name: "namespace" },
-          { name: "allowList", type: "array", of: "string" },
-          { name: "denyList",  type: "array", of: "string" }
-        ]},
-        { name: "numericRestricts", type: "array", of: "object", properties: [
-          { name: "namespace" },
-          { name: "op" }, # EQUAL, LESS, GREATER, etc.
-          { name: "valueInt",    type: "integer" },
-          { name: "valueFloat",  type: "number"  },
-          { name: "valueDouble", type: "number"  }
-        ]}
-      ]
-    end
-  },
 
     vertex_batch: {
       fields: lambda do |connection, _config, object_definitions|
@@ -2868,6 +2778,104 @@ require 'csv'
           { name: "computation_time_ms",    type: "integer", label: "Computation time (ms)" },
           { name: "threshold_used",         type: "number", label: "Threshold used", optional: true },
           { name: "vectors_normalized",     type: "boolean", control_type: "checkbox", label: "Vectors normalized", optional: true }
+        ]
+      end
+    },
+
+    document_metadata: {
+      fields: lambda do
+        [
+          { name: "document_id", type: "string", label: "Document ID" },
+          { name: "file_hash", type: "string", label: "File hash" },
+          { name: "word_count", type: "integer", label: "Word count" },
+          { name: "character_count", type: "integer", label: "Character count" },
+          { name: "estimated_tokens", type: "integer", label: "Estimated tokens" },
+          { name: "language", type: "string", label: "Language" },
+          { name: "summary", type: "string", label: "Summary" },
+          { name: "key_topics", type: "array", of: "string", label: "Key topics" },
+          { name: "entities", type: "object", label: "Entities" },
+          { name: "created_at", type: "timestamp", label: "Created at" },
+          { name: "processing_time_ms", type: "integer", label: "Processing time (ms)" }
+        ]
+      end
+    },
+
+    metrics_result: {
+      fields: lambda do
+        [
+          { name: "average", type: "number", label: "Average" },
+          { name: "median", type: "number", label: "Median" },
+          { name: "min", type: "number", label: "Minimum" },
+          { name: "max", type: "number", label: "Maximum" },
+          { name: "std_deviation", type: "number", label: "Standard deviation" },
+          { name: "percentile_95", type: "number", label: "95th percentile" },
+          { name: "percentile_99", type: "number", label: "99th percentile" },
+          { name: "total_count", type: "integer", label: "Total count" },
+          { name: "trend", type: "string", label: "Trend" },
+          { name: "anomalies_detected", type: "array", of: "object", label: "Anomalies detected",
+            properties: [
+              { name: "timestamp", type: "timestamp" },
+              { name: "value", type: "number" }
+            ]
+          }
+        ]
+      end
+    },
+
+    change_detection: {
+      fields: lambda do
+        [
+          { name: "has_changed", type: "boolean", control_type: "checkbox", label: "Has changed" },
+          { name: "change_type", type: "string", label: "Change type" },
+          { name: "change_percentage", type: "number", label: "Change percentage" },
+          { name: "added_content", type: "array", of: "string", label: "Added content" },
+          { name: "removed_content", type: "array", of: "string", label: "Removed content" },
+          { name: "modified_sections", type: "array", of: "object", label: "Modified sections",
+            properties: [
+              { name: "type", type: "string" },
+              { name: "current_range", type: "array", of: "integer" },
+              { name: "previous_range", type: "array", of: "integer" },
+              { name: "current_lines", type: "array", of: "string" },
+              { name: "previous_lines", type: "array", of: "string" }
+            ]
+          },
+          { name: "requires_reindexing", type: "boolean", control_type: "checkbox", label: "Requires reindexing" }
+        ]
+      end
+    },
+
+    classification_result: {
+      fields: lambda do
+        [
+          { name: "pattern_match", type: "boolean", control_type: "checkbox", label: "Pattern match" },
+          { name: "rule_source", type: "string", label: "Rule source" },
+          { name: "selected_action", type: "string", label: "Selected action" },
+          { name: "top_match", type: "object", label: "Top match",
+            properties: [
+              { name: "rule_id", type: "string" },
+              { name: "rule_type", type: "string" },
+              { name: "rule_pattern", type: "string" },
+              { name: "action", type: "string" },
+              { name: "priority", type: "integer" },
+              { name: "field_matched", type: "string" },
+              { name: "sample", type: "string" }
+            ]
+          },
+          { name: "matches", type: "array", of: "object", label: "Matches" },
+          { name: "standard_signals", type: "object", label: "Standard signals",
+            properties: [
+              { name: "sender_flags", type: "array", of: "string" },
+              { name: "subject_flags", type: "array", of: "string" },
+              { name: "body_flags", type: "array", of: "string" }
+            ]
+          },
+          { name: "debug", type: "object", label: "Debug",
+            properties: [
+              { name: "evaluated_rules_count", type: "integer" },
+              { name: "schema_validated", type: "boolean", control_type: "checkbox" },
+              { name: "errors", type: "array", of: "string" }
+            ]
+          }
         ]
       end
     }
