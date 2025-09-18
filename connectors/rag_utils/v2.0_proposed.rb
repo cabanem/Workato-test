@@ -338,60 +338,106 @@ require 'csv'
     },
 
     # ------------------------------------------
-    # 4. FORMAT EMBEDDINGS BATCH
+    # 4. PREPARE EMBEDDING BATCH
     # ------------------------------------------
-    format_embeddings_batch: {
-      title: "Format Embeddings for Vertex AI",
-      subtitle: "Format embeddings for batch processing",
-      description: "Prepare embedding data for Vertex AI Vector Search",
+    prepare_embedding_batch: {
+      title: "Prepare Embedding Batch",
+      subtitle: "Prepare text content for embedding processing",
+      description: "Process text array into embedding request format with batch management",
       help: lambda do
         {
-          body: "Formats embedding vectors into batches suitable for vector ingestion with JSON/JSONL/CSV payloads.",
-          learn_more_url: "https://docs.workato.com/developing-connectors/sdk/sdk-reference/object_definitions.html",
-          learn_more_text: "Object definitions"
+          body: "Accepts array of text objects with id, content, title, and metadata. Generates batch IDs and formats data according to embedding_request contract for inter-connector compatibility.",
+          learn_more_url: "https://docs.workato.com/workato-api/data-tables.html",
+          learn_more_text: "Learn about data contracts"
         }
       end,
 
       input_fields: lambda do |object_definitions|
         [
           {
-            name: "embeddings", label: "Embeddings data",
-            type: "array", of: "object",
-            properties: object_definitions["embedding_object"],
-            list_mode_toggle: true
+            name: "texts", label: "Text objects", type: "array", of: "object",
+            optional: false, list_mode_toggle: true,
+            properties: [
+              { name: "id", label: "Unique ID", type: "string", optional: false },
+              { name: "content", label: "Text content", type: "string", optional: false },
+              { name: "title", label: "Title", type: "string", optional: true },
+              { name: "metadata", label: "Metadata", type: "object", optional: true }
+            ]
           },
-          { name: "index_endpoint", label: "Index endpoint ID", type: "string", optional: false },
-          { name: "batch_size", label: "Batch size", type: "integer", optional: true, default: 25, hint: "Embeddings per batch" },
           {
-            name: "format_type", label: "Format type",
-            type: "string", optional: true, default: "json",
-            control_type: "select", pick_list: "format_types",
-            toggle_hint: "Select",
-            toggle_field: { name: "format_type", label: "Format type (custom)", type: "string", control_type: "text", toggle_hint: "Use text" }
+            name: "task_type", label: "Task type", control_type: "select",
+            pick_list: [
+              ["Retrieval Document", "RETRIEVAL_DOCUMENT"],
+              ["Query", "QUERY"],
+              ["Semantic Similarity", "SEMANTIC_SIMILARITY"]
+            ],
+            optional: false, sticky: true, support_pills: false,
+            hint: "Type of embedding task for Vertex AI processing"
+          },
+          {
+            name: "batch_size", label: "Batch size", type: "integer",
+            optional: true, default: 25, hint: "Number of texts per batch"
+          },
+          {
+            name: "include_title_in_text", label: "Include title in text",
+            type: "boolean", control_type: "checkbox", default: true,
+            hint: "Prepend title to content for embedding"
+          },
+          {
+            name: "batch_prefix", label: "Batch ID prefix", type: "string",
+            optional: true, default: "emb_batch",
+            hint: "Prefix for generated batch IDs"
           }
         ]
       end,
 
       output_fields: lambda do |object_definitions|
         [
-          { name: "formatted_batches", type: "array", of: "object", properties: object_definitions["vertex_batch"] },
+          { name: "batches", type: "array", of: "object", properties: [
+            { name: "batch_id", type: "string" },
+            { name: "batch_number", type: "integer" },
+            { name: "requests", type: "array", of: "object", properties: [
+              { name: "text", type: "string" },
+              { name: "metadata", type: "object" }
+            ]},
+            { name: "size", type: "integer" }
+          ]},
           { name: "total_batches", type: "integer" },
-          { name: "total_embeddings", type: "integer" },
-          { name: "index_endpoint", type: "string" },
-          { name: "format", type: "string" },
-          { name: "payload", type: "string" }
+          { name: "total_texts", type: "integer" },
+          { name: "task_type", type: "string" },
+          { name: "batch_generation_timestamp", type: "string" }
         ]
       end,
 
       sample_output: lambda do
         {
-          "formatted_batches" => [{ "batch_id" => "batch_0", "batch_number" => 0, "datapoints" => [], "size" => 0 }],
-          "total_batches" => 1, "total_embeddings" => 0, "index_endpoint" => "idx-123", "format" => "json", "payload" => "[]"
+          "batches" => [
+            {
+              "batch_id" => "emb_batch_0_20240115103000",
+              "batch_number" => 0,
+              "requests" => [
+                {
+                  "text" => "Product Overview: This is a sample product description...",
+                  "metadata" => {
+                    "id" => "doc_123",
+                    "title" => "Product Overview",
+                    "task_type" => "RETRIEVAL_DOCUMENT",
+                    "batch_id" => "emb_batch_0_20240115103000"
+                  }
+                }
+              ],
+              "size" => 1
+            }
+          ],
+          "total_batches" => 1,
+          "total_texts" => 1,
+          "task_type" => "RETRIEVAL_DOCUMENT",
+          "batch_generation_timestamp" => "2024-01-15T10:30:00Z"
         }
       end,
 
-      execute: lambda do |_connection, input|
-        call(:format_for_vertex_ai, input)
+      execute: lambda do |connection, input, _eis, _eos, _config|
+        call(:prepare_embedding_batch_exec, connection, input)
       end
     },
 
@@ -831,12 +877,12 @@ require 'csv'
     },
 
     # ------------------------------------------
-    # 11. EVALUATE EMAIL BY RULES
+    # 11. CLASSIFY BY PATTERN
     # ------------------------------------------
-    evaluate_email_by_rules: {
-      title: "Evaluate email against rules",
-      subtitle: "Standard patterns or custom rules from Data Tables",
-      description: "Evaluate email and return best‑matching rule and action",
+    classify_by_pattern: {
+      title: "Classify by pattern matching",
+      subtitle: "Pattern-based classification without AI",
+      description: "Evaluate text against pattern rules from standard library or Data Tables",
       help: lambda do
         {
           body: "Use standard patterns or supply a Data Table of rules {rule_id, rule_type, rule_pattern, action, priority, active}. Requires API token to read Data Tables.",
@@ -962,7 +1008,114 @@ require 'csv'
         call(:evaluate_email_by_rules_exec, connection, input, config)
       end
     },
-  
+
+    # ------------------------------------------
+    # 12. PREPARE FOR AI
+    # ------------------------------------------
+    prepare_for_ai: {
+      title: "Prepare text for AI processing",
+      subtitle: "Clean and format text with metadata for AI workflows",
+      description: "Process text based on source type, apply cleaning rules, and return contract-compliant output",
+      help: lambda do
+        {
+          body: "Prepares text for AI processing by applying source-specific cleaning rules. Supports email, document, chat, and general text sources. Returns data in cleaned_text contract format for inter-connector compatibility.",
+          learn_more_url: "https://docs.workato.com/workato-api/data-tables.html",
+          learn_more_text: "Learn about data contracts"
+        }
+      end,
+
+      input_fields: lambda do |object_definitions|
+        [
+          {
+            name: "text", label: "Text to process", type: "string", control_type: "text-area",
+            optional: false, hint: "Raw text content to be processed for AI"
+          },
+          {
+            name: "source_type", label: "Source type", control_type: "select",
+            pick_list: [
+              ["Email", "email"],
+              ["Document", "document"],
+              ["Chat", "chat"],
+              ["General", "general"]
+            ],
+            optional: false, sticky: true, support_pills: false,
+            hint: "Type of content being processed"
+          },
+          {
+            name: "task_type", label: "Task type", control_type: "select",
+            pick_list: [
+              ["Classification", "classification"],
+              ["Generation", "generation"],
+              ["Analysis", "analysis"],
+              ["Embedding", "embedding"]
+            ],
+            optional: false, sticky: true, support_pills: false,
+            hint: "AI task the text will be used for"
+          },
+          {
+            name: "options", label: "Processing options", type: "object", optional: true,
+            properties: [
+              { name: "remove_pii", label: "Remove PII", type: "boolean", control_type: "checkbox", default: false },
+              { name: "max_length", label: "Max length", type: "integer", hint: "Maximum characters to retain" },
+              { name: "remove_quotes", label: "Remove email quotes", type: "boolean", control_type: "checkbox", default: true },
+              { name: "remove_signatures", label: "Remove signatures", type: "boolean", control_type: "checkbox", default: true },
+              { name: "remove_disclaimers", label: "Remove disclaimers", type: "boolean", control_type: "checkbox", default: true },
+              { name: "extract_urls", label: "Extract URLs", type: "boolean", control_type: "checkbox", default: false },
+              { name: "normalize_whitespace", label: "Normalize whitespace", type: "boolean", control_type: "checkbox", default: true }
+            ]
+          }
+        ]
+      end,
+
+      output_fields: lambda do |object_definitions|
+        [
+          { name: "text", type: "string" },
+          { name: "removed_sections", type: "array", of: "string" },
+          { name: "word_count", type: "integer" },
+          { name: "cleaning_applied", type: "object", properties: [
+            { name: "source_type", type: "string" },
+            { name: "task_type", type: "string" },
+            { name: "operations", type: "array", of: "string" },
+            { name: "original_length", type: "integer" },
+            { name: "final_length", type: "integer" },
+            { name: "reduction_percentage", type: "number" }
+          ]},
+          { name: "metadata", type: "object", properties: [
+            { name: "source_type", type: "string" },
+            { name: "task_type", type: "string" },
+            { name: "processing_timestamp", type: "string" },
+            { name: "extracted_urls", type: "array", of: "string" }
+          ]}
+        ]
+      end,
+
+      sample_output: lambda do
+        {
+          "text" => "Hello team, I need help with the project analysis...",
+          "removed_sections" => ["--\nJohn Doe\nSenior Analyst"],
+          "word_count" => 12,
+          "cleaning_applied" => {
+            "source_type" => "email",
+            "task_type" => "classification",
+            "operations" => ["remove_signatures", "normalize_whitespace"],
+            "original_length" => 150,
+            "final_length" => 65,
+            "reduction_percentage" => 56.67
+          },
+          "metadata" => {
+            "source_type" => "email",
+            "task_type" => "classification",
+            "processing_timestamp" => "2024-01-15T10:30:00Z",
+            "extracted_urls" => []
+          }
+        }
+      end,
+
+      execute: lambda do |connection, input, _eis, _eos, _config|
+        call(:prepare_text_for_ai_exec, connection, input)
+      end
+    },
+
     adapt_chunks_for_vertex: {
       title: "Adapt chunks for Vertex",
       subtitle: "Map chunk objects → {id, text, metadata}",
@@ -1342,51 +1495,71 @@ require 'csv'
       }
     end,
 
-    format_for_vertex_ai: lambda do |input|
-      embeddings = input['embeddings'] || []
+    prepare_embedding_batch_exec: lambda do |connection, input|
+      texts = Array(input['texts'] || [])
+      task_type = (input['task_type'] || 'RETRIEVAL_DOCUMENT').to_s
       batch_size = (input['batch_size'] || 25).to_i
-      format     = (input['format_type'] || 'json').to_s
+      include_title = input['include_title_in_text'] != false
+      batch_prefix = (input['batch_prefix'] || 'emb_batch').to_s
+
+      # Generate timestamp for unique batch IDs
+      timestamp = Time.now.utc.strftime('%Y%m%d%H%M%S')
 
       batches = []
-      embeddings.each_slice(batch_size).with_index do |batch, index|
-        formatted_batch = {
-          batch_id: "batch_#{index}",
-          batch_number: index,
-          datapoints: batch.map do |emb|
-            {
-              datapoint_id: emb['id'],
-              feature_vector: emb['vector'] || [],
-              restricts: emb['metadata'] || {}
-            }
-          end,
-          size: batch.length
+      texts.each_slice(batch_size).with_index do |batch, index|
+        batch_id = "#{batch_prefix}_#{index}_#{timestamp}"
+
+        requests = batch.map do |text_obj|
+          # Build the text content
+          content = (text_obj['content'] || '').to_s
+          title = (text_obj['title'] || '').to_s
+
+          final_text = if include_title && !title.empty?
+                         "#{title}: #{content}"
+                       else
+                         content
+                       end
+
+          # Build metadata according to embedding_request contract
+          metadata = (text_obj['metadata'] || {}).dup
+          metadata.merge!({
+            'id' => text_obj['id'],
+            'title' => title,
+            'task_type' => task_type,
+            'batch_id' => batch_id
+          })
+
+          # Create embedding request object
+          request = {
+            'text' => final_text,
+            'metadata' => metadata
+          }
+
+          # Validate each request against embedding_request contract
+          call(:validate_contract, connection, request, 'embedding_request')
+
+          request
+        end
+
+        batch_info = {
+          'batch_id' => batch_id,
+          'batch_number' => index,
+          'requests' => requests,
+          'size' => requests.length
         }
-        batches << formatted_batch
+
+        batches << batch_info
       end
 
-      all_datapoints = batches.flat_map { |b| b[:datapoints] }
-
-      payload = case format
-                when 'jsonl'
-                  all_datapoints.map { |dp| JSON.generate(dp) }.join("\n")
-                when 'csv'
-                  rows = [%w[datapoint_id feature_vector restricts]]
-                  all_datapoints.each do |dp|
-                    rows << [dp[:datapoint_id], JSON.generate(dp[:feature_vector]), JSON.generate(dp[:restricts])]
-                  end
-                  CSV.generate { |c| rows.each { |r| c << r } }
-                else
-                  JSON.generate(all_datapoints)
-                end
-
-      {
-        formatted_batches: batches,
-        total_batches: batches.length,
-        total_embeddings: embeddings.length,
-        index_endpoint: input['index_endpoint'],
-        format: format,
-        payload: payload
+      result = {
+        'batches' => batches,
+        'total_batches' => batches.length,
+        'total_texts' => texts.length,
+        'task_type' => task_type,
+        'batch_generation_timestamp' => Time.now.utc.iso8601
       }
+
+      result
     end,
 
     construct_rag_prompt: lambda do |input|
@@ -2210,6 +2383,101 @@ require 'csv'
       }
     end,
 
+    # Prepare text for AI processing with source-specific cleaning
+    prepare_text_for_ai_exec: lambda do |connection, input|
+      text = (input['text'] || '').to_s
+      source_type = (input['source_type'] || 'general').to_s
+      task_type = (input['task_type'] || 'general').to_s
+      options = input['options'] || {}
+
+      original_length = text.length
+      operations_applied = []
+      removed_sections = []
+      extracted_urls = []
+
+      # Apply source-specific processing
+      if source_type == 'email'
+        # Use existing process_email_text method for email content
+        email_result = call(:process_email_text, {
+          'email_body' => text,
+          'remove_quotes' => options['remove_quotes'] != false,
+          'remove_signatures' => options['remove_signatures'] != false,
+          'remove_disclaimers' => options['remove_disclaimers'] != false,
+          'extract_urls' => options['extract_urls'] == true,
+          'normalize_whitespace' => options['normalize_whitespace'] != false
+        })
+
+        text = email_result[:cleaned_text] || email_result['cleaned_text'] || text
+        removed_sections = email_result[:removed_sections] || email_result['removed_sections'] || []
+        extracted_urls = email_result[:extracted_urls] || email_result['extracted_urls'] || []
+
+        operations_applied << 'email_preprocessing'
+        operations_applied << 'remove_quotes' if options['remove_quotes'] != false
+        operations_applied << 'remove_signatures' if options['remove_signatures'] != false
+        operations_applied << 'remove_disclaimers' if options['remove_disclaimers'] != false
+        operations_applied << 'normalize_whitespace' if options['normalize_whitespace'] != false
+      else
+        # General text processing for document, chat, general types
+        if options['normalize_whitespace'] != false
+          text.gsub!(/[ \t]+/, ' ')
+          text.gsub!(/\n{3,}/, "\n\n")
+          text.strip!
+          operations_applied << 'normalize_whitespace'
+        end
+
+        if options['extract_urls'] == true
+          extracted_urls = text.scan(%r{https?://[^\s<>"'()]+})
+          operations_applied << 'extract_urls'
+        end
+      end
+
+      # Apply max_length if specified
+      if options['max_length'] && options['max_length'].to_i > 0
+        max_len = options['max_length'].to_i
+        if text.length > max_len
+          text = text[0, max_len]
+          operations_applied << 'truncate_to_max_length'
+        end
+      end
+
+      # Basic PII removal if requested
+      if options['remove_pii'] == true
+        # Simple email and phone number masking
+        text.gsub!(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/, '[EMAIL]')
+        text.gsub!(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/, '[PHONE]')
+        operations_applied << 'remove_pii'
+      end
+
+      final_length = text.length
+      word_count = text.split(/\s+/).length
+
+      # Build contract-compliant output
+      result = {
+        'text' => text,
+        'removed_sections' => removed_sections,
+        'word_count' => word_count,
+        'cleaning_applied' => {
+          'source_type' => source_type,
+          'task_type' => task_type,
+          'operations' => operations_applied,
+          'original_length' => original_length,
+          'final_length' => final_length,
+          'reduction_percentage' => original_length.zero? ? 0 : ((1 - final_length.to_f / original_length) * 100).round(2)
+        },
+        'metadata' => {
+          'source_type' => source_type,
+          'task_type' => task_type,
+          'processing_timestamp' => Time.now.utc.iso8601,
+          'extracted_urls' => extracted_urls
+        }
+      }
+
+      # Validate contract compliance
+      call(:validate_contract, connection, result, 'cleaned_text')
+
+      result
+    end,
+
     # ----- Templates (Data Tables) -----
     pick_templates_from_table: lambda do |connection, config|
       error('api_token is required in connector connection to read templates from Data Tables') unless connection['api_token'].present?
@@ -2311,6 +2579,68 @@ require 'csv'
       row['$created_at'] = record['created_at'] if record['created_at']
       row['$updated_at'] = record['updated_at'] if record['updated_at']
       row
+    end,
+
+    validate_contract: lambda do |connection, data, contract_type|
+      contracts = {
+        'cleaned_text' => {
+          required_fields: ['text', 'removed_sections', 'word_count', 'cleaning_applied'],
+          field_types: {
+            'text' => String,
+            'removed_sections' => Array,
+            'word_count' => Integer,
+            'cleaning_applied' => Hash
+          }
+        },
+        'embedding_request' => {
+          required_fields: ['text', 'metadata'],
+          field_types: {
+            'text' => String,
+            'metadata' => Hash
+          }
+        },
+        'classification_request' => {
+          required_fields: ['content', 'rules_source'],
+          field_types: {
+            'content' => String,
+            'rules_source' => String
+          }
+        },
+        'prompt_request' => {
+          required_fields: ['context_documents', 'user_query'],
+          field_types: {
+            'context_documents' => Array,
+            'user_query' => String
+          }
+        }
+      }
+
+      contract = contracts[contract_type.to_s]
+      error("Unknown contract type: #{contract_type}") unless contract
+
+      missing_fields = contract[:required_fields].select { |field| !data.key?(field) }
+      error("Contract validation failed. Missing required fields: #{missing_fields.join(', ')}") unless missing_fields.empty?
+
+      type_errors = []
+      contract[:field_types].each do |field, expected_type|
+        next unless data.key?(field)
+
+        actual_value = data[field]
+        case expected_type.name
+        when 'String'
+          type_errors << "#{field} must be a string" unless actual_value.is_a?(String)
+        when 'Integer'
+          type_errors << "#{field} must be an integer" unless actual_value.is_a?(Integer)
+        when 'Hash'
+          type_errors << "#{field} must be a hash/object" unless actual_value.is_a?(Hash)
+        when 'Array'
+          type_errors << "#{field} must be an array" unless actual_value.is_a?(Array)
+        end
+      end
+
+      error("Contract validation failed. Type errors: #{type_errors.join(', ')}") unless type_errors.empty?
+
+      data
     end
   },
 
