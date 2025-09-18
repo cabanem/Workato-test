@@ -1,4 +1,7 @@
 ## Part 1: RAG_Utils Connector Modifications
+
+---
+
 RAG_UTILS located "connectors/rag_utils/v2.0_proposed.rb"
 VERTEX located "connectors/vertex/v2.0_proposed.rb"
 
@@ -81,11 +84,9 @@ In the 'to_vertex_datapoints' action:
 ## Part 2: Vertex AI Connector Modifications
 
 6. Remove Data Tables Integration
-
-Location: Multiple locations in the Vertex connector (connectors/vertex/v2.0_proposed.rb)
-Action: Delete methods and fields
-
-Prompt for AI/Developer:
+   - Location: Multiple locations in the Vertex connector (connectors/vertex/v2.  0_proposed.rb)
+   - Action: Delete methods and fields
+   - Prompt for AI/Developer:
 ```
 Remove all Workato Data Tables integration from Vertex AI connector:
 
@@ -110,11 +111,9 @@ Remove all Workato Data Tables integration from Vertex AI connector:
 ```
 
 7. Create AI Classification Action
-
-Location: After categorize_text action (~line 700), in the Vertex connector (connectors/vertex/v2.0_proposed.rb)
-Action: Add new action
-
-Prompt for AI/Developer:
+   - Location: After categorize_text action (~line 700), in the Vertex connector (connectors/vertex/v2.0_proposed.rb)
+   - Action: Add new action
+   - Prompt for AI/Developer:
 ```
 Create a new action 'ai_classify' in Vertex connector after categorize_text. Requirements:
 
@@ -137,9 +136,8 @@ Implementation:
 ```
 
 8. Deprecate Old Categorization
-
-Location: categorize_text action (~line 600) in the Vertex connector (connectors/vertex/v2.0_proposed.rb)
-Action: Add deprecation notices
+   - Location: categorize_text action (~line 600) in the Vertex connector (connectors/vertex/v2.0_proposed.rb)
+   - Action: Add deprecation notices
 
 Prompt for AI/Developer:
 ```
@@ -180,11 +178,9 @@ Use existing embedding generation logic but process multiple texts.
 ```
 
 10. Update Send Messages for Prepared Input
-
-Location: send_messages action in the Vertex connector (connectors/vertex/v2.0_proposed.rb)
-Action: Add contract support
-
-Prompt for AI/Developer:
+   - Location: send_messages action in the Vertex connector (connectors/vertex/v2.0_proposed.rb)
+   - Action: Add contract support
+   - Prompt for AI/Developer:
 ```
 Update 'send_messages' action to accept prepared input:
 1. Check if input contains 'formatted_prompt' field
@@ -194,16 +190,13 @@ Update 'send_messages' action to accept prepared input:
 ```
 ---
 
-Part 3: Testing & Validation
+## Part 3: Testing & Validation
 
-Task 11: Create Test Recipe
-
-Recipe Name: Test_Connector_Migration_v2
-
-Prompt for Recipe Creation:
-
-Create a Workato recipe that tests the new connector flow:
-
+11. Create Test Recipe
+   - Recipe Name: Test_Connector_Migration_v2
+   - Prompt for Recipe Creation:
+   - Create a Workato recipe that tests the new connector flow:
+```
 1. Manual trigger with test email text
 2. RAG_Utils: clean_email_text action
 3. RAG_Utils: classify_by_pattern (use standard rules)
@@ -217,12 +210,12 @@ Test with 3 sample emails:
 - Newsletter (should match pattern)
 - Customer inquiry (needs AI)
 - Mixed content (tests both paths)
-Task 12: Create Integration Test
+```
 
-Test Name: Contract_Validation_Test
-
-Prompt for Test Creation:
-
+12. Create Integration Test
+   - Test Name: Contract_Validation_Test
+   - Prompt for Test Creation:
+```
 Create a test that validates data contracts between connectors:
 
 1. Generate sample data for each contract type
@@ -235,14 +228,16 @@ Test cases:
 - Valid cleaned_text → ai_classify
 - Valid embedding_request → generate_embeddings
 - Invalid data → should error appropriately
-Part 4: Documentation Updates
+```
 
-Task 13: Update Connector README
+---
 
-Location: Both connector documentation
+## Part 4: Documentation Updates
 
-Prompt for Documentation:
-
+13. Update Connector README
+   - Location: Both connector documentation 
+   - Prompt for Documentation:
+```
 Update the README/documentation for both connectors:
 
 RAG_Utils:
@@ -256,12 +251,12 @@ Vertex AI:
 - Document that it expects prepared input
 - Remove Data Tables documentation
 - Add migration guide from v1 to v2
-Task 14: Create Migration Script
+```
 
-Purpose: Automate recipe updates
-
-Prompt for Script Creation:
-
+14. Create Migration Script
+   - Purpose: Automate recipe updates
+   - Prompt for Script Creation:
+```
 Create a Ruby script that:
 1. Exports all recipes using deprecated actions
 2. Lists required changes for each
@@ -273,10 +268,12 @@ Include mappings:
 - evaluate_email_by_rules → classify_by_pattern
 - categorize_text → prepare_for_ai + ai_classify
 - format_embeddings_batch → prepare_embedding_batch
-Verification Prompts
+```
+---
+# Verification Prompts
 
-Final Validation Prompt:
-
+- Final Validation Prompt:
+```
 Review both modified connectors and verify:
 
 RAG_Utils Checklist:
@@ -301,3 +298,5 @@ Integration Checklist:
 □ No circular dependencies
 □ Performance acceptable
 □ Error handling works
+
+```

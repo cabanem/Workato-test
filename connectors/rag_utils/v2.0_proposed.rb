@@ -1206,6 +1206,7 @@ require 'csv'
       title: "Build Vertex datapoints",
       subtitle: "Embeddings + metadata → upsert payload",
       description: "Produce datapoints with restricts/numericRestricts ready for Vertex upsertDatapoints.",
+      deprecated: "This action will be replaced by format_vector_datapoints in v2.0",
       input_fields: lambda do |object_definitions|
         [
           { name: "embeddings", type: "array", of: "object", list_mode_toggle: true, optional: false,
@@ -1224,6 +1225,7 @@ require 'csv'
         ]
       end,
       execute: lambda do |_connection, input|
+        puts "DEPRECATION WARNING: to_vertex_datapoints will be replaced by format_vector_datapoints in v2.0"
         mode = (input['restrict_mode'] || 'per_key').to_s
         flat_ns = input['flat_namespace']
         promote = !!input['promote_numeric']
@@ -2604,6 +2606,15 @@ require 'csv'
           field_types: {
             'content' => String,
             'rules_source' => String
+          }
+        },
+        'classification_response' => {
+          required_fields: ['selected_category', 'confidence'],
+          field_types: {
+            'selected_category' => String,
+            'confidence' => Float,
+            'alternatives' => Array,
+            'usage_metrics' => Hash
           }
         },
         'prompt_request' => {

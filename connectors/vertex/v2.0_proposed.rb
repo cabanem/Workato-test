@@ -273,10 +273,19 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
+        # Accepts prepared prompts from RAG_Utils
         # Validate model
         call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('payload_for_send_message', input)
+
+        # Build payload - check for prepared input from RAG_Utils
+        payload = if input['formatted_prompt'].present?
+          # Use prepared prompt directly (from RAG_Utils)
+          input['formatted_prompt']
+        else
+          # Build payload using existing method (backward compatibility)
+          call('payload_for_send_message', input)
+        end
+
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
@@ -456,8 +465,9 @@
       end
     },
     categorize_text: {
-      title: 'Categorize text',
-      subtitle: 'Classify text based on user-defined categories',
+      title: 'Categorize text (DEPRECATED)',
+      subtitle: 'Will be removed in v2.0 - Use ai_classify or RAG_Utils::classify_by_pattern',
+      deprecated: true,
       description: "Classify <span class='provider'>text</span> based on " \
                    'user-defined categories using Gemini models in ' \
                    "<span class='provider'>Google Vertex AI</span>",
@@ -473,6 +483,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
+        puts "DEPRECATION WARNING: categorize_text is deprecated. Use RAG_Utils::classify_by_pattern for rules or ai_classify for AI classification"
         # Validate model
         call('validate_publisher_model!', connection, input['model'])
         # Ensure Workato API details if rules source is Workato table
@@ -502,6 +513,112 @@
                 call('usage_output_sample'))
       end
     },
+
+    ai_classify: {
+      title: 'AI Classification',
+      subtitle: 'Classify text using AI with confidence scoring',
+      description: "Classify <span class='provider'>text</span> into predefined categories " \
+                   'using Gemini models in ' \
+                   "<span class='provider'>Google Vertex AI</span> with confidence scores and alternatives",
+      help: {
+        body: 'This action uses AI to classify text into one of the provided categories. ' \
+              'Returns confidence scores and alternative classifications. Designed to work ' \
+              'with text prepared by RAG_Utils prepare_for_ai action.'
+      },
+
+      input_fields: lambda do |object_definitions|
+        [
+          {
+            name: 'text', label: 'Text to classify', type: 'string',
+            optional: false, hint: 'Text content to classify (preferably from RAG_Utils prepare_for_ai)'
+          },
+          {
+            name: 'categories', label: 'Categories', type: 'array', of: 'object',
+            optional: false, list_mode_toggle: true,
+            properties: [
+              { name: 'key', label: 'Category key', type: 'string', optional: false },
+              { name: 'description', label: 'Category description', type: 'string', optional: true }
+            ],
+            hint: 'Array of categories with keys and optional descriptions'
+          },
+          {
+            name: 'model', label: 'Model', type: 'string',
+            optional: false, control_type: 'select',
+            pick_list: :available_text_models,
+            extends_schema: true,
+            hint: 'Select the Gemini model to use',
+            toggle_hint: 'Select from list',
+            toggle_field: {
+              name: 'model', label: 'Model (custom)', type: 'string',
+              control_type: 'text', toggle_hint: 'Use custom value',
+              hint: 'E.g., publishers/google/models/gemini-pro'
+            }
+          },
+          {
+            name: 'options', label: 'Classification options', type: 'object', optional: true,
+            properties: [
+              { name: 'return_confidence', label: 'Return confidence score', type: 'boolean', control_type: 'checkbox', default: true },
+              { name: 'return_alternatives', label: 'Return alternative classifications', type: 'boolean', control_type: 'checkbox', default: true },
+              { name: 'temperature', label: 'Temperature', type: 'number', hint: 'Controls randomness (0.0-1.0)', default: 0.1 }
+            ]
+          }
+        ].concat(object_definitions['config_schema'].only('safetySettings'))
+      end,
+
+      output_fields: lambda do |object_definitions|
+        [
+          { name: 'selected_category', label: 'Selected category', type: 'string' },
+          { name: 'confidence', label: 'Confidence score', type: 'number', hint: 'Confidence score (0.0-1.0)' },
+          { name: 'alternatives', label: 'Alternative classifications', type: 'array', of: 'object',
+            properties: [
+              { name: 'category', type: 'string' },
+              { name: 'confidence', type: 'number' }
+            ]
+          },
+          { name: 'usage_metrics', label: 'Usage metrics', type: 'object', properties: [
+            { name: 'prompt_token_count', type: 'integer' },
+            { name: 'candidates_token_count', type: 'integer' },
+            { name: 'total_token_count', type: 'integer' }
+          ]}
+        ].concat(object_definitions['safety_rating_schema'])
+      end,
+
+      sample_output: lambda do |_connection, input|
+        {
+          'selected_category' => input['categories']&.first&.[]('key') || 'urgent',
+          'confidence' => 0.95,
+          'alternatives' => [
+            { 'category' => 'normal', 'confidence' => 0.05 }
+          ],
+          'usage_metrics' => {
+            'prompt_token_count' => 45,
+            'candidates_token_count' => 12,
+            'total_token_count' => 57
+          }
+        }.merge(call('safety_ratings_output_sample'))
+      end,
+
+      execute: lambda do |connection, input, _eis, _eos|
+        # Validate model
+        call('validate_publisher_model!', connection, input['model'])
+
+        # Build payload for AI classification
+        payload = call('payload_for_ai_classify', connection, input)
+
+        # Build the url
+        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
+                        "/#{input['model']}:generateContent"
+
+        response = post(url, payload).
+                  after_error_response(/.*/) do |code, body, _header, message|
+                    call('handle_vertex_error', connection, code, body, message)
+                  end
+
+        # Extract and return the response
+        call('extract_ai_classify_response', response, input)
+      end
+    },
+
     analyze_text: {
       title: 'Analyze text',
       subtitle: 'Contextual analysis of text to answer user-provided questions',
@@ -583,46 +700,111 @@
       end
     },
     # --- Embedding and Vector Search actions ---
-    generate_embedding: {
-      title: 'Generate text embedding',
-      subtitle: 'Generate text embedding for the input text',
-      description: "Generate text <span class='provider'>embedding</span> using " \
+    generate_embeddings: {
+      title: 'Generate text embeddings (Batch)',
+      subtitle: 'Generate embeddings for multiple texts in batch',
+      description: "Generate text <span class='provider'>embeddings</span> for multiple texts using " \
                    "Google models in <span class='provider'>Google Vertex AI</span>",
       help: {
-        body: 'Text embedding is a technique for representing text data as numerical ' \
-              'vectors. It uses deep neural networks to learn the patterns in large amounts ' \
-              'of text data and generates vector representations that capture the meaning ' \
-              'and context of the text. These vectors can be used for a variety of natural ' \
-              'language processing tasks.'
+        body: 'Batch text embedding generates numerical vectors for multiple text inputs efficiently. ' \
+              'It processes an array of texts and returns vectors that capture the meaning ' \
+              'and context of each text. These vectors can be used for similarity search, ' \
+              'clustering, classification, and other natural language processing tasks.'
       },
 
       input_fields: lambda do |object_definitions|
-        object_definitions['generate_embedding_input']
+        [
+          {
+            name: 'batch_id', label: 'Batch ID', type: 'string',
+            optional: false, hint: 'Unique identifier for this batch of embeddings'
+          },
+          {
+            name: 'texts', label: 'Text objects', type: 'array', of: 'object',
+            optional: false, list_mode_toggle: true,
+            properties: [
+              { name: 'id', label: 'Text ID', type: 'string', optional: false },
+              { name: 'content', label: 'Text content', type: 'string', optional: false,
+                hint: 'Input text must not exceed 8192 tokens (approximately 6000 words).' },
+              { name: 'metadata', label: 'Metadata', type: 'object', optional: true }
+            ],
+            hint: 'Array of text objects to generate embeddings for'
+          },
+          {
+            name: 'model', label: 'Model', type: 'string',
+            optional: false, control_type: 'select',
+            pick_list: :available_embedding_models,
+            extends_schema: true,
+            hint: 'Select the embedding model to use',
+            toggle_hint: 'Select from list',
+            toggle_field: {
+              name: 'model', label: 'Model (custom)', type: 'string',
+              control_type: 'text', toggle_hint: 'Use custom value',
+              hint: 'E.g., publishers/google/models/text-embedding-004'
+            }
+          },
+          {
+            name: 'task_type', label: 'Task type', type: 'string',
+            optional: true, control_type: 'select',
+            pick_list: :embedding_task_list,
+            hint: 'Intended downstream application to help the model produce better embeddings',
+            toggle_hint: 'Select from list',
+            toggle_field: {
+              name: 'task_type', label: 'Task type (custom)', type: 'string',
+              control_type: 'text', toggle_hint: 'Use custom value',
+              hint: 'E.g., RETRIEVAL_DOCUMENT, RETRIEVAL_QUERY, SEMANTIC_SIMILARITY'
+            }
+          }
+        ]
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('payload_for_text_embedding', input)
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-              "/#{input['model']}:predict"
-        # Make the request
-        response = post(url, payload).
-          after_error_response(/.*/) do |code, body, _header, message|
-            call('handle_vertex_error', connection, code, body, message)
-          end
-        # Extract and return the response
-        call('extract_embedding_response', response)
+        call('generate_embeddings_batch_exec', connection, input)
       end,
 
       output_fields: lambda do |object_definitions|
-        object_definitions['generate_embedding_output']
+        [
+          { name: 'batch_id', label: 'Batch ID', type: 'string' },
+          { name: 'embeddings', label: 'Generated embeddings', type: 'array', of: 'object',
+            properties: [
+              { name: 'id', label: 'Text ID', type: 'string' },
+              { name: 'vector', label: 'Embedding vector', type: 'array', of: 'number' },
+              { name: 'dimensions', label: 'Vector dimensions', type: 'integer' },
+              { name: 'metadata', label: 'Original metadata', type: 'object' }
+            ]
+          },
+          { name: 'model_used', label: 'Model used', type: 'string' },
+          { name: 'total_processed', label: 'Total texts processed', type: 'integer' },
+          { name: 'usage_statistics', label: 'Usage statistics', type: 'object',
+            properties: [
+              { name: 'total_requests', type: 'integer' },
+              { name: 'successful_requests', type: 'integer' },
+              { name: 'failed_requests', type: 'integer' },
+              { name: 'total_tokens', type: 'integer' }
+            ]
+          }
+        ]
       end,
 
-      sample_output: lambda do
-        call('sample_record_output', 'text_embedding')
+      sample_output: lambda do |_connection, input|
+        {
+          'batch_id' => input['batch_id'] || 'batch_001',
+          'embeddings' => [
+            {
+              'id' => 'text_1',
+              'vector' => Array.new(768) { rand(-1.0..1.0).round(6) },
+              'dimensions' => 768,
+              'metadata' => { 'source' => 'sample' }
+            }
+          ],
+          'model_used' => input['model'] || 'publishers/google/models/text-embedding-004',
+          'total_processed' => 1,
+          'usage_statistics' => {
+            'total_requests' => 1,
+            'successful_requests' => 1,
+            'failed_requests' => 0,
+            'total_tokens' => 15
+          }
+        }
       end
     },
     find_neighbors: {
@@ -1653,8 +1835,56 @@
                     "If you don't understand the question or the answer isn't in the " \
                     'information to analyze, input the value as null for "response". ' \
                     'Only return a JSON object.'
-      
+
       call('build_base_payload', instruction, user_prompt, input['safetySettings'])
+    end,
+
+    payload_for_ai_classify: lambda do |connection, input|
+      # Extract categories and options
+      categories = Array(input['categories'] || [])
+      options = input['options'] || {}
+      temperature = (options['temperature'] || 0.1).to_f
+
+      # Build categories text with descriptions
+      categories_text = categories.map do |cat|
+        key = cat['key'].to_s
+        desc = cat['description'].to_s
+        desc.empty? ? key : "#{key}: #{desc}"
+      end.join("\n")
+
+      # Build instruction for AI classification
+      instruction = 'You are an expert text classifier. Classify the provided text into one of the given categories. ' \
+                    'Analyze the text carefully and select the most appropriate category. ' \
+                    'Return confidence scores and alternative classifications if requested. ' \
+                    'The categories and text are delimited by triple backticks.'
+
+      # Build the classification prompt
+      user_prompt = "Categories:\n```#{categories_text}```\n" \
+                    "Text to classify:\n```#{call('replace_backticks_with_hash', input['text']&.strip)}```\n\n"
+
+      # Add output format instructions
+      if options['return_confidence'] && options['return_alternatives']
+        user_prompt += 'Return a JSON object with: ' \
+                       '{"selected_category": "category_key", ' \
+                       '"confidence": 0.95, ' \
+                       '"alternatives": [{"category": "other_key", "confidence": 0.05}]}. ' \
+                       'Confidence scores should be between 0.0 and 1.0. ' \
+                       'Only respond with the JSON object.'
+      elsif options['return_confidence']
+        user_prompt += 'Return a JSON object with: ' \
+                       '{"selected_category": "category_key", "confidence": 0.95}. ' \
+                       'Confidence should be between 0.0 and 1.0. ' \
+                       'Only respond with the JSON object.'
+      else
+        user_prompt += 'Return a JSON object with: {"selected_category": "category_key"}. ' \
+                       'Only respond with the JSON object.'
+      end
+
+      # Build payload with temperature setting
+      payload = call('build_base_payload', instruction, user_prompt, input['safetySettings'])
+      payload['generationConfig'] ||= {}
+      payload['generationConfig']['temperature'] = temperature
+      payload
     end,
     payload_for_analyze_image: lambda do |input|
       # We can't use the base builder since we have to pass image data in parts
@@ -1690,6 +1920,92 @@
             'content' => input['text']
           }.compact
         ]
+      }
+    end,
+
+    generate_embeddings_batch_exec: lambda do |connection, input|
+      # Validate model
+      call('validate_publisher_model!', connection, input['model'])
+
+      # Extract inputs
+      batch_id = input['batch_id'].to_s
+      texts = Array(input['texts'] || [])
+      model = input['model']
+      task_type = input['task_type']
+
+      # Initialize statistics
+      total_requests = 0
+      successful_requests = 0
+      failed_requests = 0
+      total_tokens = 0
+      embeddings = []
+
+      # Process each text individually
+      texts.each do |text_obj|
+        begin
+          total_requests += 1
+
+          # Build individual payload
+          payload = {
+            'instances' => [
+              {
+                'task_type' => task_type.presence,
+                'content' => text_obj['content'].to_s
+              }.compact
+            ]
+          }
+
+          # Build the url
+          url = "projects/#{connection['project']}/locations/#{connection['region']}" \
+                "/#{model}:predict"
+
+          # Make the request
+          response = post(url, payload).
+            after_error_response(/.*/) do |code, body, _header, message|
+              call('handle_vertex_error', connection, code, body, message)
+            end
+
+          # Extract embedding from response
+          vals = response&.dig('predictions', 0, 'embeddings', 'values') ||
+                 response&.dig('predictions', 0, 'embeddings')&.first&.dig('values') ||
+                 []
+
+          # Add to results
+          embeddings << {
+            'id' => text_obj['id'],
+            'vector' => vals,
+            'dimensions' => vals.length,
+            'metadata' => text_obj['metadata'] || {}
+          }
+
+          successful_requests += 1
+          # Estimate tokens (rough approximation: ~4 characters per token)
+          total_tokens += (text_obj['content'].to_s.length / 4.0).ceil
+
+        rescue => e
+          failed_requests += 1
+          # Add failed embedding with empty vector
+          embeddings << {
+            'id' => text_obj['id'],
+            'vector' => [],
+            'dimensions' => 0,
+            'metadata' => (text_obj['metadata'] || {}).merge('error' => e.message)
+          }
+        end
+      end
+
+      # Return batch results
+      {
+        'batch_id' => batch_id,
+        'embeddings' => embeddings,
+        'model_used' => model,
+        'total_processed' => texts.length,
+        'usage_statistics' => {
+          'total_requests' => total_requests,
+          'successful_requests' => successful_requests,
+          'failed_requests' => failed_requests,
+          'total_tokens' => total_tokens
+        }
       }
     end,
     payload_for_find_neighbors: lambda do |input|
@@ -1829,6 +2145,47 @@
             resp&.dig('predictions', 0, 'embeddings')&.first&.dig('values') ||
             []
       { 'embedding' => vals.map { |v| { 'value' => v } } }
+    end,
+
+    extract_ai_classify_response: lambda do |resp, input|
+      call('check_finish_reason', resp.dig('candidates', 0, 'finishReason'))
+      ratings = call('get_safety_ratings', resp.dig('candidates', 0, 'safetyRatings'))
+      return({ 'selected_category' => 'N/A', 'confidence' => 0.0, 'safety_ratings' => {} }) if ratings.blank?
+
+      json = call('extract_json', resp)
+      options = input['options'] || {}
+
+      # Extract the basic classification result
+      selected_category = json&.[]('selected_category') || 'N/A'
+      confidence = json&.[]('confidence')&.to_f || 1.0
+      alternatives = json&.[]('alternatives') || []
+
+      # Build the response based on options
+      result = {
+        'selected_category' => selected_category,
+        'safety_ratings' => ratings
+      }
+
+      # Add confidence if requested
+      if options['return_confidence'] != false
+        result['confidence'] = confidence
+      end
+
+      # Add alternatives if requested
+      if options['return_alternatives'] != false
+        result['alternatives'] = alternatives
+      end
+
+      # Add usage metrics
+      if resp['usageMetadata']
+        result['usage_metrics'] = {
+          'prompt_token_count' => resp['usageMetadata']['promptTokenCount'],
+          'candidates_token_count' => resp['usageMetadata']['candidatesTokenCount'],
+          'total_token_count' => resp['usageMetadata']['totalTokenCount']
+        }
+      end
+
+      result
     end,
  
     # ─────────────────────────────────────────────────────────────────────────────
@@ -2461,7 +2818,13 @@
               type: 'object',
               optional: false,
               properties: message_schema,
-              group: 'Message' }
+              group: 'Message' },
+            { name: 'formatted_prompt',
+              label: 'Formatted prompt (RAG_Utils)',
+              type: 'object',
+              optional: true,
+              hint: 'Pre-formatted prompt payload from RAG_Utils. When provided, this will be used directly instead of building from messages.',
+              group: 'Advanced' }
           ].compact
         ).concat(object_definitions['config_schema'])
       end
@@ -2916,77 +3279,6 @@
             label: 'Analysis' }
         ].concat(object_definitions['safety_rating_schema']).
           concat(object_definitions['usage_schema'])
-      end
-    },
-    generate_embedding_input: {
-      fields: lambda do |_connection, _config_fields, _object_definitions|
-        [
-          { name: 'model',
-            optional: false,
-            control_type: 'select',
-            pick_list: :available_embedding_models,
-            extends_schema: true,
-            hint: 'Select the model to use',
-            toggle_hint: 'Select from list',
-            toggle_field: {
-              name: 'model',
-              label: 'Model',
-              type: 'string',
-              control_type: 'text',
-              optional: false,
-              extends_schema: true,
-              toggle_hint: 'Use custom value',
-              hint: 'Provide the model you want to use in this format: ' \
-                    '<b>publishers/{publisher}/models/{model}</b>. ' \
-                    'E.g. publishers/google/models/text-embedding-004'
-            },
-            group: 'Model' },
-          { name: 'text',
-            label: 'Text for embedding generation',
-            control_type: 'text-area',
-            optional: false,
-            hint: 'Input text must not exceed 8192 tokens (approximately 6000 words).',
-            group: 'Text' },
-          { name: 'task_type',
-            sticky: true,
-            extends_schema: true,
-            ngIf: 'input.model != "publishers/google/models/textembedding-gecko@001"',
-            control_type: 'select',
-            pick_list: :embedding_task_list,
-            hint: 'Provide the intended downstream application to help the model produce ' \
-                  'better embeddings. If left blank, defaults to Retrieval query.',
-            toggle_hint: 'Select from list',
-            toggle_field: {
-              name: 'task_type',
-              label: 'Task type',
-              type: 'string',
-              control_type: 'text',
-              optional: true,
-              extends_schema: true,
-              toggle_hint: 'Use custom value',
-              hint: 'Allowed values are: RETRIEVAL_QUERY, RETRIEVAL_DOCUMENT, ' \
-                    'SEMANTIC_SIMILARITY, CLASSIFICATION, CLUSTERING, ' \
-                    'QUESTION_ANSWERING or FACT_VERIFICATION.'
-            },
-            group: 'Task options' },
-          { name: 'title',
-            sticky: true,
-            ngIf: 'input.task_type == "RETRIEVAL_DOCUMENT"',
-            hint: 'Used to help the model produce better embeddings.',
-            group: 'Task options' }
-        ]
-      end
-    },
-    generate_embedding_output: {
-      fields: lambda do |_connection, _config_fields, _object_definitions|
-        [
-          { name: 'embedding',
-            type: 'array',
-            of: 'object',
-            properties: [
-              { name: 'value', type: 'number' }
-            ] }
-        ]
       end
     },
     find_neighbors_input: {
