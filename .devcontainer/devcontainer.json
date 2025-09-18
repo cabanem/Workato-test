@@ -10,7 +10,7 @@
     "source=${localWorkspaceFolderBasename}-bashhistory,target=/commandhistory,type=volume"
   ],
   "onCreateCommand": "sudo apt-get update && sudo apt-get install -y build-essential libicu-dev libmagic-dev cmake pkg-config libssl-dev && git config --global --add safe.directory ${containerWorkspaceFolder}",
-  "postCreateCommand": "bash -c 'gem install bundler workato-connector-sdk && if [ -f Gemfile ]; then bundle install || echo \"Bundle install failed, but workato-connector-sdk is installed\"; fi'",
+  "postCreateCommand": "bash -c 'gem install bundler workato-connector-sdk && echo \"alias wtest=\\\"make test CONNECTOR=\\\"\" >> ~/.bashrc && echo \"alias wconsole=\\\"make console CONNECTOR=\\\"\" >> ~/.bashrc && echo \"alias wcheck=\\\"workato exec check connectors/\\\"\" >> ~/.bashrc && source ~/.bashrc'",
   "customizations": {
     "vscode": {
       "extensions": ["anthropic.claude-code", "github.copilot", "shopify.ruby-lsp"],

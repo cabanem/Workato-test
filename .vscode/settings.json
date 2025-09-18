@@ -1,5 +1,18 @@
 {
   "terminal.integrated.defaultProfile.linux": "bash",
   "editor.formatOnSave": false,
-  "ruby.lint": { "rubocop": false }
+  "ruby.lint": { "rubocop": false },
+  "files.associations": {
+    "*.rb": "ruby",
+    "connectors/*.rb": "ruby"
+  },
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#4a90e2",
+    "titleBar.activeForeground": "#ffffff"
+  },
+  "terminal.integrated.env.linux": {
+    "CONNECTOR_PATH": "${workspaceFolder}/connectors",
+    "DEFAULT_CONNECTOR": "rag_utils"
+  },
+  "task.autoDetect": "on"
 }

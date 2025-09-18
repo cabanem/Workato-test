@@ -1,0 +1,31 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Test RAG Utils",
+      "type": "shell",
+      "command": "make test CONNECTOR=rag_utils",
+      "group": "test"
+    },
+    {
+      "label": "Test Vertex AI",
+      "type": "shell", 
+      "command": "make test CONNECTOR=vertex_ai",
+      "group": "test"
+    },
+    {
+      "label": "Validate Contracts",
+      "type": "shell",
+      "command": "ruby scripts/validate_contract.rb ${input:contractType}",
+      "group": "test"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "contractType",
+      "type": "pickString",
+      "description": "Contract to validate",
+      "options": ["cleaned_text", "embedding_request", "classification_request"]
+    }
+  ]
+}
