@@ -381,3 +381,219 @@ Vertex AI:
 - Update ai_classify help text with integration example
 - Clean up any Data Tables references in help text
 ```
+
+# Additional
+
+## 1-a. Add upsert vectors action to the Vertex AI Connector
+Location: Vertex AI connector (found at connectors/vertex/v2.0_proposed.rb))
+Prompt:
+```
+Add a new action called 'upsert_index_datapoints' to the Vertex AI connector (connectors/vertex/v2.0_proposed.rb) with the following requirements:
+INPUT FIELDS:
+- index_id (required): The Vector Search index resource ID
+- datapoints (array, required): Array of objects containing:
+  - datapoint_id: Unique identifier for the vector
+  - feature_vector: Array of floats (the embedding)
+  - restricts (optional): Array of namespace/allowList/denyList filters
+  - crowding_tag (optional): For result diversity
+- update_mask (optional): Fields to update for existing datapoints
+
+IMPLEMENTATION:
+- Use the Vertex AI REST API endpoint: POST /v1/projects/{project}/locations/{region}/indexes/{index_id}:upsertDatapoints
+- Handle batch processing (API limit is typically 100 datapoints per request)
+- Return: successfully_upserted_count, failed_datapoints array with error details
+
+COMPATIBILITY:
+- Accept output from RAG_Utils 'adapt_chunks_for_vertex' action
+- Support both create and update operations in single call
+```
+
+1-b. Implement index update api calls
+- Location: Vertex AI Connector (connectors/vertex/v2.0_proposed.rb)
+- Task for developer:
+```
+Extend the Vertex AI connector methods section with proper index management:
+
+REQUIRED METHODS:
+1. 'batch_upsert_datapoints': 
+   - Chunks datapoints into batches of 100
+   - Makes sequential API calls to avoid rate limits
+   - Implements exponential backoff for retries
+   - Tracks success/failure per batch
+
+2. 'validate_index_access':
+   - Verifies service account has aiplatform.indexes.update permission
+   - Checks index exists and is in DEPLOYED state
+   - Returns index metadata including dimensions for validation
+
+ERROR HANDLING:
+- Dimension mismatch between vectors and index
+- Index not found or not deployed
+- Permission denied (missing IAM roles)
+- Rate limiting (implement backoff)
+
+RESPONSE FORMAT:
+{
+  "total_processed": 250,
+  "successful_upserts": 248,
+  "failed_upserts": 2,
+  "error_details": [...],
+  "index_stats": {
+    "total_datapoints": 15420,
+    "index_id": "...",
+    "deployed_state": "DEPLOYED"
+  }
+}
+```
+
+Task 3a: Ensure Recipe-Accessible Outputs
+Location: Vertex AI Connector (connectors/vertex/v2.0_proposed.rb)
+
+```
+Review and modify all connector outputs to ensure Workato recipe compatibility:
+
+REQUIREMENTS FOR ALL ACTIONS:
+1. Flatten nested objects where possible (Workato struggles with deep nesting)
+2. Ensure all array outputs include a 'count' field at the root level
+3. Add 'summary' objects for complex responses
+
+SPECIFIC CHANGES:
+
+For 'generate_embeddings_batch':
+- Add root level: 'first_embedding' object for easy access
+- Add: 'embeddings_json' field with stringified array for bulk operations
+
+For 'find_neighbors':
+- Flatten to: 'top_matches' array at root level
+- Add: 'best_match_id' and 'best_match_score' at root
+
+For 'ai_classify':
+- Ensure 'selected_category' is always a string (never null)
+- Add: 'requires_human_review' boolean based on confidence
+
+For all validation/scoring actions:
+- Add 'pass_fail' boolean at root level
+- Add 'action_required' field with specific next step
+
+RECIPE INTEGRATION HELPERS:
+- All ID fields should be strings (not integers)
+- All timestamps in ISO 8601 format
+- All numeric scores normalized to 0-1 range
+- Empty arrays should return [] not null
+```
+
+Task 3b: Ensure Recipe-Accessible Outputs
+Location: RAG Utils Connector (connectors/rag_utils/v2.0_proposed.rb)
+
+```
+Review and modify all connector outputs to ensure Workato recipe compatibility:
+
+REQUIREMENTS FOR ALL ACTIONS:
+1. Flatten nested objects where possible (Workato struggles with deep nesting)
+2. Ensure all array outputs include a 'count' field at the root level
+3. Add 'summary' objects for complex responses
+
+SPECIFIC CHANGES:
+
+For 'generate_embeddings_batch':
+- Add root level: 'first_embedding' object for easy access
+- Add: 'embeddings_json' field with stringified array for bulk operations
+
+For 'find_neighbors':
+- Flatten to: 'top_matches' array at root level
+- Add: 'best_match_id' and 'best_match_score' at root
+
+For 'ai_classify':
+- Ensure 'selected_category' is always a string (never null)
+- Add: 'requires_human_review' boolean based on confidence
+
+For all validation/scoring actions:
+- Add 'pass_fail' boolean at root level
+- Add 'action_required' field with specific next step
+
+RECIPE INTEGRATION HELPERS:
+- All ID fields should be strings (not integers)
+- All timestamps in ISO 8601 format
+- All numeric scores normalized to 0-1 range
+- Empty arrays should return [] not null
+```
+
+Task 4a: Create Test Data Structure
+Define test scenarios to validate the complete chain works:
+
+TEST CASE 1 - Vector Upsert:
+Input: 
+{
+  "texts": ["Example customer query about return policy"],
+  "metadata": {"source": "email", "timestamp": "2024-01-15"}
+}
+Expected flow:
+RAG_Utils.prepare_for_ai → clean text
+Vertex.generate_embedding_single → vector
+Vertex.upsert_index_datapoints → success
+
+TEST CASE 2 - Query Flow:
+Input: "What is your return policy?"
+Expected flow:
+Vertex.generate_embedding_single(RETRIEVAL_QUERY) → query_vector
+Vertex.find_neighbors → document_ids
+[Future: retrieve_documents] → context
+RAG_Utils.build_rag_prompt → formatted_prompt
+
+VALIDATION POINTS:
+- Vector dimensions match index configuration
+- Metadata preserved through pipeline
+- IDs remain consistent
+- Response formats are recipe-compatible
+
+---
+
+Task 5
+   - Location: Vertex AI Connector (connectors/vertex/v2.0_proposed.rb)
+   - Request for developer
+```
+Add comprehensive rate limiting to the Vertex AI connector to prevent 429 errors. Requirements:
+
+1. Add a new method 'enforce_vertex_rate_limits' that implements:
+   - Sliding window tracking (last 60 seconds)
+   - Model-specific limits:
+     * Gemini Pro: 300 QPM
+     * Gemini Flash: 600 QPM  
+     * Embedding models: 600 QPM
+   - Per-project tracking (support multiple projects)
+
+2. Implementation approach:
+   - Store request timestamps in Workato cache with TTL
+   - Key format: "vertex_rate_{project}_{model_family}_{timestamp}"
+   - Before each API call:
+     * Count requests in last 60 seconds
+     * If at limit, calculate sleep time
+     * Add jitter (0-1 second) to prevent thundering herd
+
+3. Add to connection fields:
+   {
+     name: "enable_rate_limiting",
+     type: "boolean", 
+     control_type: "checkbox",
+     default: true,
+     hint: "Automatically throttle requests to stay within Vertex AI quotas"
+   }
+
+4. Modify these methods to call enforce_vertex_rate_limits:
+   - generate_embeddings_batch_exec
+   - generate_embedding_single_exec  
+   - All send_messages/analyze/classify actions
+
+5. Add monitoring output to all actions:
+   - rate_limit_status: {
+       requests_last_minute: integer,
+       limit: integer,
+       throttled: boolean,
+       sleep_ms: integer
+     }
+
+6. Fallback strategy:
+   - On 429 response, extract Retry-After header
+   - Implement exponential backoff: 1s, 2s, 4s, 8s
+   - After 3 retries, fail gracefully with clear error message
+```

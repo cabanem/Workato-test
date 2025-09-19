@@ -96,8 +96,12 @@
       },
       { # - validate_model_on_run
         name: 'validate_model_on_run', label: 'Validate model before run', group: 'Model discovery and validation',
-        type: 'boolean', control_type: 'checkbox', optional: true, sticky: true, 
-        hint: 'Pre-flight check the chosen model and your project access before sending the request. Recommended.' }
+        type: 'boolean', control_type: 'checkbox', optional: true, sticky: true,
+        hint: 'Pre-flight check the chosen model and your project access before sending the request. Recommended.' },
+      { # - enable_rate_limiting
+        name: 'enable_rate_limiting', label: 'Enable rate limiting', group: 'Model discovery and validation',
+        type: 'boolean', control_type: 'checkbox', optional: true, default: true,
+        hint: 'Automatically throttle requests to stay within Vertex AI quotas' }
 
     ],
     authorization: {
@@ -274,11 +278,21 @@
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
-        # Make the request
-        post(url, payload).
-          after_error_response(/.*/) do |code, body, _header, message|
-            call('handle_vertex_error', connection, code, body, message)
+
+        # Apply rate limiting
+        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
+
+        # Make the request with 429 fallback
+        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
+          post(url, payload).
+            after_error_response(/.*/) do |code, body, _header, message|
+              call('handle_vertex_error', connection, code, body, message)
+            end
         end
+
+        # Add rate limit info to response
+        response['rate_limit_status'] = rate_limit_info
+        response
       end,
 
       output_fields: lambda do |object_definitions|
@@ -312,11 +326,17 @@
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
-        # Make the request
-        response = post(url, payload).
-          after_error_response(/.*/) do |code, body, _header, message|
-            call('handle_vertex_error', connection, code, body, message)
-          end
+
+        # Apply rate limiting
+        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
+
+        # Make the request with 429 fallback
+        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
+          post(url, payload).
+            after_error_response(/.*/) do |code, body, _header, message|
+              call('handle_vertex_error', connection, code, body, message)
+            end
+        end
         # Extract and return the response
         call('extract_generic_response', response, true)
       end,
@@ -350,11 +370,17 @@
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
-        # Make the request
-        response = post(url, payload).
-                  after_error_response(/.*/) do |code, body, _header, message|
-                    call('handle_vertex_error', connection, code, body, message)
-                  end
+
+        # Apply rate limiting
+        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
+
+        # Make the request with 429 fallback
+        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
+          post(url, payload).
+            after_error_response(/.*/) do |code, body, _header, message|
+              call('handle_vertex_error', connection, code, body, message)
+            end
+        end
         # Extract and return the response
         call('extract_generic_response', response, false)
       end,
@@ -390,11 +416,17 @@
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
                         "/#{input['model']}:generateContent"
-        # Make the request
-        response = post(url, payload).
-                  after_error_response(/.*/) do |code, body, _header, message|
-                    call('handle_vertex_error', connection, code, body, message)
-                  end
+
+        # Apply rate limiting
+        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
+
+        # Make the request with 429 fallback
+        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
+          post(url, payload).
+            after_error_response(/.*/) do |code, body, _header, message|
+              call('handle_vertex_error', connection, code, body, message)
+            end
+        end
         # Extract and return the response
         call('extract_parsed_response', response)
       end,
@@ -433,10 +465,17 @@
         # Build the url
         url ="projects/#{connection['project']}/locations/#{connection['region']}" \
                         "/#{input['model']}:generateContent"
-        response = post(url, payload).
-                  after_error_response(/.*/) do |code, body, _header, message|
-                    call('handle_vertex_error', connection, code, body, message)
-                  end
+
+        # Apply rate limiting
+        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
+
+        # Make the request with 429 fallback
+        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
+          post(url, payload).
+            after_error_response(/.*/) do |code, body, _header, message|
+              call('handle_vertex_error', connection, code, body, message)
+            end
+        end
         # Extract and return the response
         call('extract_generated_email_response', response)
       end,
@@ -545,10 +584,16 @@
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
                         "/#{input['model']}:generateContent"
 
-        response = post(url, payload).
-                  after_error_response(/.*/) do |code, body, _header, message|
-                    call('handle_vertex_error', connection, code, body, message)
-                  end
+        # Apply rate limiting
+        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
+
+        # Make the request with 429 fallback
+        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
+          post(url, payload).
+            after_error_response(/.*/) do |code, body, _header, message|
+              call('handle_vertex_error', connection, code, body, message)
+            end
+        end
 
         # Extract and return the response
         call('extract_ai_classify_response', response, input)
@@ -579,11 +624,17 @@
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
-        # Make the request
-        response = post(url, payload).
-                  after_error_response(/.*/) do |code, body, _header, message|
-                    call('handle_vertex_error', connection, code, body, message)
-                  end
+
+        # Apply rate limiting
+        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
+
+        # Make the request with 429 fallback
+        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
+          post(url, payload).
+            after_error_response(/.*/) do |code, body, _header, message|
+              call('handle_vertex_error', connection, code, body, message)
+            end
+        end
         # Extract and return the response
         call('extract_generic_response', response, true)
       end,
@@ -618,11 +669,17 @@
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
-        # Make the request
-        response = post(url, payload).
-                  after_error_response(/.*/) do |code, body, _header, message|
-                    call('handle_vertex_error', connection, code, body, message)
-                  end
+
+        # Apply rate limiting
+        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
+
+        # Make the request with 429 fallback
+        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
+          post(url, payload).
+            after_error_response(/.*/) do |code, body, _header, message|
+              call('handle_vertex_error', connection, code, body, message)
+            end
+        end
         # Extract and return the response
         call('extract_generic_response', response, false)
       end,
@@ -700,6 +757,8 @@
       output_fields: lambda do |object_definitions|
         [
           { name: 'batch_id', label: 'Batch ID', type: 'string' },
+          { name: 'embeddings_count', label: 'Embeddings count', type: 'integer',
+            hint: 'Total number of embeddings generated' },
           { name: 'embeddings', label: 'Generated embeddings', type: 'array', of: 'object',
             properties: [
               { name: 'id', label: 'Text ID', type: 'string' },
@@ -708,41 +767,177 @@
               { name: 'metadata', label: 'Original metadata', type: 'object' }
             ]
           },
+          { name: 'first_embedding', label: 'First embedding (quick access)', type: 'object',
+            properties: [
+              { name: 'id', label: 'Text ID', type: 'string' },
+              { name: 'vector', label: 'Embedding vector', type: 'array', of: 'number' },
+              { name: 'dimensions', label: 'Vector dimensions', type: 'integer' }
+            ],
+            hint: 'First embedding for quick recipe access'
+          },
+          { name: 'embeddings_json', label: 'Embeddings as JSON string', type: 'string',
+            hint: 'All embeddings serialized as JSON for bulk operations' },
           { name: 'model_used', label: 'Model used', type: 'string' },
           { name: 'total_processed', label: 'Total texts processed', type: 'integer' },
-          { name: 'usage_statistics', label: 'Usage statistics', type: 'object',
-            properties: [
-              { name: 'total_requests', type: 'integer' },
-              { name: 'successful_requests', type: 'integer' },
-              { name: 'failed_requests', type: 'integer' },
-              { name: 'total_tokens', type: 'integer' }
-            ]
+          { name: 'successful_requests', label: 'Successful requests', type: 'integer' },
+          { name: 'failed_requests', label: 'Failed requests', type: 'integer' },
+          { name: 'total_tokens', label: 'Total tokens', type: 'integer' },
+          { name: 'batches_processed', label: 'Batches processed', type: 'integer',
+            hint: 'Number of API calls made (including retries and fallbacks)' },
+          { name: 'api_calls_saved', label: 'API calls saved', type: 'integer',
+            hint: 'Number of API calls saved through batching' },
+          { name: 'estimated_cost_savings', label: 'Estimated cost savings', type: 'number',
+            hint: 'Estimated cost savings in USD from batching' },
+          { name: 'pass_fail', label: 'Batch success', type: 'boolean',
+            hint: 'True if all embeddings were generated successfully' },
+          { name: 'action_required', label: 'Action required', type: 'string',
+            hint: 'Next recommended action based on results' }
+        ]
+      end,
+
+      sample_output: lambda do |_connection, input|
+        sample_embedding = {
+          'id' => 'text_1',
+          'vector' => Array.new(768) { rand(-1.0..1.0).round(6) },
+          'dimensions' => 768,
+          'metadata' => { 'source' => 'sample' }
+        }
+        {
+          'batch_id' => input['batch_id'] || 'batch_001',
+          'embeddings_count' => 1,
+          'embeddings' => [sample_embedding],
+          'first_embedding' => {
+            'id' => sample_embedding['id'],
+            'vector' => sample_embedding['vector'],
+            'dimensions' => sample_embedding['dimensions']
+          },
+          'embeddings_json' => [sample_embedding].to_json,
+          'model_used' => input['model'] || 'publishers/google/models/text-embedding-004',
+          'total_processed' => 1,
+          'successful_requests' => 1,
+          'failed_requests' => 0,
+          'total_tokens' => 15,
+          'batches_processed' => 1,
+          'api_calls_saved' => 0,
+          'estimated_cost_savings' => 0.0,
+          'pass_fail' => true,
+          'action_required' => 'ready_for_indexing'
+        }
+      end
+    },
+
+    generate_embedding_single: {
+      title: 'Generate single text embedding',
+      subtitle: 'Generate embedding for a single text input',
+      description: "Generate text <span class='provider'>embedding</span> for a single text using " \
+                   "Google models in <span class='provider'>Google Vertex AI</span>",
+      help: {
+        body: 'Generate a numerical vector for a single text input. This is optimized for RAG query flows ' \
+              'where you need to embed a single user query to find similar documents. The vector captures ' \
+              'the semantic meaning of the text and can be used for similarity search, retrieval, and ' \
+              'other natural language processing tasks.'
+      },
+
+      input_fields: lambda do |object_definitions|
+        [
+          {
+            name: 'text',
+            label: 'Text',
+            type: 'string',
+            optional: false,
+            hint: 'Single text string to embed. Must not exceed 8192 tokens (approximately 6000 words).'
+          },
+          {
+            name: 'model',
+            label: 'Model',
+            type: 'string',
+            optional: false,
+            control_type: 'select',
+            pick_list: :available_embedding_models,
+            extends_schema: true,
+            hint: 'Select the embedding model to use',
+            toggle_hint: 'Select from list',
+            toggle_field: {
+              name: 'model',
+              label: 'Model (custom)',
+              type: 'string',
+              control_type: 'text',
+              toggle_hint: 'Use custom value',
+              hint: 'E.g., publishers/google/models/text-embedding-004'
+            }
+          },
+          {
+            name: 'task_type',
+            label: 'Task type',
+            type: 'string',
+            optional: true,
+            control_type: 'select',
+            pick_list: :embedding_task_list,
+            hint: 'Intended downstream application to help the model produce better embeddings',
+            toggle_hint: 'Select from list',
+            toggle_field: {
+              name: 'task_type',
+              label: 'Task type (custom)',
+              type: 'string',
+              control_type: 'text',
+              toggle_hint: 'Use custom value',
+              hint: 'E.g., RETRIEVAL_QUERY, RETRIEVAL_DOCUMENT, SEMANTIC_SIMILARITY'
+            }
+          },
+          {
+            name: 'title',
+            label: 'Title',
+            type: 'string',
+            optional: true,
+            hint: 'Document title to prepend to text content for better embedding quality'
+          }
+        ]
+      end,
+
+      execute: lambda do |connection, input, _eis, _eos|
+        call('generate_embedding_single_exec', connection, input)
+      end,
+
+      output_fields: lambda do |object_definitions|
+        [
+          {
+            name: 'vector',
+            label: 'Embedding vector',
+            type: 'array',
+            of: 'number',
+            hint: 'Array of float values representing the text embedding'
+          },
+          {
+            name: 'dimensions',
+            label: 'Vector dimensions',
+            type: 'integer',
+            hint: 'Number of dimensions in the vector'
+          },
+          {
+            name: 'model_used',
+            label: 'Model used',
+            type: 'string',
+            hint: 'The embedding model that was used'
+          },
+          {
+            name: 'token_count',
+            label: 'Token count',
+            type: 'integer',
+            hint: 'Estimated number of tokens processed'
           }
         ]
       end,
 
       sample_output: lambda do |_connection, input|
         {
-          'batch_id' => input['batch_id'] || 'batch_001',
-          'embeddings' => [
-            {
-              'id' => 'text_1',
-              'vector' => Array.new(768) { rand(-1.0..1.0).round(6) },
-              'dimensions' => 768,
-              'metadata' => { 'source' => 'sample' }
-            }
-          ],
+          'vector' => Array.new(768) { rand(-1.0..1.0).round(6) },
+          'dimensions' => 768,
           'model_used' => input['model'] || 'publishers/google/models/text-embedding-004',
-          'total_processed' => 1,
-          'usage_statistics' => {
-            'total_requests' => 1,
-            'successful_requests' => 1,
-            'failed_requests' => 0,
-            'total_tokens' => 15
-          }
+          'token_count' => 15
         }
       end
     },
+
     find_neighbors: {
       title: 'Find neighbors (Vector Search)',
       subtitle: 'K-NN query on a deployed Vertex AI index endpoint',
@@ -793,7 +988,7 @@
         url = "https://#{host}/#{version}/projects/#{project}/locations/#{region}/" \
               "indexEndpoints/#{endpoint_id}:findNeighbors"
         # Make the request
-        post(url, payload).
+        response = post(url, payload).
           after_error_response(/404/) do |code, body, _headers, message|
             # Use a custom message for 404s since they're often configuration errors
             error("Index endpoint not found. Please verify:\n" \
@@ -805,6 +1000,9 @@
             # Use the centralized handler for all other errors
             call('handle_vertex_error', connection, code, body, message)
           end
+
+        # Transform to recipe-friendly structure
+        call('transform_find_neighbors_response', response)
       end,
 
       output_fields: lambda do |object_definitions|
@@ -842,6 +1040,236 @@
         }
       end
     },
+
+    upsert_index_datapoints: {
+      title: 'Upsert index datapoints',
+      subtitle: 'Add or update vector datapoints in Vertex AI Vector Search index',
+      description: 'Upsert vector datapoints to <span class="provider">Vertex AI Vector Search</span> index',
+
+      help: lambda do
+        {
+          body: 'Insert or update vector datapoints in a Vertex AI Vector Search index. ' \
+                'This action handles batch processing and can process up to 100 datapoints per request. ' \
+                'It accepts output from RAG_Utils adapt_chunks_for_vertex action and supports both ' \
+                'create and update operations in a single call.',
+          learn_more_url: 'https://cloud.google.com/vertex-ai/docs/vector-search/update-rebuild-index',
+          learn_more_text: 'Learn more about Vector Search'
+        }
+      end,
+
+      input_fields: lambda do |object_definitions|
+        [
+          {
+            name: 'index_id',
+            label: 'Index ID',
+            type: 'string',
+            optional: false,
+            hint: 'The Vector Search index resource ID (e.g., "projects/PROJECT/locations/REGION/indexes/INDEX_ID")'
+          },
+          {
+            name: 'datapoints',
+            label: 'Datapoints',
+            type: 'array',
+            of: 'object',
+            optional: false,
+            properties: [
+              {
+                name: 'datapoint_id',
+                label: 'Datapoint ID',
+                type: 'string',
+                optional: false,
+                hint: 'Unique identifier for the vector datapoint'
+              },
+              {
+                name: 'feature_vector',
+                label: 'Feature vector',
+                type: 'array',
+                of: 'number',
+                optional: false,
+                hint: 'Array of floats representing the embedding vector'
+              },
+              {
+                name: 'restricts',
+                label: 'Restricts',
+                type: 'array',
+                of: 'object',
+                optional: true,
+                properties: [
+                  {
+                    name: 'namespace',
+                    label: 'Namespace',
+                    type: 'string',
+                    optional: false
+                  },
+                  {
+                    name: 'allowList',
+                    label: 'Allow list',
+                    type: 'array',
+                    of: 'string',
+                    optional: true
+                  },
+                  {
+                    name: 'denyList',
+                    label: 'Deny list',
+                    type: 'array',
+                    of: 'string',
+                    optional: true
+                  }
+                ],
+                hint: 'Array of namespace/allowList/denyList filters for the datapoint'
+              },
+              {
+                name: 'crowding_tag',
+                label: 'Crowding tag',
+                type: 'string',
+                optional: true,
+                hint: 'Tag used for result diversity in searches'
+              }
+            ],
+            hint: 'Array of vector datapoints to upsert. Maximum 100 datapoints per request.'
+          },
+          {
+            name: 'update_mask',
+            label: 'Update mask',
+            type: 'string',
+            optional: true,
+            hint: 'Comma-separated list of fields to update for existing datapoints (e.g., "featureVector,restricts")'
+          }
+        ]
+      end,
+
+      execute: lambda do |connection, input|
+        index_id = input['index_id']
+        datapoints = input['datapoints'] || []
+        update_mask = input['update_mask']
+
+        # Use the enhanced batch upsert method
+        results = call('batch_upsert_datapoints', connection, index_id, datapoints, update_mask)
+
+        # Transform the enhanced response format to match the action's expected output
+        {
+          'successfully_upserted_count' => results['successful_upserts'],
+          'failed_datapoints' => results['error_details'].map do |error|
+            {
+              'datapoint_id' => error['datapoint_id'],
+              'error' => error['error']
+            }
+          end,
+          'total_processed' => results['total_processed'],
+          'failed_upserts' => results['failed_upserts'],
+          'index_stats' => results['index_stats']
+        }
+      end,
+
+      output_fields: lambda do |object_definitions|
+        [
+          {
+            name: 'successfully_upserted_count',
+            label: 'Successfully upserted count',
+            type: 'integer',
+            hint: 'Number of datapoints successfully upserted'
+          },
+          {
+            name: 'total_processed',
+            label: 'Total processed',
+            type: 'integer',
+            hint: 'Total number of datapoints processed'
+          },
+          {
+            name: 'failed_upserts',
+            label: 'Failed upserts',
+            type: 'integer',
+            hint: 'Number of datapoints that failed to upsert'
+          },
+          {
+            name: 'failed_datapoints',
+            label: 'Failed datapoints',
+            type: 'array',
+            of: 'object',
+            properties: [
+              {
+                name: 'datapoint_id',
+                label: 'Datapoint ID',
+                type: 'string'
+              },
+              {
+                name: 'error',
+                label: 'Error message',
+                type: 'string'
+              }
+            ],
+            hint: 'Array of datapoints that failed to upsert with error details'
+          },
+          {
+            name: 'index_stats',
+            label: 'Index statistics',
+            type: 'object',
+            properties: [
+              {
+                name: 'index_id',
+                label: 'Index ID',
+                type: 'string'
+              },
+              {
+                name: 'deployed_state',
+                label: 'Deployed state',
+                type: 'string'
+              },
+              {
+                name: 'total_datapoints',
+                label: 'Total datapoints',
+                type: 'integer'
+              },
+              {
+                name: 'dimensions',
+                label: 'Vector dimensions',
+                type: 'integer'
+              },
+              {
+                name: 'display_name',
+                label: 'Display name',
+                type: 'string'
+              },
+              {
+                name: 'created_time',
+                label: 'Created time',
+                type: 'string'
+              },
+              {
+                name: 'updated_time',
+                label: 'Updated time',
+                type: 'string'
+              }
+            ],
+            hint: 'Index metadata and statistics'
+          }
+        ]
+      end,
+
+      sample_output: lambda do |connection|
+        {
+          'successfully_upserted_count' => 248,
+          'total_processed' => 250,
+          'failed_upserts' => 2,
+          'failed_datapoints' => [
+            {
+              'datapoint_id' => 'doc_123',
+              'error' => 'Vector dimension mismatch'
+            }
+          ],
+          'index_stats' => {
+            'index_id' => 'projects/my-project/locations/us-central1/indexes/my-index',
+            'deployed_state' => 'DEPLOYED',
+            'total_datapoints' => 15420,
+            'dimensions' => 768,
+            'display_name' => 'My Vector Index',
+            'created_time' => '2024-01-01T00:00:00Z',
+            'updated_time' => '2024-01-15T12:30:00Z'
+          }
+        }
+      end
+    },
+
     # --- Legacy Text Bison action kept for backward compatibility ---
     get_prediction: {
       title: 'Get prediction',
@@ -965,6 +1393,133 @@
       when Integer then val != 0
       else
         %w[true 1 yes y t].include?(val.to_s.strip.downcase)
+      end
+    end,
+    # ─────────────────────────────────────────────────────────────────────────────
+    # -- Rate limiting utilities
+    # ─────────────────────────────────────────────────────────────────────────────
+    enforce_vertex_rate_limits: lambda do |connection, model, action_type = 'inference'|
+      # Skip if rate limiting is disabled
+      return { requests_last_minute: 0, limit: 0, throttled: false, sleep_ms: 0 } unless connection['enable_rate_limiting']
+
+      # Determine model family and limits
+      model_family = case model.to_s.downcase
+      when /gemini.*pro/
+        'gemini-pro'
+      when /gemini.*flash/
+        'gemini-flash'
+      when /embedding/
+        'embedding'
+      else
+        'gemini-pro' # default to most restrictive
+      end
+
+      # Model-specific limits (requests per minute)
+      limits = {
+        'gemini-pro' => 300,
+        'gemini-flash' => 600,
+        'embedding' => 600
+      }
+
+      limit = limits[model_family]
+      project = connection['project'] || 'default'
+      current_time = Time.now.to_i
+
+      # Cache key for this project/model combination
+      cache_prefix = "vertex_rate_#{project}_#{model_family}"
+
+      # Get current request count in the last 60 seconds
+      requests_in_window = 0
+      begin
+        # Check last 60 seconds of timestamps
+        60.times do |i|
+          timestamp = current_time - i
+          cache_key = "#{cache_prefix}_#{timestamp}"
+          count = workato.cache.get(cache_key) || 0
+          requests_in_window += count.to_i
+        end
+      rescue => e
+        # If cache fails, allow the request but log warning
+        puts "Rate limit cache read failed: #{e.message}"
+        return { requests_last_minute: 0, limit: limit, throttled: false, sleep_ms: 0 }
+      end
+
+      # Check if we're at the limit
+      if requests_in_window >= limit
+        # Calculate how long to wait
+        # Find the oldest request timestamp to know when window will refresh
+        oldest_valid_timestamp = current_time - 59 # 60 second window
+        sleep_seconds = oldest_valid_timestamp + 60 - current_time
+        sleep_seconds = [sleep_seconds, 1].max # minimum 1 second
+
+        # Add jitter to prevent thundering herd (0-1 second)
+        jitter = rand
+        total_sleep = sleep_seconds + jitter
+        sleep_ms = (total_sleep * 1000).to_i
+
+        puts "Rate limit reached for #{model_family} (#{requests_in_window}/#{limit}). Sleeping #{total_sleep.round(2)}s"
+        sleep(total_sleep)
+
+        return {
+          requests_last_minute: requests_in_window,
+          limit: limit,
+          throttled: true,
+          sleep_ms: sleep_ms
+        }
+      end
+
+      # Record this request
+      begin
+        current_key = "#{cache_prefix}_#{current_time}"
+        current_count = workato.cache.get(current_key) || 0
+        workato.cache.set(current_key, current_count.to_i + 1, 70) # TTL slightly longer than window
+      rescue => e
+        puts "Rate limit cache write failed: #{e.message}"
+      end
+
+      {
+        requests_last_minute: requests_in_window + 1,
+        limit: limit,
+        throttled: false,
+        sleep_ms: 0
+      }
+    end,
+    handle_429_with_backoff: lambda do |connection, action_type, model, &block|
+      max_retries = 3
+      base_delay = 1.0
+
+      max_retries.times do |attempt|
+        begin
+          # Execute the block (API call)
+          return block.call
+        rescue => e
+          # Check if this is a 429 error
+          if e.message.include?('429') || e.message.include?('Rate limit')
+            if attempt < max_retries - 1
+              # Calculate exponential backoff delay
+              delay = base_delay * (2 ** attempt)
+
+              # Try to extract Retry-After header from error if available
+              retry_after = nil
+              if e.respond_to?(:response) && e.response.respond_to?(:headers)
+                retry_after = e.response.headers['Retry-After']&.to_i
+              end
+
+              # Use Retry-After if available, otherwise use exponential backoff
+              actual_delay = retry_after || delay
+
+              puts "429 rate limit hit for #{model} (attempt #{attempt + 1}/#{max_retries}). Retrying in #{actual_delay}s"
+              sleep(actual_delay)
+            else
+              # Max retries exceeded
+              error("Rate limit exceeded for #{model} after #{max_retries} attempts. " \
+                    "Please reduce request frequency or enable automatic rate limiting in connection settings.")
+            end
+          else
+            # Not a rate limit error, re-raise
+            raise e
+          end
+        end
       end
     end,
     # ─────────────────────────────────────────────────────────────────────────────
@@ -1612,80 +2167,283 @@
       task_type = input['task_type']
 
       # Initialize statistics
-      total_requests = 0
+      batches_processed = 0
       successful_requests = 0
       failed_requests = 0
       total_tokens = 0
       embeddings = []
+      batch_size = 25  # Vertex AI's limit for embedding batch requests
+      rate_limit_info = { requests_last_minute: 0, limit: 0, throttled: false, sleep_ms: 0 }
 
-      # Process each text individually
-      texts.each do |text_obj|
-        begin
-          total_requests += 1
+      # Build the URL once
+      url = "projects/#{connection['project']}/locations/#{connection['region']}" \
+            "/#{model}:predict"
 
-          # Build individual payload
-          payload = {
-            'instances' => [
+      # Process texts in batches of 25
+      texts.each_slice(batch_size) do |batch_texts|
+        batch_success = false
+        retry_count = 0
+        max_retries = 1
+
+        while !batch_success && retry_count <= max_retries
+          begin
+            batches_processed += 1
+
+            # Build batch payload with multiple instances
+            instances = batch_texts.map do |text_obj|
               {
                 'task_type' => task_type.presence,
                 'content' => text_obj['content'].to_s
               }.compact
-            ]
-          }
+            end
 
-          # Build the url
-          url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-                "/#{model}:predict"
+            payload = { 'instances' => instances }
 
-          # Make the request
-          response = post(url, payload).
+            # Apply rate limiting
+            rate_limit_info = call('enforce_vertex_rate_limits', connection, model, 'embedding')
+
+            # Make batch API call with 429 fallback
+            response = call('handle_429_with_backoff', connection, 'embedding', model) do
+              post(url, payload).
+                after_error_response(/.*/) do |code, body, _header, message|
+                  call('handle_vertex_error', connection, code, body, message)
+                end
+            end
+
+            # Process batch response - each prediction corresponds to each instance
+            predictions = response['predictions'] || []
+
+            batch_texts.each_with_index do |text_obj, index|
+              prediction = predictions[index]
+
+              if prediction
+                # Extract embedding from prediction
+                vals = prediction&.dig('embeddings', 'values') ||
+                       prediction&.dig('embeddings')&.first&.dig('values') ||
+                       []
+
+                embeddings << {
+                  'id' => text_obj['id'],
+                  'vector' => vals,
+                  'dimensions' => vals.length,
+                  'metadata' => text_obj['metadata'] || {}
+                }
+
+                successful_requests += 1
+                # Estimate tokens (rough approximation: ~4 characters per token)
+                total_tokens += (text_obj['content'].to_s.length / 4.0).ceil
+              else
+                # Missing prediction for this text
+                failed_requests += 1
+                embeddings << {
+                  'id' => text_obj['id'],
+                  'vector' => [],
+                  'dimensions' => 0,
+                  'metadata' => (text_obj['metadata'] || {}).merge('error' => 'Missing prediction in batch response')
+                }
+              end
+            end
+
+            batch_success = true
+
+          rescue
+            retry_count += 1
+
+            if retry_count > max_retries
+              # Fallback: process this batch individually
+              batch_texts.each do |text_obj|
+                begin
+                  batches_processed += 1
+
+                  # Build individual payload
+                  individual_payload = {
+                    'instances' => [
+                      {
+                        'task_type' => task_type.presence,
+                        'content' => text_obj['content'].to_s
+                      }.compact
+                    ]
+                  }
+
+                  # Make individual API call
+                  individual_response = post(url, individual_payload).
+                    after_error_response(/.*/) do |code, body, _header, message|
+                      call('handle_vertex_error', connection, code, body, message)
+                    end
+
+                  # Extract embedding from individual response
+                  vals = individual_response&.dig('predictions', 0, 'embeddings', 'values') ||
+                         individual_response&.dig('predictions', 0, 'embeddings')&.first&.dig('values') ||
+                         []
+
+                  embeddings << {
+                    'id' => text_obj['id'],
+                    'vector' => vals,
+                    'dimensions' => vals.length,
+                    'metadata' => text_obj['metadata'] || {}
+                  }
+
+                  successful_requests += 1
+                  total_tokens += (text_obj['content'].to_s.length / 4.0).ceil
+
+                rescue => individual_error
+                  failed_requests += 1
+                  embeddings << {
+                    'id' => text_obj['id'],
+                    'vector' => [],
+                    'dimensions' => 0,
+                    'metadata' => (text_obj['metadata'] || {}).merge('error' => individual_error.message)
+                  }
+                end
+              end
+
+              batch_success = true
+            end
+          end
+        end
+      end
+
+      # Calculate batch efficiency metrics
+      api_calls_saved = texts.length - batches_processed
+
+      # Estimate cost savings (assuming $0.0001 per API call for embeddings)
+      estimated_cost_savings = api_calls_saved * 0.0001
+
+      # Recipe-friendly output structure
+      first_embedding = embeddings.first || {}
+      all_successful = failed_requests == 0
+
+      {
+        'batch_id' => batch_id,
+        'embeddings_count' => embeddings.length,
+        'embeddings' => embeddings,
+        'first_embedding' => {
+          'id' => first_embedding['id'],
+          'vector' => first_embedding['vector'] || [],
+          'dimensions' => first_embedding['dimensions'] || 0
+        },
+        'embeddings_json' => embeddings.to_json,
+        'model_used' => model,
+        'total_processed' => texts.length,
+        'successful_requests' => successful_requests,
+        'failed_requests' => failed_requests,
+        'total_tokens' => total_tokens,
+        'batches_processed' => batches_processed,
+        'api_calls_saved' => api_calls_saved,
+        'estimated_cost_savings' => estimated_cost_savings.round(4),
+        'pass_fail' => all_successful,
+        'action_required' => all_successful ? 'ready_for_indexing' : 'retry_failed_embeddings',
+        'rate_limit_status' => rate_limit_info
+      }
+    end,
+
+    generate_embedding_single_exec: lambda do |connection, input|
+      # Validate model
+      call('validate_publisher_model!', connection, input['model'])
+
+      # Extract inputs
+      text = input['text'].to_s
+      model = input['model']
+      task_type = input['task_type']
+      title = input['title']
+
+      # Validate text length (rough estimate)
+      if text.length > 32000  # Approximately 8192 tokens
+        error('Text too long. Must not exceed 8192 tokens (approximately 6000 words).')
+      end
+
+      begin
+        # Prepare content with optional title
+        content = title.present? ? "#{title}: #{text}" : text
+
+        # Build payload using existing helper
+        payload = call('payload_for_text_embedding', {
+          'text' => content,
+          'task_type' => task_type,
+          'title' => title
+        })
+
+        # Build the URL
+        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
+              "/#{model}:predict"
+
+        # Apply rate limiting
+        rate_limit_info = call('enforce_vertex_rate_limits', connection, model, 'embedding')
+
+        # Make the request with 429 fallback
+        response = call('handle_429_with_backoff', connection, 'embedding', model) do
+          post(url, payload).
             after_error_response(/.*/) do |code, body, _header, message|
               call('handle_vertex_error', connection, code, body, message)
             end
+        end
 
-          # Extract embedding from response
-          vals = response&.dig('predictions', 0, 'embeddings', 'values') ||
+        # Extract embedding from response
+        vector = response&.dig('predictions', 0, 'embeddings', 'values') ||
                  response&.dig('predictions', 0, 'embeddings')&.first&.dig('values') ||
                  []
 
-          # Add to results
-          embeddings << {
-            'id' => text_obj['id'],
-            'vector' => vals,
-            'dimensions' => vals.length,
-            'metadata' => text_obj['metadata'] || {}
-          }
+        # Estimate token count (rough approximation: ~4 characters per token)
+        token_count = (content.length / 4.0).ceil
 
-          successful_requests += 1
-          # Estimate tokens (rough approximation: ~4 characters per token)
-          total_tokens += (text_obj['content'].to_s.length / 4.0).ceil
+        # Return single embedding result
+        {
+          'vector' => vector,
+          'dimensions' => vector.length,
+          'model_used' => model,
+          'token_count' => token_count,
+          'rate_limit_status' => rate_limit_info
+        }
 
-        rescue => e
-          failed_requests += 1
-          # Add failed embedding with empty vector
-          embeddings << {
-            'id' => text_obj['id'],
-            'vector' => [],
-            'dimensions' => 0,
-            'metadata' => (text_obj['metadata'] || {}).merge('error' => e.message)
+      rescue => e
+        error("Failed to generate embedding: #{e.message}")
+      end
+    end,
+
+    transform_find_neighbors_response: lambda do |response|
+      # Extract all neighbors from potentially multiple queries
+      all_neighbors = []
+      nearest_neighbors = response['nearestNeighbors'] || []
+
+      nearest_neighbors.each do |query_result|
+        neighbors = query_result['neighbors'] || []
+        neighbors.each do |neighbor|
+          datapoint = neighbor['datapoint'] || {}
+          distance = neighbor['distance'].to_f
+
+          # Normalize distance to similarity score (0-1)
+          # Assuming distances are typically 0-2 for cosine distance
+          max_distance = 2.0
+          similarity_score = [1.0 - (distance / max_distance), 0.0].max
+
+          all_neighbors << {
+            'datapoint_id' => datapoint['datapointId'].to_s,
+            'distance' => distance,
+            'similarity_score' => similarity_score.round(6),
+            'feature_vector' => datapoint['featureVector'] || [],
+            'crowding_attribute' => datapoint.dig('crowdingTag', 'crowdingAttribute').to_s
           }
         end
       end
 
-      # Return batch results
+      # Sort by similarity score (highest first)
+      all_neighbors.sort_by! { |n| -n['similarity_score'] }
+
+      # Recipe-friendly response
+      best_match = all_neighbors.first || {}
+      has_matches = all_neighbors.any?
+
       {
-        'batch_id' => batch_id,
-        'embeddings' => embeddings,
-        'model_used' => model,
-        'total_processed' => texts.length,
-        'usage_statistics' => {
-          'total_requests' => total_requests,
-          'successful_requests' => successful_requests,
-          'failed_requests' => failed_requests,
-          'total_tokens' => total_tokens
-        }
+        'matches_count' => all_neighbors.length,
+        'top_matches' => all_neighbors,
+        'best_match_id' => best_match['datapoint_id'].to_s,
+        'best_match_score' => best_match['similarity_score'] || 0.0,
+        'pass_fail' => has_matches,
+        'action_required' => has_matches ? 'retrieve_content' : 'refine_query',
+        'nearestNeighbors' => nearest_neighbors  # Keep original for backward compatibility
       }
     end,
+
     payload_for_find_neighbors: lambda do |input|
       # We follow Google’s JSON casing for FindNeighbors REST:
       # top-level: deployedIndexId, returnFullDatapoint, queries[]
@@ -1792,10 +2550,20 @@
               else
                 resp&.dig('candidates', 0, 'content', 'parts', 0, 'text')
               end
+
+      # Recipe-friendly enhancements
+      has_answer = !answer.nil? && !answer.to_s.strip.empty? && answer.to_s.strip != 'N/A'
+
       {
-        'answer' => answer,
+        'answer' => answer.to_s,
+        'has_answer' => has_answer,
+        'pass_fail' => has_answer,
+        'action_required' => has_answer ? 'use_answer' : 'try_different_question',
+        'answer_length' => answer.to_s.length,
         'safety_ratings' => ratings,
-        'usage' => resp['usageMetadata']
+        'prompt_tokens' => resp.dig('usageMetadata', 'promptTokenCount') || 0,
+        'response_tokens' => resp.dig('usageMetadata', 'candidatesTokenCount') || 0,
+        'total_tokens' => resp.dig('usageMetadata', 'totalTokenCount') || 0
       }
     end,
     extract_generated_email_response: lambda do |resp|
@@ -1838,29 +2606,43 @@
       confidence = json&.[]('confidence')&.to_f || 1.0
       alternatives = json&.[]('alternatives') || []
 
-      # Build the response based on options
+      # Ensure selected_category is always a string (never null)
+      selected_category = selected_category.to_s
+      selected_category = 'unknown' if selected_category.empty? || selected_category == 'N/A'
+
+      # Normalize confidence to 0-1 range
+      confidence = [[confidence, 0.0].max, 1.0].min
+
+      # Determine if human review is required (confidence threshold)
+      confidence_threshold = 0.7
+      requires_human_review = confidence < confidence_threshold
+
+      # Recipe-friendly response structure
       result = {
         'selected_category' => selected_category,
+        'confidence' => confidence.round(4),
+        'requires_human_review' => requires_human_review,
+        'pass_fail' => !requires_human_review,
+        'action_required' => requires_human_review ? 'human_review' : 'proceed_with_classification',
+        'confidence_level' => case confidence
+                             when 0.8..1.0 then 'high'
+                             when 0.6..0.8 then 'medium'
+                             else 'low'
+                             end,
         'safety_ratings' => ratings
       }
-
-      # Add confidence if requested
-      if options['return_confidence'] != false
-        result['confidence'] = confidence
-      end
 
       # Add alternatives if requested
       if options['return_alternatives'] != false
         result['alternatives'] = alternatives
+        result['alternatives_count'] = alternatives.length
       end
 
-      # Add usage metrics
+      # Add usage metrics with consistent naming
       if resp['usageMetadata']
-        result['usage_metrics'] = {
-          'prompt_token_count' => resp['usageMetadata']['promptTokenCount'],
-          'candidates_token_count' => resp['usageMetadata']['candidatesTokenCount'],
-          'total_token_count' => resp['usageMetadata']['totalTokenCount']
-        }
+        result['prompt_tokens'] = resp['usageMetadata']['promptTokenCount'] || 0
+        result['response_tokens'] = resp['usageMetadata']['candidatesTokenCount'] || 0
+        result['total_tokens'] = resp['usageMetadata']['totalTokenCount'] || 0
       end
 
       result
@@ -1994,6 +2776,221 @@
           hash[element['name'].gsub(/^\d|\W/) { |c| "_ #{c.unpack('H*')}" }] = '<Sample Text>'
         end
       end || {}
+    end,
+
+    # ─────────────────────────────────────────────────────────────────────────────
+    # -- Index Management Methods
+    # ─────────────────────────────────────────────────────────────────────────────
+
+    validate_index_access: lambda do |connection, index_id|
+      # Extract project, region, and index name from the index_id
+      index_parts = index_id.split('/')
+      if index_parts.length < 6 || index_parts[0] != 'projects' || index_parts[2] != 'locations' || index_parts[4] != 'indexes'
+        error("Invalid index_id format. Expected: projects/PROJECT/locations/REGION/indexes/INDEX_ID")
+      end
+
+      # Extract for future use if needed
+      # project = index_parts[1]
+      # region = index_parts[3]
+      # index_name = index_parts[5]
+
+      begin
+        # Get index details
+        index_response = get("#{index_id}").
+          after_error_response(/.*/) do |code, body, _header, message|
+            if code == 404
+              error("Index not found: #{index_id}")
+            elsif code == 403
+              error("Permission denied. Service account missing aiplatform.indexes.get permission for index: #{index_id}")
+            else
+              call('handle_vertex_error', connection, code, body, message)
+            end
+          end
+
+        # Check if index is deployed
+        deployed_indexes = index_response['deployedIndexes'] || []
+        if deployed_indexes.empty?
+          error("Index is not deployed. Index must be in DEPLOYED state for upsert operations.")
+        end
+
+        # Get index stats from first deployed index
+        deployed_index = deployed_indexes[0]
+        # Ensure all ID fields are strings and timestamps are ISO 8601
+        created_time = index_response['createTime']
+        updated_time = index_response['updateTime']
+
+        # Ensure timestamps are in ISO 8601 format (Google already provides ISO 8601)
+        created_time = created_time.to_s if created_time
+        updated_time = updated_time.to_s if updated_time
+
+        index_stats = {
+          'index_id' => index_id.to_s,
+          'deployed_state' => 'DEPLOYED',
+          'dimensions' => index_response.dig('indexStats', 'vectorsCount')&.to_i || 0,
+          'total_datapoints' => index_response.dig('indexStats', 'shardsCount')&.to_i || 0,
+          'display_name' => index_response['displayName'].to_s,
+          'created_time' => created_time || '',
+          'updated_time' => updated_time || ''
+        }
+
+        # Try to get more detailed stats if available
+        if deployed_index['indexEndpoint']
+          endpoint_id = deployed_index['indexEndpoint']
+          begin
+            endpoint_response = get("#{endpoint_id}").
+              after_error_response(/.*/) do |code, body, _header, message|
+                # Don't fail validation if we can't get endpoint details
+                # This is optional information
+              end
+
+            if endpoint_response
+              index_stats['endpoint_state'] = endpoint_response['state'] || 'UNKNOWN'
+              index_stats['public_endpoint_enabled'] = endpoint_response['publicEndpointEnabled'] || false
+            end
+          rescue
+            # Ignore endpoint lookup failures - not critical for validation
+          end
+        end
+
+        index_stats
+      rescue => e
+        if e.message.include?('Permission denied') || e.message.include?('aiplatform.indexes')
+          error("Service account missing required permissions. Ensure the service account has 'aiplatform.indexes.get' and 'aiplatform.indexes.update' permissions.")
+        else
+          error("Failed to validate index access: #{e.message}")
+        end
+      end
+    end,
+
+    batch_upsert_datapoints: lambda do |connection, index_id, datapoints, update_mask = nil|
+      # Validate inputs
+      if datapoints.nil? || datapoints.empty?
+        error('At least one datapoint is required for batch upsert')
+      end
+
+      # First validate index access and get metadata
+      index_stats = call('validate_index_access', connection, index_id)
+
+      # Process datapoints in batches of 100 with exponential backoff
+      batch_size = 100
+      max_retries = 3
+      base_delay = 1.0 # Base delay in seconds
+
+      results = {
+        'total_processed' => datapoints.length,
+        'successful_upserts' => 0,
+        'failed_upserts' => 0,
+        'error_details' => [],
+        'index_stats' => index_stats
+      }
+
+      # Process each batch
+      datapoints.each_slice(batch_size).with_index do |batch, batch_index|
+        retry_count = 0
+        batch_success = false
+
+        while retry_count <= max_retries && !batch_success
+          begin
+            # Format datapoints for API
+            formatted_datapoints = batch.map do |dp|
+              # Validate required fields
+              unless dp['datapoint_id'] && dp['feature_vector']
+                error("Datapoint missing required fields. Each datapoint must have 'datapoint_id' and 'feature_vector'")
+              end
+
+              # Validate vector dimensions if we have index metadata
+              if index_stats['dimensions'] && index_stats['dimensions'] > 0
+                if dp['feature_vector'].length != index_stats['dimensions']
+                  error("Vector dimension mismatch. Expected #{index_stats['dimensions']} dimensions, got #{dp['feature_vector'].length} for datapoint '#{dp['datapoint_id']}'")
+                end
+              end
+
+              datapoint = {
+                'datapointId' => dp['datapoint_id'],
+                'featureVector' => dp['feature_vector']
+              }
+
+              # Add optional fields if present
+              if dp['restricts']&.any?
+                datapoint['restricts'] = dp['restricts'].map do |restrict|
+                  formatted_restrict = { 'namespace' => restrict['namespace'] }
+                  formatted_restrict['allowList'] = restrict['allowList'] if restrict['allowList']&.any?
+                  formatted_restrict['denyList'] = restrict['denyList'] if restrict['denyList']&.any?
+                  formatted_restrict
+                end
+              end
+
+              datapoint['crowdingTag'] = dp['crowding_tag'] if dp['crowding_tag']
+              datapoint
+            end
+
+            # Build request payload
+            payload = { 'datapoints' => formatted_datapoints }
+            payload['updateMask'] = update_mask if update_mask
+
+            # Make API call
+            post("#{index_id}:upsertDatapoints", payload).
+              after_error_response(/.*/) do |code, body, _header, message|
+                if code == 429 # Rate limit
+                  raise StandardError.new("Rate limited: #{message}")
+                elsif code == 403
+                  raise StandardError.new("Permission denied. Service account missing aiplatform.indexes.update permission")
+                else
+                  call('handle_vertex_error', connection, code, body, message)
+                end
+              end
+
+            # If we get here, the batch was successful
+            results['successful_upserts'] += batch.length
+            batch_success = true
+
+          rescue => e
+            retry_count += 1
+
+            if e.message.include?('Rate limited') && retry_count <= max_retries
+              # Exponential backoff for rate limits
+              delay = base_delay * (2 ** (retry_count - 1))
+              sleep(delay)
+            elsif retry_count > max_retries
+              # Mark all datapoints in this batch as failed
+              batch.each do |dp|
+                results['error_details'] << {
+                  'datapoint_id' => dp['datapoint_id'],
+                  'batch_index' => batch_index,
+                  'error' => "Failed after #{max_retries} retries: #{e.message}",
+                  'retry_count' => retry_count - 1
+                }
+              end
+              results['failed_upserts'] += batch.length
+              batch_success = true # Exit retry loop
+            else
+              # Non-retryable error, mark batch as failed
+              batch.each do |dp|
+                results['error_details'] << {
+                  'datapoint_id' => dp['datapoint_id'],
+                  'batch_index' => batch_index,
+                  'error' => e.message,
+                  'retry_count' => retry_count - 1
+                }
+              end
+              results['failed_upserts'] += batch.length
+              batch_success = true # Exit retry loop
+            end
+          end
+        end
+      end
+
+      # Update final index stats if we successfully processed some datapoints
+      if results['successful_upserts'] > 0
+        begin
+          updated_stats = call('validate_index_access', connection, index_id)
+          results['index_stats'] = updated_stats
+        rescue
+          # Ignore errors getting updated stats - use original stats
+        end
+      end
+
+      results
     end
 
   },
@@ -2582,7 +3579,15 @@
             ] },
           { name: 'modelVersion' },
           { name: 'createTime', type: 'date_time' },
-          { name: 'responseId' }
+          { name: 'responseId' },
+          { name: 'rate_limit_status',
+            type: 'object',
+            properties: [
+              { name: 'requests_last_minute', type: 'integer', label: 'Requests in last minute' },
+              { name: 'limit', type: 'integer', label: 'Rate limit (requests/minute)' },
+              { name: 'throttled', type: 'boolean', label: 'Was throttled' },
+              { name: 'sleep_ms', type: 'integer', label: 'Sleep time (milliseconds)' }
+            ] }
         ]
       end
     },
@@ -2912,42 +3917,42 @@
     find_neighbors_output: {
       fields: lambda do |_connection, _config_fields, _object_definitions|
         [
-          {
-            name: 'nearestNeighbors',
-            type: 'array',
-            of: 'object',
+          # Flattened recipe-friendly structure
+          { name: 'matches_count', label: 'Number of matches', type: 'integer',
+            hint: 'Total number of neighbors found' },
+          { name: 'top_matches', label: 'Top matches (flattened)', type: 'array', of: 'object',
+            properties: [
+              { name: 'datapoint_id', label: 'Datapoint ID', type: 'string' },
+              { name: 'distance', label: 'Distance', type: 'number' },
+              { name: 'similarity_score', label: 'Similarity score (0-1)', type: 'number',
+                hint: 'Normalized similarity score (1 - normalized_distance)' },
+              { name: 'feature_vector', label: 'Feature vector', type: 'array', of: 'number' },
+              { name: 'crowding_attribute', label: 'Crowding attribute', type: 'string' }
+            ]
+          },
+          { name: 'best_match_id', label: 'Best match ID', type: 'string',
+            hint: 'ID of the closest neighbor for quick recipe access' },
+          { name: 'best_match_score', label: 'Best match score', type: 'number',
+            hint: 'Similarity score of the best match (0-1)' },
+          { name: 'pass_fail', label: 'Search success', type: 'boolean',
+            hint: 'True if at least one neighbor was found' },
+          { name: 'action_required', label: 'Action required', type: 'string',
+            hint: 'Next recommended action based on search results' },
+          # Original nested structure for backward compatibility
+          { name: 'nearestNeighbors', label: 'Nearest neighbors (original)', type: 'array', of: 'object',
             properties: [
               { name: 'id', label: 'Query datapoint ID' },
-              {
-                name: 'neighbors',
-                type: 'array',
-                of: 'object',
+              { name: 'neighbors', type: 'array', of: 'object',
                 properties: [
                   { name: 'distance', type: 'number' },
-                  {
-                    name: 'datapoint', type: 'object',
+                  { name: 'datapoint', type: 'object',
                     properties: [
                       { name: 'datapointId' },
                       { name: 'featureVector', type: 'array', of: 'number' },
-                      { name: 'restricts', type: 'array', of: 'object', properties: [
-                        { name: 'namespace' },
-                        { name: 'allowList', type: 'array', of: 'string' },
-                        { name: 'denyList',  type: 'array', of: 'string' }
-                      ]},
-                      { name: 'numericRestricts', type: 'array', of: 'object', properties: [
-                        { name: 'namespace' },
-                        { name: 'op' },
-                        { name: 'valueInt',    type: 'integer' },
-                        { name: 'valueFloat',  type: 'number' },
-                        { name: 'valueDouble', type: 'number' }
-                      ]},
-                      { name: 'crowdingTag', type: 'object', properties: [
-                        { name: 'crowdingAttribute' }
-                      ]},
-                      { name: 'sparseEmbedding', type: 'object', properties: [
-                        { name: 'values', type: 'array', of: 'number' },
-                        { name: 'dimensions', type: 'array', of: 'integer' }
-                      ]}
+                      { name: 'restricts', type: 'array', of: 'object' },
+                      { name: 'numericRestricts', type: 'array', of: 'object' },
+                      { name: 'crowdingTag', type: 'object' },
+                      { name: 'sparseEmbedding', type: 'object' }
                     ]
                   }
                 ]

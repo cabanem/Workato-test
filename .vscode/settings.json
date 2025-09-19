@@ -7,8 +7,8 @@
     "connectors/*.rb": "ruby"
   },
   "workbench.colorCustomizations": {
-    "titleBar.activeBackground": "#4a90e2",
-    "titleBar.activeForeground": "#ffffff"
+    "titleBar.activeBackground": "#27185050",
+    "titleBar.activeForeground": "#d5cff0d5"
   },
   "terminal.integrated.env.linux": {
     "CONNECTOR_PATH": "${workspaceFolder}/connectors",

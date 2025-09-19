@@ -643,10 +643,20 @@ require 'csv'
         [
           { name: "is_valid", type: "boolean", control_type: "checkbox" },
           { name: "confidence_score", type: "number" },
+          { name: "pass_fail", type: "boolean", label: "Validation passed",
+            hint: "True if response passes all validation checks" },
+          { name: "action_required", type: "string", label: "Action required",
+            hint: "Next recommended action based on validation results" },
           { name: "validation_results", type: "object" },
+          { name: "issues_count", type: "integer", label: "Number of issues",
+            hint: "Total number of validation issues found" },
           { name: "issues_found", type: "array", of: "string" },
           { name: "requires_human_review", type: "boolean", control_type: "checkbox" },
-          { name: "suggested_improvements", type: "array", of: "string" }
+          { name: "suggestions_count", type: "integer", label: "Number of suggestions",
+            hint: "Total number of improvement suggestions" },
+          { name: "suggested_improvements", type: "array", of: "string" },
+          { name: "confidence_level", type: "string", label: "Confidence level",
+            hint: "high, medium, or low based on confidence score" }
         ]
       end,
 
@@ -1303,10 +1313,21 @@ require 'csv'
         chunk_index += 1
       end
 
+      # Recipe-friendly enhancements
+      first_chunk = chunks.first || {}
+      total_tokens = chunks.sum { |c| c[:token_count] }
+      average_chunk_size = chunks.any? ? (total_tokens.to_f / chunks.length).round : 0
+
       {
+        chunks_count: chunks.length,
         chunks: chunks,
+        first_chunk: first_chunk,
+        chunks_json: chunks.to_json,
         total_chunks: chunks.length,
-        total_tokens: chunks.sum { |c| c[:token_count] }
+        total_tokens: total_tokens,
+        average_chunk_size: average_chunk_size,
+        pass_fail: chunks.any?,
+        action_required: chunks.any? ? "ready_for_embedding" : "check_input_text"
       }
     end,
 
@@ -1356,14 +1377,23 @@ require 'csv'
 
       extracted_query = cleaned.split(/\n{2,}/).find { |p| p.strip.length.positive? } || cleaned[0, 200].to_s
 
+      # Recipe-friendly enhancements
+      has_content = cleaned.strip.length > 10 # Meaningful content threshold
+      cleaning_successful = cleaned.length > 0
+
       {
         cleaned_text: cleaned,
         extracted_query: extracted_query,
+        removed_sections_count: removed_sections.length,
         removed_sections: removed_sections,
+        urls_count: extracted_urls.length,
         extracted_urls: extracted_urls,
         original_length: original_length,
         cleaned_length: cleaned.length,
-        reduction_percentage: (original_length.zero? ? 0 : ((1 - cleaned.length.to_f / original_length) * 100)).round(2)
+        reduction_percentage: (original_length.zero? ? 0 : ((1 - cleaned.length.to_f / original_length) * 100)).round(2),
+        pass_fail: cleaning_successful,
+        action_required: has_content ? "ready_for_chunking" : "check_email_content",
+        has_content: has_content
       }
     end,
 
@@ -1416,10 +1446,20 @@ require 'csv'
           end
         end
 
+      # Recipe-friendly enhancements
+      confidence_level = case score
+                        when 0.8..1.0 then 'high'
+                        when 0.6..0.8 then 'medium'
+                        else 'low'
+                        end
+
       {
         similarity_score: score.round(6),
         similarity_percentage: percent,
         is_similar: similar,
+        pass_fail: similar,
+        action_required: similar ? "vectors_are_similar" : "vectors_are_different",
+        confidence_level: confidence_level,
         similarity_type: type,
         computation_time_ms: ((Time.now - start_time) * 1000).round,
         threshold_used: threshold,
@@ -1607,13 +1647,28 @@ require 'csv'
 
       confidence = [[confidence, 0.0].max, 1.0].min
 
+      # Recipe-friendly enhancements
+      is_valid = confidence >= min_confidence
+      confidence_level = case confidence
+                        when 0.8..1.0 then 'high'
+                        when 0.6..0.8 then 'medium'
+                        else 'low'
+                        end
+
+      suggestions = issues.empty? ? [] : ['Review and improve response quality']
+
       {
-        is_valid: confidence >= min_confidence,
+        is_valid: is_valid,
         confidence_score: confidence.round(2),
+        pass_fail: is_valid,
+        action_required: is_valid ? "response_approved" : "response_needs_review",
         validation_results: { query_overlap: overlap.round(2), response_length: response.length, word_count: response_words.length },
+        issues_count: issues.length,
         issues_found: issues,
         requires_human_review: confidence < 0.5,
-        suggested_improvements: issues.empty? ? [] : ['Review and improve response quality']
+        suggestions_count: suggestions.length,
+        suggested_improvements: suggestions,
+        confidence_level: confidence_level
       }
     end,
 
@@ -2735,9 +2790,22 @@ require 'csv'
     chunking_result: {
       fields: lambda do |connection, _config, object_definitions|
         [
+          { name: "chunks_count", type: "integer", label: "Number of chunks",
+            hint: "Total number of chunks created" },
           { name: "chunks", type: "array", of: "object", properties: object_definitions["chunk_object"] },
+          { name: "first_chunk", type: "object", properties: object_definitions["chunk_object"],
+            label: "First chunk (quick access)",
+            hint: "First chunk for quick recipe access" },
+          { name: "chunks_json", type: "string", label: "Chunks as JSON string",
+            hint: "All chunks serialized as JSON for bulk operations" },
           { name: "total_chunks", type: "integer" },
-          { name: "total_tokens", type: "integer" }
+          { name: "total_tokens", type: "integer" },
+          { name: "average_chunk_size", type: "integer", label: "Average chunk size",
+            hint: "Average number of tokens per chunk" },
+          { name: "pass_fail", type: "boolean", label: "Chunking success",
+            hint: "True if chunking completed successfully" },
+          { name: "action_required", type: "string", label: "Action required",
+            hint: "Next recommended action based on results" }
         ]
       end
     },
@@ -2759,11 +2827,21 @@ require 'csv'
         [
           { name: "cleaned_text", type: "string" },
           { name: "extracted_query", type: "string" },
+          { name: "removed_sections_count", type: "integer", label: "Removed sections count",
+            hint: "Number of sections removed during cleaning" },
           { name: "removed_sections", type: "array", of: "string" },
+          { name: "urls_count", type: "integer", label: "URLs count",
+            hint: "Number of URLs extracted" },
           { name: "extracted_urls", type: "array", of: "string" },
           { name: "original_length", type: "integer" },
           { name: "cleaned_length", type: "integer" },
-          { name: "reduction_percentage", type: "number" }
+          { name: "reduction_percentage", type: "number" },
+          { name: "pass_fail", type: "boolean", label: "Cleaning success",
+            hint: "True if cleaning completed successfully" },
+          { name: "action_required", type: "string", label: "Action required",
+            hint: "Next recommended action based on results" },
+          { name: "has_content", type: "boolean", label: "Has meaningful content",
+            hint: "True if cleaned text contains meaningful content" }
         ]
       end
     },
@@ -2774,6 +2852,9 @@ require 'csv'
           { name: "similarity_score",       type: "number", label: "Similarity score", hint: "0–1 for cosine/euclidean; unbounded for dot product" },
           { name: "similarity_percentage",  type: "number", label: "Similarity percentage", hint: "0–100; only for cosine/euclidean" },
           { name: "is_similar",             type: "boolean", control_type: "checkbox", label: "Is similar", hint: "Whether the vectors meet the threshold" },
+          { name: "pass_fail",              type: "boolean", label: "Similarity check", hint: "True if vectors are considered similar" },
+          { name: "action_required",        type: "string", label: "Action required", hint: "Next recommended action based on similarity" },
+          { name: "confidence_level",       type: "string", label: "Confidence level", hint: "high, medium, or low based on score" },
           { name: "similarity_type",        type: "string", label: "Similarity type", hint: "cosine, euclidean, or dot_product" },
           { name: "computation_time_ms",    type: "integer", label: "Computation time (ms)" },
           { name: "threshold_used",         type: "number", label: "Threshold used", optional: true },
