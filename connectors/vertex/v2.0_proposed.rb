@@ -3597,9 +3597,104 @@
 
       result
     end,
+    # ─────────────────────────────────────────────────────────────────────────────
+    # -- Google Drive Helper Methods
+    # ─────────────────────────────────────────────────────────────────────────────
+
+    extract_drive_file_id: lambda do |url_or_id|
+      return url_or_id if url_or_id.blank?
+
+      # Try different URL patterns
+      # Pattern 1: /d/{file_id}/
+      if match = url_or_id.match(%r{/d/([a-zA-Z0-9_-]+)})
+        return match[1]
+      end
+
+      # Pattern 2: ?id={file_id}
+      if match = url_or_id.match(/[?&]id=([a-zA-Z0-9_-]+)/)
+        return match[1]
+      end
+
+      # Pattern 3: Raw file ID (alphanumeric with dashes/underscores)
+      if url_or_id.match(/^[a-zA-Z0-9_-]+$/)
+        return url_or_id
+      end
+
+      # If no pattern matches, return as-is and let API handle the error
+      url_or_id
+    end,
+
+    get_export_mime_type: lambda do |mime_type|
+      return nil if mime_type.blank?
+
+      case mime_type
+      when 'application/vnd.google-apps.document'
+        'text/plain'
+      when 'application/vnd.google-apps.spreadsheet'
+        'text/csv'
+      when 'application/vnd.google-apps.presentation'
+        'text/plain'
+      else
+        # Return nil for regular files (will be downloaded as-is)
+        nil
+      end
+    end,
+
+    build_drive_query: lambda do |options = {}|
+      query_parts = ['trashed = false']
+
+      # Add folder filter
+      if options[:folder_id].present?
+        query_parts << "'#{options[:folder_id]}' in parents"
+      end
+
+      # Add date filters
+      if options[:modified_after].present?
+        query_parts << "modifiedTime > '#{options[:modified_after]}'"
+      end
+
+      if options[:modified_before].present?
+        query_parts << "modifiedTime < '#{options[:modified_before]}'"
+      end
+
+      # Add MIME type filters
+      if options[:mime_type].present?
+        query_parts << "mimeType = '#{options[:mime_type]}'"
+      end
+
+      if options[:exclude_folders]
+        query_parts << "mimeType != 'application/vnd.google-apps.folder'"
+      end
+
+      query_parts.join(' and ')
+    end,
+
+    handle_drive_error: lambda do |connection, code, body, message|
+      service_account_email = connection.dig('service_account_creds', 'client_email') || 'your-service-account@project.iam.gserviceaccount.com'
+
+      case code
+      when 404
+        "File not found in Google Drive. Please verify the file ID and ensure the file exists."
+      when 403
+        if body&.include?('insufficientFilePermissions') || body&.include?('forbidden')
+          "Access denied. Please share the file with the service account: #{service_account_email}"
+        else
+          "Permission denied. Check your Google Drive API access and file permissions."
+        end
+      when 429
+        "Rate limit exceeded. Please implement request backoff and retry logic."
+      when 401
+        "Authentication failed. Please check your OAuth2 token or service account credentials."
+      when 500, 502, 503
+        "Google Drive API temporary error (#{code}). Please retry after a brief delay."
+      else
+        "Google Drive API error (#{code}): #{message || body}"
+      end
+    end,
  
     # ─────────────────────────────────────────────────────────────────────────────
     # -- Samples and UX helpers
+    # 
     sample_record_output: lambda do |input|
       case input
       when 'send_message'
@@ -5063,101 +5158,6 @@
         ['Question answering', 'QUESTION_ANSWERING'],
         ['Fact verification', 'FACT_VERIFICATION']
       ]
-    end,
-
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Google Drive Helper Methods
-    # ─────────────────────────────────────────────────────────────────────────────
-
-    extract_drive_file_id: lambda do |url_or_id|
-      return url_or_id if url_or_id.blank?
-
-      # Try different URL patterns
-      # Pattern 1: /d/{file_id}/
-      if match = url_or_id.match(%r{/d/([a-zA-Z0-9_-]+)})
-        return match[1]
-      end
-
-      # Pattern 2: ?id={file_id}
-      if match = url_or_id.match(/[?&]id=([a-zA-Z0-9_-]+)/)
-        return match[1]
-      end
-
-      # Pattern 3: Raw file ID (alphanumeric with dashes/underscores)
-      if url_or_id.match(/^[a-zA-Z0-9_-]+$/)
-        return url_or_id
-      end
-
-      # If no pattern matches, return as-is and let API handle the error
-      url_or_id
-    end,
-
-    get_export_mime_type: lambda do |mime_type|
-      return nil if mime_type.blank?
-
-      case mime_type
-      when 'application/vnd.google-apps.document'
-        'text/plain'
-      when 'application/vnd.google-apps.spreadsheet'
-        'text/csv'
-      when 'application/vnd.google-apps.presentation'
-        'text/plain'
-      else
-        # Return nil for regular files (will be downloaded as-is)
-        nil
-      end
-    end,
-
-    build_drive_query: lambda do |options = {}|
-      query_parts = ['trashed = false']
-
-      # Add folder filter
-      if options[:folder_id].present?
-        query_parts << "'#{options[:folder_id]}' in parents"
-      end
-
-      # Add date filters
-      if options[:modified_after].present?
-        query_parts << "modifiedTime > '#{options[:modified_after]}'"
-      end
-
-      if options[:modified_before].present?
-        query_parts << "modifiedTime < '#{options[:modified_before]}'"
-      end
-
-      # Add MIME type filters
-      if options[:mime_type].present?
-        query_parts << "mimeType = '#{options[:mime_type]}'"
-      end
-
-      if options[:exclude_folders]
-        query_parts << "mimeType != 'application/vnd.google-apps.folder'"
-      end
-
-      query_parts.join(' and ')
-    end,
-
-    handle_drive_error: lambda do |connection, code, body, message|
-      service_account_email = connection.dig('service_account_creds', 'client_email') || 'your-service-account@project.iam.gserviceaccount.com'
-
-      case code
-      when 404
-        "File not found in Google Drive. Please verify the file ID and ensure the file exists."
-      when 403
-        if body&.include?('insufficientFilePermissions') || body&.include?('forbidden')
-          "Access denied. Please share the file with the service account: #{service_account_email}"
-        else
-          "Permission denied. Check your Google Drive API access and file permissions."
-        end
-      when 429
-        "Rate limit exceeded. Please implement request backoff and retry logic."
-      when 401
-        "Authentication failed. Please check your OAuth2 token or service account credentials."
-      when 500, 502, 503
-        "Google Drive API temporary error (#{code}). Please retry after a brief delay."
-      else
-        "Google Drive API error (#{code}): #{message || body}"
-      end
     end
   }
 
