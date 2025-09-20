@@ -1,0 +1,67 @@
+FREQUENTLY ASKED QUESTIONS
+Last Updated: September 15, 2024
+
+SECTION 1: ORDERING AND SHIPPING
+=================================
+
+Q: What are your standard shipping times?
+A: Standard shipping typically takes 5-7 business days within the continental United States. Express shipping options are available at checkout for 2-3 business day delivery. International shipping times vary by destination but generally range from 10-21 business days.
+
+Q: How can I track my order?
+A: Once your order ships, you'll receive an email confirmation with a tracking number. You can track your package using this number on our website or directly on the carrier's website. Order status is also available in your account dashboard under "My Orders".
+
+Q: Do you ship internationally?
+A: Yes, we ship to most countries worldwide. International shipping rates are calculated at checkout based on your location and order weight. Please note that customers are responsible for any customs duties or import taxes.
+
+SECTION 2: RETURNS AND REFUNDS
+===============================
+
+Q: What is your return policy?
+A: We accept returns within 30 days of delivery for most items in original condition with tags attached. Items must be unworn and unwashed. Final sale items, intimate apparel, and customized products cannot be returned.
+
+Q: How do I initiate a return?
+A: To start a return, log into your account and select the order containing the items you wish to return. Click "Return Items" and follow the prompts. You'll receive a prepaid return label via email. Pack items securely and drop off at any authorized shipping location.
+
+Q: When will I receive my refund?
+A: Refunds are processed within 5-7 business days of receiving your return. The refund will be credited to your original payment method. Bank processing times may add 3-5 additional business days before the credit appears in your account.
+
+SECTION 3: PRODUCTS AND INVENTORY
+==================================
+
+Q: How often do you restock sold-out items?
+A: Restock schedules vary by product. Popular items are typically restocked within 2-4 weeks. You can sign up for restock notifications on any product page by entering your email address when an item is out of stock.
+
+Q: Can I cancel or modify my order?
+A: Orders can be cancelled or modified within 1 hour of placement. After this window, our fulfillment process begins and changes cannot be made. If you need to make changes after this time, you'll need to return the items once received.
+
+Q: Do you offer gift wrapping?
+A: Yes, gift wrapping is available for $5 per item. You can select this option during checkout and include a personalized message. Gift receipts that exclude prices are included with all gift orders.
+
+SECTION 4: ACCOUNT AND PAYMENT
+===============================
+
+Q: What payment methods do you accept?
+A: We accept all major credit cards (Visa, MasterCard, American Express, Discover), PayPal, Apple Pay, Google Pay, and Klarna for buy-now-pay-later options. Gift cards can also be used for payment.
+
+Q: Is my payment information secure?
+A: Yes, all payment transactions are encrypted using SSL technology. We are PCI DSS compliant and do not store credit card information on our servers. Payment processing is handled by secure, third-party payment providers.
+
+Q: How do I update my account information?
+A: Log into your account and navigate to "Account Settings". Here you can update your email, password, shipping addresses, and payment methods. Changes are saved automatically.
+
+SECTION 5: TECHNICAL SUPPORT
+=============================
+
+Q: I'm having trouble accessing my account. What should I do?
+A: First, try resetting your password using the "Forgot Password" link on the login page. If you continue to have issues, clear your browser cache and cookies. For further assistance, contact our support team with your account email address.
+
+Q: Which browsers do you support?
+A: Our website works best with the latest versions of Chrome, Firefox, Safari, and Edge. We recommend keeping your browser updated for the best experience and security.
+
+Q: Is there a mobile app available?
+A: Yes, our mobile app is available for both iOS and Android devices. Download it from the App Store or Google Play Store. The app offers exclusive deals and faster checkout.
+
+For additional questions not covered here, please contact our customer service team:
+- Email: support@example.com
+- Phone: 1-800-EXAMPLE (Monday-Friday, 9 AM - 6 PM EST)
+- Live Chat: Available on our website during business hours

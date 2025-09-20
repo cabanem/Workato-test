@@ -14,3 +14,14 @@ services:
       POSTGRES_PASSWORD: test123
     ports: ["5432:5432"]
     volumes: ["./test/fixtures/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql"]
+
+  mockdrive:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./test/mock_services/drive:/app
+    ports:
+      - "3002:3002"
+    command: node server.js
+    environment:
+      - FIXTURES_PATH=/app/fixtures

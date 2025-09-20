@@ -1,21 +1,36 @@
-# Getting started
+# Google Drive Integration Implementation Guide
+
+## Overview
+This document provides step-by-step implementation instructions for adding Google Drive capabilities to the Vertex AI and RAG_Utils connectors for document processing in the RAG Email Response System.
+
+---
+
+## Part 1: Vertex AI Connector - OAuth2 & Helper Methods
+
+### Task 1: Add Drive Scope to OAuth2
+**Location:** Connection authorization section (~line 100-120)  
+**Action:** Extend OAuth2 scopes
+
+**Implementation Prompt:**
 ```
-Working on Workato connector integration in Codespaces.
-Context: Vertex AI integration with Google Drive, contract validation
-Current task:  #6 - Add Drive Helper Methods
-File: connectors/rag_utils/v2.0_proposed.rb
+In the Vertex AI connector, find the authorization_url lambda in the oauth2 section.
+Current state shows only: 'https://www.googleapis.com/auth/cloud-platform'
 
+Add the Drive scope to make it:
+scopes = [
+  'https://www.googleapis.com/auth/cloud-platform',
+  'https://www.googleapis.com/auth/drive.readonly'
+].join(' ')
+
+IMPORTANT: Users will need to re-authenticate after this change.
 ```
---- 
 
-## Task 1
-Add Drive Helper Methods
+### Task 2: Add Drive Helper Methods
+**Location:** Methods section (~line 2000)  
+**Action:** Add utility methods
 
-Location: Methods section (~line 2000)
-Action: Add utility methods
-
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Add four new helper methods to the Vertex connector methods section:
 
 1. extract_drive_file_id: Parse file IDs from various URL formats
@@ -38,16 +53,18 @@ Add four new helper methods to the Vertex connector methods section:
    - 404: "File not found, verify ID"
    - 403: "Share with service account: {email}"
    - 429: "Rate limited, implement backoff"
+```
 
 ---
 
-# Task 2: Implement fetch_drive_file
+## Part 2: Vertex AI Connector - Drive Actions
 
-Location: After existing actions (~line 1500)
-Action: Create core file fetching action
+### Task 3: Implement fetch_drive_file
+**Location:** After existing actions (~line 1500)  
+**Action:** Create core file fetching action
 
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Create 'fetch_drive_file' action that:
 
 Step 1 - Get metadata:
@@ -69,16 +86,14 @@ Output all metadata plus:
 - text_content (empty if binary)
 - needs_processing (true for PDFs, images)
 - checksum for change detection
+```
 
----
+### Task 4: Implement list_drive_files
+**Location:** After fetch_drive_file action  
+**Action:** Create file listing capability
 
-# Task 3: Implement list_drive_files
-
-Location: After fetch_drive_file action
-Action: Create file listing capability
-
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Create 'list_drive_files' action:
 
 Input processing:
@@ -99,15 +114,14 @@ Output structure:
 - count: files.length
 - has_more: check nextPageToken presence
 - next_page_token: for pagination
+```
 
----
-# Task 4: Implement batch_fetch_drive_files
+### Task 5: Implement batch_fetch_drive_files
+**Location:** After list_drive_files action  
+**Action:** Create batch processing capability
 
-Location: After list_drive_files action
-Action: Create batch processing capability
-
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Create 'batch_fetch_drive_files' action for multiple files:
 
 Processing logic:
@@ -130,15 +144,14 @@ Metrics to track:
 - processing_time_ms
 
 Return both successful content and failure details.
+```
 
----
-# Task 5: Enhance Connection Test
+### Task 6: Enhance Connection Test
+**Location:** Connection test lambda (~line 300)  
+**Action:** Add Drive validation
 
-Location: Connection test lambda (~line 300)
-Action: Add Drive validation
-
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Modify the test lambda to validate both APIs:
 
 Structure:
@@ -160,16 +173,18 @@ Google Drive test (add new):
 - Set status: connected/failed/not_configured
 
 Return combined results with actionable error messages.
+```
 
 ---
 
-# Task 6: Add Document Helper Methods
+## Part 3: RAG_Utils Connector - Document Processing
 
-Location: Methods section (~line 1600)
-Action: Add document utilities
+### Task 7: Add Document Helper Methods
+**Location:** Methods section (~line 1600)  
+**Action:** Add document utilities
 
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Add three document processing helpers to RAG_Utils:
 
 1. generate_document_id:
@@ -188,16 +203,14 @@ Add three document processing helpers to RAG_Utils:
    - Add: document_id, file_name, file_id
    - Add: source='google_drive', indexed_at timestamp
    - Return merged hash
+```
 
----
+### Task 8: Create process_document_for_rag
+**Location:** After existing actions (~line 1100)  
+**Action:** Complete processing pipeline
 
-# Task 7: Create process_document_for_rag
-
-Location: After existing actions (~line 1100)
-Action: Complete processing pipeline
-
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Create 'process_document_for_rag' action:
 
 Input structure:
@@ -219,16 +232,14 @@ Output:
 - chunks array with full metadata
 - document_metadata (totals and timestamp)
 - ready_for_embedding: true
+```
 
----
+### Task 9: Create prepare_document_batch
+**Location:** After process_document_for_rag  
+**Action:** Batch document processor
 
-# Task 8: Create prepare_document_batch
-
-Location: After process_document_for_rag
-Action: Batch document processor
-
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Create 'prepare_document_batch' for multiple documents:
 
 Processing flow:
@@ -247,16 +258,14 @@ Output summary:
 - batches array
 - total_chunks across all documents
 - total_documents processed
+```
 
----
+### Task 10: Enhance smart_chunk_text
+**Location:** smart_chunk_text execute block (~line 200)  
+**Action:** Add document awareness
 
-# Task 9: Enhance smart_chunk_text
-
-Location: smart_chunk_text execute block (~line 200)
-Action: Add document awareness
-
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Modify smart_chunk_text to accept document metadata:
 
 In execute block, after getting chunk result:
@@ -272,15 +281,17 @@ if input['document_metadata'].present?
 end
 
 This maintains backward compatibility while enabling document tracking.
+```
 
 ---
 
-# Task 10: Create End-to-End Test Recipe
+## Part 4: Integration Testing
 
-Recipe Name: Test_Drive_Document_Pipeline
+### Task 11: Create End-to-End Test Recipe
+**Recipe Name:** Test_Drive_Document_Pipeline
 
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Create a comprehensive test recipe:
 
 Trigger: Manual with test folder_id
@@ -315,15 +326,13 @@ Success criteria:
 - Text extracted from at least one file
 - Chunks have document metadata
 - Batch processing handles errors gracefully
+```
 
----
+### Task 12: Create Change Detection Test
+**Recipe Name:** Test_Drive_Change_Detection
 
-# Task 11: Create Change Detection Test
-
-Recipe Name: Test_Drive_Change_Detection
-
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Test incremental update capability:
 
 1. Initial run:
@@ -345,15 +354,17 @@ Test incremental update capability:
    - Verify: same checksum, skip processing
 
 Log all checksum comparisons and processing decisions.
+```
 
 ---
 
-# Task 12: Test Error Scenarios
+## Part 5: Error Handling & Edge Cases
 
-Test Name: Drive_Error_Handling_Test
+### Task 13: Test Error Scenarios
+**Test Name:** Drive_Error_Handling_Test
 
-Implementation Prompt:
-
+**Implementation Prompt:**
+```
 Create tests for common error scenarios:
 
 Test cases:
@@ -381,4 +392,104 @@ Test cases:
    - Rapid successive calls
    - Expected: Appropriate backoff
 
+Document all error messages for troubleshooting guide.
+```
 
+---
+
+## Verification Checklist
+
+### Pre-Implementation Verification:
+```
+Before starting:
+□ Backup current connector versions
+□ Document current recipe dependencies
+□ Verify test folder has sample files
+□ Service account email noted
+□ Drive API enabled in GCP Console
+```
+
+### Post-Implementation Verification:
+```
+OAuth2 & Authentication:
+□ OAuth2 flow requests both scopes
+□ Re-authentication successful
+□ Service account alternative documented
+
+Drive Operations:
+□ fetch_drive_file extracts text from Google Docs
+□ fetch_drive_file identifies PDFs correctly
+□ list_drive_files filters work (folder, date, MIME)
+□ batch_fetch_drive_files handles partial failures
+□ All helper methods work with various URL formats
+
+Document Processing:
+□ process_document_for_rag generates stable IDs
+□ Chunks preserve document metadata
+□ Batch processing maintains document grouping
+□ Change detection using checksums works
+
+Error Handling:
+□ 404 errors provide helpful messages
+□ 403 errors include sharing instructions
+□ Rate limiting handled gracefully
+□ Binary files flagged appropriately
+
+Integration:
+□ End-to-end pipeline processes documents
+□ Metadata flows through all stages
+□ Performance acceptable (<60s for 10 docs)
+□ No breaking changes to existing actions
+```
+
+---
+
+## Quick Reference Card
+
+### API Endpoints Used:
+| Operation | Endpoint | Purpose |
+|-----------|----------|---------|
+| Get metadata | `/drive/v3/files/{id}` | File details |
+| Export Google file | `/drive/v3/files/{id}/export` | Extract text |
+| Download file | `/drive/v3/files/{id}?alt=media` | Get content |
+| List files | `/drive/v3/files` | Find documents |
+| Get changes | `/drive/v3/changes` | Incremental updates |
+
+### Key Patterns:
+| Pattern | Implementation | Used In |
+|---------|---------------|---------|
+| ID extraction | Regex: `/d/([a-zA-Z0-9-_]+)` | All Drive actions |
+| Checksum comparison | MD5 from metadata | Change detection |
+| Batch processing | Sequential with error collection | batch_fetch |
+| Document ID | SHA256(path\|checksum) | process_document |
+
+### Common Issues & Solutions:
+| Issue | Solution | Prevention |
+|-------|----------|------------|
+| "File not found" | Verify ID, check trash | Validate IDs before use |
+| "Permission denied" | Share with service account | Document sharing requirement |
+| "Rate limited" | Implement exponential backoff | Batch operations |
+| "No text extracted" | Check MIME type, use OCR for PDFs | Set needs_processing flag |
+
+---
+
+## Rollback Plan
+
+If implementation fails:
+```
+1. Immediate rollback:
+   - Remove Drive scope from OAuth2
+   - Delete new Drive actions
+   - Remove Drive helper methods
+   - Restore original test lambda
+
+2. Partial rollback (keep preparations):
+   - Keep document processing enhancements
+   - Remove only Drive API calls
+   - Use manual file upload instead
+
+3. Data cleanup:
+   - No data migration needed
+   - Existing recipes unaffected
+   - Re-authentication reverses OAuth changes
+```

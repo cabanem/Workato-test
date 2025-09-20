@@ -1,0 +1,16 @@
+{
+  "id": "1234567890abcdef",
+  "name": "Company_Policy_2024.pdf",
+  "mimeType": "application/pdf",
+  "size": 1048576,
+  "createdTime": "2024-01-15T10:00:00.000Z",
+  "modifiedTime": "2024-09-15T14:30:00.000Z",
+  "version": "123",
+  "md5Checksum": "098f6bcd4621d373cade4e832627b4f6",
+  "parents": ["folder_xyz"],
+  "webViewLink": "https://drive.google.com/file/d/1234567890abcdef/view",
+  "owners": [{
+    "displayName": "John Doe",
+    "emailAddress": "john@company.com"
+  }]
+}

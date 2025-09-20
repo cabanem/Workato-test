@@ -1,9 +1,15 @@
 # Workato Connector Repo
 
 ## Quick Start
-1. Run `chmod +x ./setup.sh`, then `./setup.sh`
-2. Test: `make test`
-3. Console: `make console`
+1. Run **setup.sh**
+   - Run `chmod +x ./setup.sh`
+   - Run `./setup.sh`
+2. Init Claude Code
+   - Run `curl -fsSL https://claude.ai/install.sh | bash`
+   - Complete authentication process
+3. Use the Workato SDK
+   - Test: `make test`
+   - Console: `make console`
 
 ## Structure
 - `connectors/` - Your connector files
@@ -51,11 +57,10 @@ docker system prune -af
 ## When starting a new conversation about this project begin with:
 
 ```
-Working on Workato connector migration in Codespaces.
-Context: RAG_Utils + Vertex separation, contract validation
-Current task: [specific task]
-File: connectors/[rag_utils|vertex_ai].rb
-Testing with: make test CONNECTOR=[name]
+Working on Workato connector integration in Codespaces.
+Context: Vertex AI integration with Google Drive, contract validation
+Current task: [specifictask]
+File: connectors/vertex/v2.0_proposed.rb
 ```
 
 ## Conversation starters
