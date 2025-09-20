@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(workato exec check:*)"
+      "Bash(workato exec check:*)",
+      "Bash(ruby:*)"
     ],
     "deny": [],
     "ask": []

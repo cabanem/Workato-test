@@ -190,3 +190,4 @@ Target: Process 100+ Drive documents → chunks → embeddings → vector index
 
 - Migration map: `docs/migration/migration_map.md`
 - Test fixtures: `test/fixtures/drive_responses/`
+- Please maintain a changelog at /.claude/CHANGELOG.txt.

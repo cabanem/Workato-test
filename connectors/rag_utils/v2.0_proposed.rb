@@ -178,7 +178,15 @@ require 'csv'
         fields = [
           { name: "text", label: "Input text", type: "string",
             optional: false, control_type: "text-area",
-            hint: "Raw text to be chunked" }
+            hint: "Raw text to be chunked" },
+          { name: "document_metadata", label: "Document metadata", type: "object",
+            optional: true,
+            properties: [
+              { name: "document_id", label: "Document ID", type: "string", optional: true },
+              { name: "file_name", label: "File name", type: "string", optional: true },
+              { name: "file_id", label: "File ID", type: "string", optional: true }
+            ],
+            hint: "Optional document metadata to include with each chunk" }
         ]
         if config["use_custom_settings"] == "custom"
           fields.concat(object_definitions["chunking_config"])
@@ -215,6 +223,20 @@ require 'csv'
         error("Chunk overlap must be >= 0")    if co < 0
 
         result = call(:chunk_text_with_overlap, input)
+
+        # Add document metadata to chunks if provided
+        if input['document_metadata'].present?
+          result['chunks'].each_with_index do |chunk, idx|
+            chunk['metadata'] ||= {}
+            chunk['metadata'].merge!({
+              'document_id' => input['document_metadata']['document_id'],
+              'file_name' => input['document_metadata']['file_name'],
+              'file_id' => input['document_metadata']['file_id'],
+              'total_chunks' => result['total_chunks']
+            })
+          end
+        end
+
         call(:validate_contract, connection, result, 'chunking_result')
       end
     },
@@ -1247,6 +1269,497 @@ require 'csv'
         error("API token is required for Developer API calls") if connection['api_token'].blank?
         call(:resolve_project_from_recipe, connection, input["recipe_id"])
       end
+    },
+
+    # --- Document Processing for RAG Pipeline ---
+    process_document_for_rag: {
+      title: 'Process document for RAG',
+      subtitle: 'Complete document processing pipeline for RAG indexing',
+      description: lambda do |input|
+        file_name = input.dig('file_metadata', 'file_name') || 'document'
+        chunk_size = input['chunk_size'] || 1000
+        "Process #{file_name} into RAG-ready chunks (#{chunk_size} chars each)"
+      end,
+
+      help: {
+        body: 'This action provides a complete document processing pipeline for RAG (Retrieval-Augmented Generation). ' \
+              'It takes raw document content and metadata, generates a stable document ID, chunks the text with smart boundaries, ' \
+              'and produces enhanced chunks with merged metadata ready for embedding and indexing.',
+        learn_more_url: 'https://docs.workato.com/connectors/rag-utils.html',
+        learn_more_text: 'RAG Utils Documentation'
+      },
+
+      input_fields: lambda do |object_definitions|
+        [
+          {
+            name: 'document_content', label: 'Document content', type: 'string',
+            optional: false,
+            hint: 'Raw text content of the document to be processed'
+          },
+          {
+            name: 'file_metadata', label: 'File metadata', type: 'object',
+            optional: false,
+            properties: [
+              { name: 'file_id', label: 'File ID', type: 'string', optional: false },
+              { name: 'file_name', label: 'File name', type: 'string', optional: false },
+              { name: 'checksum', label: 'Checksum', type: 'string', optional: true },
+              { name: 'mime_type', label: 'MIME type', type: 'string', optional: true },
+              { name: 'size', label: 'File size', type: 'integer', optional: true },
+              { name: 'modified_time', label: 'Modified time', type: 'date_time', optional: true }
+            ],
+            hint: 'File metadata object containing file_id, file_name, and optional checksum/mime_type'
+          },
+          {
+            name: 'chunk_size', label: 'Chunk size', type: 'integer',
+            optional: true, default: 1000,
+            hint: 'Target size for each text chunk in characters (default: 1000)'
+          },
+          {
+            name: 'chunk_overlap', label: 'Chunk overlap', type: 'integer',
+            optional: true, default: 100,
+            hint: 'Number of characters to overlap between chunks (default: 100)'
+          },
+          {
+            name: 'additional_metadata', label: 'Additional metadata', type: 'object',
+            optional: true,
+            hint: 'Additional metadata to include with each chunk'
+          }
+        ]
+      end,
+
+      output_fields: lambda do |object_definitions|
+        [
+          {
+            name: 'document_id', label: 'Document ID', type: 'string',
+            hint: 'Unique document identifier generated from file path and checksum'
+          },
+          {
+            name: 'chunks', label: 'Enhanced chunks', type: 'array', of: 'object',
+            properties: [
+              { name: 'chunk_id', label: 'Chunk ID', type: 'string' },
+              { name: 'text', label: 'Chunk text', type: 'string' },
+              { name: 'chunk_index', label: 'Chunk index', type: 'integer' },
+              { name: 'start_position', label: 'Start position', type: 'integer' },
+              { name: 'end_position', label: 'End position', type: 'integer' },
+              { name: 'character_count', label: 'Character count', type: 'integer' },
+              { name: 'word_count', label: 'Word count', type: 'integer' },
+              { name: 'document_id', label: 'Document ID', type: 'string' },
+              { name: 'file_name', label: 'File name', type: 'string' },
+              { name: 'file_id', label: 'File ID', type: 'string' },
+              { name: 'source', label: 'Source', type: 'string' },
+              { name: 'indexed_at', label: 'Indexed at', type: 'string' }
+            ],
+            hint: 'Array of chunks with enhanced metadata ready for embedding'
+          },
+          {
+            name: 'document_metadata', label: 'Document metadata', type: 'object',
+            properties: [
+              { name: 'total_chunks', label: 'Total chunks', type: 'integer' },
+              { name: 'total_characters', label: 'Total characters', type: 'integer' },
+              { name: 'total_words', label: 'Total words', type: 'integer' },
+              { name: 'processing_timestamp', label: 'Processing timestamp', type: 'string' },
+              { name: 'chunk_size_used', label: 'Chunk size used', type: 'integer' },
+              { name: 'overlap_used', label: 'Overlap used', type: 'integer' }
+            ],
+            hint: 'Summary metadata about the document processing'
+          },
+          {
+            name: 'ready_for_embedding', label: 'Ready for embedding', type: 'boolean',
+            hint: 'True when document processing is complete and ready for embedding generation'
+          }
+        ]
+      end,
+
+      execute: lambda do |connection, input|
+        # Step 1: Extract and validate inputs
+        document_content = input['document_content'].to_s
+        file_metadata = input['file_metadata'] || {}
+        chunk_size = [input.fetch('chunk_size', 1000), 100].max  # Minimum 100 chars
+        chunk_overlap = [input.fetch('chunk_overlap', 100), 0].max
+        additional_metadata = input['additional_metadata'] || {}
+
+        # Validate required fields
+        error('Document content is required') if document_content.empty?
+        error('file_metadata.file_id is required') if file_metadata['file_id'].blank?
+        error('file_metadata.file_name is required') if file_metadata['file_name'].blank?
+
+        # Step 2: Generate document ID using helper
+        file_path = file_metadata['file_name']
+        checksum = file_metadata['checksum'] || 'no_checksum'
+        document_id = call('generate_document_id', file_path, checksum)
+
+        # Step 3: Call chunk_text_with_overlap action
+        chunk_input = {
+          'text' => document_content,
+          'chunk_size' => chunk_size,
+          'overlap_tokens' => (chunk_overlap / 4.0).ceil  # Convert chars to approximate tokens
+        }
+
+        chunk_result = call('chunk_text_with_overlap', chunk_input)
+        base_chunks = chunk_result['chunks'] || []
+
+        # Step 4: Process each chunk and enhance with metadata
+        enhanced_chunks = []
+        base_chunks.each_with_index do |chunk, index|
+          # Generate chunk ID
+          chunk_id = "#{document_id}_chunk_#{index}"
+
+          # Prepare chunk metadata
+          chunk_metadata = {
+            'chunk_id' => chunk_id,
+            'chunk_index' => index,
+            'start_position' => chunk['start_position'],
+            'end_position' => chunk['end_position'],
+            'character_count' => chunk['character_count'],
+            'word_count' => chunk['word_count']
+          }
+
+          # Merge with additional metadata if provided
+          chunk_metadata.merge!(additional_metadata) if additional_metadata.is_a?(Hash)
+
+          # Use helper to merge document metadata
+          merge_options = {
+            document_id: document_id,
+            file_name: file_metadata['file_name'],
+            file_id: file_metadata['file_id']
+          }
+
+          enhanced_metadata = call('merge_document_metadata', chunk_metadata, file_metadata, merge_options)
+
+          # Build enhanced chunk
+          enhanced_chunk = {
+            'chunk_id' => chunk_id,
+            'text' => chunk['text'],
+            'chunk_index' => index,
+            'start_position' => chunk['start_position'],
+            'end_position' => chunk['end_position'],
+            'character_count' => chunk['character_count'],
+            'word_count' => chunk['word_count'],
+            'document_id' => document_id,
+            'file_name' => file_metadata['file_name'],
+            'file_id' => file_metadata['file_id'],
+            'source' => enhanced_metadata['source'],
+            'indexed_at' => enhanced_metadata['indexed_at']
+          }
+
+          # Add any additional metadata fields
+          enhanced_metadata.each do |key, value|
+            unless enhanced_chunk.key?(key)
+              enhanced_chunk[key] = value
+            end
+          end
+
+          enhanced_chunks << enhanced_chunk
+        end
+
+        # Step 5: Generate document metadata
+        processing_timestamp = Time.now.iso8601
+        total_characters = document_content.length
+        total_words = document_content.split(/\s+/).length
+
+        document_metadata = {
+          'total_chunks' => enhanced_chunks.length,
+          'total_characters' => total_characters,
+          'total_words' => total_words,
+          'processing_timestamp' => processing_timestamp,
+          'chunk_size_used' => chunk_size,
+          'overlap_used' => chunk_overlap
+        }
+
+        # Step 6: Build final response
+        {
+          'document_id' => document_id,
+          'chunks' => enhanced_chunks,
+          'document_metadata' => document_metadata,
+          'ready_for_embedding' => true
+        }
+      end
+    },
+
+    prepare_document_batch: {
+      title: 'Prepare document batch for RAG',
+      subtitle: 'Process multiple documents and group chunks into batches',
+      description: lambda do |input|
+        documents = input['documents'] || []
+        batch_size = input['batch_size'] || 25
+        count = documents.length
+        if count > 0
+          "Process #{count} documents and group chunks into batches of #{batch_size}"
+        else
+          'Process multiple documents for RAG indexing'
+        end
+      end,
+
+      help: {
+        body: 'This action processes multiple documents through the RAG pipeline and groups their chunks into batches. ' \
+              'Each document is processed using process_document_for_rag, then all chunks are organized into ' \
+              'manageable batches for embedding generation. Provides comprehensive metrics and batch tracking.',
+        learn_more_url: 'https://docs.workato.com/connectors/rag-utils.html',
+        learn_more_text: 'RAG Utils Documentation'
+      },
+
+      input_fields: lambda do |object_definitions|
+        [
+          {
+            name: 'documents', label: 'Documents', type: 'array', of: 'object',
+            optional: false,
+            properties: [
+              { name: 'document_content', label: 'Document content', type: 'string', optional: false },
+              { name: 'file_metadata', label: 'File metadata', type: 'object', optional: false,
+                properties: [
+                  { name: 'file_id', label: 'File ID', type: 'string', optional: false },
+                  { name: 'file_name', label: 'File name', type: 'string', optional: false },
+                  { name: 'checksum', label: 'Checksum', type: 'string', optional: true },
+                  { name: 'mime_type', label: 'MIME type', type: 'string', optional: true },
+                  { name: 'size', label: 'File size', type: 'integer', optional: true },
+                  { name: 'modified_time', label: 'Modified time', type: 'date_time', optional: true }
+                ]
+              },
+              { name: 'chunk_size', label: 'Chunk size', type: 'integer', optional: true },
+              { name: 'chunk_overlap', label: 'Chunk overlap', type: 'integer', optional: true },
+              { name: 'additional_metadata', label: 'Additional metadata', type: 'object', optional: true }
+            ],
+            hint: 'Array of documents to process, each with content and metadata'
+          },
+          {
+            name: 'batch_size', label: 'Batch size', type: 'integer',
+            optional: true, default: 25,
+            hint: 'Number of chunks per batch (default: 25, max: 100)'
+          },
+          {
+            name: 'default_chunk_size', label: 'Default chunk size', type: 'integer',
+            optional: true, default: 1000,
+            hint: 'Default chunk size for documents that don\'t specify one'
+          },
+          {
+            name: 'default_chunk_overlap', label: 'Default chunk overlap', type: 'integer',
+            optional: true, default: 100,
+            hint: 'Default chunk overlap for documents that don\'t specify one'
+          }
+        ]
+      end,
+
+      output_fields: lambda do |object_definitions|
+        [
+          {
+            name: 'batches', label: 'Chunk batches', type: 'array', of: 'object',
+            properties: [
+              { name: 'batch_id', label: 'Batch ID', type: 'string' },
+              { name: 'chunks', label: 'Chunks', type: 'array', of: 'object',
+                properties: [
+                  { name: 'chunk_id', label: 'Chunk ID', type: 'string' },
+                  { name: 'text', label: 'Chunk text', type: 'string' },
+                  { name: 'chunk_index', label: 'Chunk index', type: 'integer' },
+                  { name: 'document_id', label: 'Document ID', type: 'string' },
+                  { name: 'file_name', label: 'File name', type: 'string' },
+                  { name: 'file_id', label: 'File ID', type: 'string' },
+                  { name: 'source', label: 'Source', type: 'string' },
+                  { name: 'indexed_at', label: 'Indexed at', type: 'string' }
+                ]
+              },
+              { name: 'document_count', label: 'Document count', type: 'integer' },
+              { name: 'chunk_count', label: 'Chunk count', type: 'integer' },
+              { name: 'batch_index', label: 'Batch index', type: 'integer' }
+            ],
+            hint: 'Array of batches, each containing chunks grouped for processing'
+          },
+          {
+            name: 'summary', label: 'Processing summary', type: 'object',
+            properties: [
+              { name: 'total_documents', label: 'Total documents', type: 'integer' },
+              { name: 'total_chunks', label: 'Total chunks', type: 'integer' },
+              { name: 'total_batches', label: 'Total batches', type: 'integer' },
+              { name: 'processing_timestamp', label: 'Processing timestamp', type: 'string' },
+              { name: 'successful_documents', label: 'Successful documents', type: 'integer' },
+              { name: 'failed_documents', label: 'Failed documents', type: 'integer' }
+            ],
+            hint: 'Summary statistics about the batch processing operation'
+          },
+          {
+            name: 'failed_documents', label: 'Failed documents', type: 'array', of: 'object',
+            properties: [
+              { name: 'file_name', label: 'File name', type: 'string' },
+              { name: 'file_id', label: 'File ID', type: 'string' },
+              { name: 'error_message', label: 'Error message', type: 'string' }
+            ],
+            hint: 'Array of documents that failed to process with error details'
+          }
+        ]
+      end,
+
+      execute: lambda do |connection, input|
+        start_time = Time.now
+        timestamp = start_time.strftime('%Y%m%d_%H%M%S')
+
+        # Step 1: Extract and validate inputs
+        documents = input['documents'] || []
+        batch_size = [input.fetch('batch_size', 25), 100].min  # Max 100 chunks per batch
+        default_chunk_size = input.fetch('default_chunk_size', 1000)
+        default_chunk_overlap = input.fetch('default_chunk_overlap', 100)
+
+        return {
+          'batches' => [],
+          'summary' => {
+            'total_documents' => 0,
+            'total_chunks' => 0,
+            'total_batches' => 0,
+            'processing_timestamp' => start_time.iso8601,
+            'successful_documents' => 0,
+            'failed_documents' => 0
+          },
+          'failed_documents' => []
+        } if documents.empty?
+
+        # Step 2: Process each document and collect all chunks
+        all_chunks = []
+        successful_documents = 0
+        failed_documents = []
+
+        documents.each do |document|
+          begin
+            # Prepare input for process_document_for_rag
+            process_input = {
+              'document_content' => document['document_content'],
+              'file_metadata' => document['file_metadata'],
+              'chunk_size' => document['chunk_size'] || default_chunk_size,
+              'chunk_overlap' => document['chunk_overlap'] || default_chunk_overlap,
+              'additional_metadata' => document['additional_metadata']
+            }
+
+            # Process document using the same logic as process_document_for_rag
+            document_content = process_input['document_content'].to_s
+            file_metadata = process_input['file_metadata'] || {}
+            chunk_size = [process_input.fetch('chunk_size', 1000), 100].max
+            chunk_overlap = [process_input.fetch('chunk_overlap', 100), 0].max
+            additional_metadata = process_input['additional_metadata'] || {}
+
+            # Validate required fields
+            next if document_content.empty? || file_metadata['file_id'].blank? || file_metadata['file_name'].blank?
+
+            # Generate document ID
+            file_path = file_metadata['file_name']
+            checksum = file_metadata['checksum'] || 'no_checksum'
+            document_id = call('generate_document_id', file_path, checksum)
+
+            # Chunk the text
+            chunk_input = {
+              'text' => document_content,
+              'chunk_size' => chunk_size,
+              'overlap_tokens' => (chunk_overlap / 4.0).ceil
+            }
+
+            chunk_result = call('chunk_text_with_overlap', chunk_input)
+            base_chunks = chunk_result['chunks'] || []
+
+            # Process each chunk
+            enhanced_chunks = []
+            base_chunks.each_with_index do |chunk, index|
+              chunk_id = "#{document_id}_chunk_#{index}"
+
+              chunk_metadata = {
+                'chunk_id' => chunk_id,
+                'chunk_index' => index,
+                'start_position' => chunk['start_position'],
+                'end_position' => chunk['end_position'],
+                'character_count' => chunk['character_count'],
+                'word_count' => chunk['word_count']
+              }
+
+              chunk_metadata.merge!(additional_metadata) if additional_metadata.is_a?(Hash)
+
+              merge_options = {
+                document_id: document_id,
+                file_name: file_metadata['file_name'],
+                file_id: file_metadata['file_id']
+              }
+
+              enhanced_metadata = call('merge_document_metadata', chunk_metadata, file_metadata, merge_options)
+
+              enhanced_chunk = {
+                'chunk_id' => chunk_id,
+                'text' => chunk['text'],
+                'chunk_index' => index,
+                'start_position' => chunk['start_position'],
+                'end_position' => chunk['end_position'],
+                'character_count' => chunk['character_count'],
+                'word_count' => chunk['word_count'],
+                'document_id' => document_id,
+                'file_name' => file_metadata['file_name'],
+                'file_id' => file_metadata['file_id'],
+                'source' => enhanced_metadata['source'],
+                'indexed_at' => enhanced_metadata['indexed_at']
+              }
+
+              enhanced_metadata.each do |key, value|
+                unless enhanced_chunk.key?(key)
+                  enhanced_chunk[key] = value
+                end
+              end
+
+              enhanced_chunks << enhanced_chunk
+            end
+
+            result = { 'chunks' => enhanced_chunks }
+
+            # Collect chunks from this document
+            document_chunks = result['chunks'] || []
+            all_chunks.concat(document_chunks)
+            successful_documents += 1
+
+          rescue => e
+            # Track failed documents
+            file_metadata = document['file_metadata'] || {}
+            failed_documents << {
+              'file_name' => file_metadata['file_name'] || 'unknown',
+              'file_id' => file_metadata['file_id'] || 'unknown',
+              'error_message' => e.message
+            }
+          end
+        end
+
+        # Step 3: Group chunks into batches
+        batches = []
+        batch_index = 0
+
+        all_chunks.each_slice(batch_size) do |chunk_group|
+          # Generate batch ID with timestamp and index
+          batch_id = "batch_#{timestamp}_#{batch_index}"
+
+          # Count unique document IDs in this batch
+          document_ids = chunk_group.map { |chunk| chunk['document_id'] }.uniq
+          document_count = document_ids.length
+
+          # Create batch object
+          batch = {
+            'batch_id' => batch_id,
+            'chunks' => chunk_group,
+            'document_count' => document_count,
+            'chunk_count' => chunk_group.length,
+            'batch_index' => batch_index
+          }
+
+          batches << batch
+          batch_index += 1
+        end
+
+        # Step 4: Generate summary
+        processing_timestamp = Time.now.iso8601
+        summary = {
+          'total_documents' => documents.length,
+          'total_chunks' => all_chunks.length,
+          'total_batches' => batches.length,
+          'processing_timestamp' => processing_timestamp,
+          'successful_documents' => successful_documents,
+          'failed_documents' => failed_documents.length
+        }
+
+        # Step 5: Build final response
+        {
+          'batches' => batches,
+          'summary' => summary,
+          'failed_documents' => failed_documents
+        }
+      end
     }
 
   },
@@ -1255,7 +1768,6 @@ require 'csv'
   # METHODS (Helper Functions)
   # ==========================================
   methods: {
-
 
     chunk_text_with_overlap: lambda do |input|
       text = input['text'].to_s
@@ -3087,6 +3599,123 @@ require 'csv'
         call(:dt_table_columns, connection, tbl)
       end
     end
+  end,
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # -- Document Processing Helper Methods
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  generate_document_id: lambda do |file_path, checksum|
+    # Create stable document ID using SHA256 hash of "path|checksum"
+    require 'digest'
+
+    path_str = file_path.to_s.strip
+    checksum_str = checksum.to_s.strip
+
+    # Combine path and checksum with pipe separator
+    combined = "#{path_str}|#{checksum_str}"
+
+    # Generate SHA256 hash and return as hex string
+    Digest::SHA256.hexdigest(combined)
+  end,
+
+  calculate_chunk_boundaries: lambda do |text, chunk_size, overlap_tokens = 0|
+    # Convert text to string and ensure we have content
+    text_str = text.to_s
+    return [] if text_str.empty?
+
+    # Calculate overlap in characters (tokens * 4 approximation)
+    overlap_chars = overlap_tokens * 4
+
+    # Start with basic chunk positions
+    boundaries = []
+    start_pos = 0
+
+    while start_pos < text_str.length
+      # Calculate end position for this chunk
+      end_pos = start_pos + chunk_size
+
+      # If this is the last chunk, take everything remaining
+      if end_pos >= text_str.length
+        boundaries << { start: start_pos, end: text_str.length }
+        break
+      end
+
+      # Smart boundary detection - look for sentence endings
+      # Search backward from end_pos for sentence boundary
+      search_start = [end_pos - 200, start_pos].max  # Don't search too far back
+      chunk_text = text_str[search_start...end_pos + 100] || ""
+
+      # Look for sentence endings: period, exclamation, question mark followed by whitespace
+      sentence_matches = chunk_text.scan(/[.!?]\s+/).map.with_index do |match, idx|
+        match_pos = search_start + chunk_text.index(match, idx * 2)
+        match_pos + match.length
+      end
+
+      # Find the best sentence boundary near our target end position
+      best_boundary = sentence_matches.select { |pos| pos <= end_pos + 50 && pos > start_pos + chunk_size / 2 }.last
+
+      if best_boundary
+        # Use sentence boundary
+        actual_end = best_boundary
+      else
+        # Fallback to word boundary
+        # Look for last word boundary before end_pos
+        word_boundary_text = text_str[start_pos...end_pos + 50] || ""
+        word_matches = word_boundary_text.scan(/\s+/).map.with_index do |match, idx|
+          match_pos = start_pos + word_boundary_text.index(match, idx * 2)
+          match_pos
+        end
+
+        word_boundary = word_matches.select { |pos| pos <= end_pos }.last
+        actual_end = word_boundary ? word_boundary : end_pos
+      end
+
+      # Ensure we don't go past the text
+      actual_end = [actual_end, text_str.length].min
+
+      boundaries << { start: start_pos, end: actual_end }
+
+      # Calculate next start position with overlap
+      start_pos = [actual_end - overlap_chars, actual_end].min
+
+      # Ensure we make progress
+      start_pos = actual_end if start_pos <= boundaries.last[:start]
+    end
+
+    boundaries
+  end,
+
+  merge_document_metadata: lambda do |chunk_metadata, document_metadata, options = {}|
+    # Extract required information
+    document_id = options[:document_id] || document_metadata[:id] || document_metadata['id']
+    file_name = options[:file_name] || document_metadata[:name] || document_metadata['name']
+    file_id = options[:file_id] || document_metadata[:file_id] || document_metadata['file_id']
+
+    # Start with chunk metadata
+    merged = chunk_metadata.is_a?(Hash) ? chunk_metadata.dup : {}
+
+    # Add document metadata
+    if document_metadata.is_a?(Hash)
+      merged.merge!(document_metadata)
+    end
+
+    # Add required fields
+    merged[:document_id] = document_id if document_id
+    merged[:file_name] = file_name if file_name
+    merged[:file_id] = file_id if file_id
+
+    # Add source and timestamp
+    merged[:source] = 'google_drive'
+    merged[:indexed_at] = Time.now.iso8601
+
+    # Convert symbol keys to strings for consistency
+    result = {}
+    merged.each do |key, value|
+      result[key.to_s] = value
+    end
+
+    result
   end
 
   }
