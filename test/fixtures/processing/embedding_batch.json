@@ -1,0 +1,92 @@
+{
+  "batch_id": "emb_batch_20240919_143052",
+  "batch_type": "document_chunks",
+  "source_document": {
+    "file_id": "drive_file_faq_001",
+    "file_name": "sample_faq.txt",
+    "mime_type": "text/plain",
+    "file_path": "/support/faqs/sample_faq.txt"
+  },
+  "batches": [
+    {
+      "batch_id": "emb_batch_0_20240919_143052",
+      "batch_number": 0,
+      "requests": [
+        {
+          "text": "FREQUENTLY ASKED QUESTIONS\nLast Updated: September 15, 2024\n\nSECTION 1: ORDERING AND SHIPPING\n=================================\n\nQ: What are your standard shipping times?\nA: Standard shipping typically takes 5-7 business days within the continental United States. Express shipping options are available at checkout for 2-3 business day delivery. International shipping times vary by destination but generally range from 10-21 business days.",
+          "metadata": {
+            "id": "doc_faq_chunk_0",
+            "title": "FAQ - Ordering and Shipping",
+            "task_type": "RETRIEVAL_DOCUMENT",
+            "batch_id": "emb_batch_0_20240919_143052",
+            "document_id": "doc_faq_001",
+            "file_id": "drive_file_faq_001",
+            "file_name": "sample_faq.txt",
+            "file_path": "/support/faqs/sample_faq.txt",
+            "document_type": "faq",
+            "chunk_index": 0,
+            "total_chunks": 5,
+            "section": "ORDERING AND SHIPPING",
+            "last_updated": "2024-09-15T00:00:00Z"
+          }
+        },
+        {
+          "text": "Q: How can I track my order?\nA: Once your order ships, you'll receive an email confirmation with a tracking number. You can track your package using this number on our website or directly on the carrier's website. Order status is also available in your account dashboard under \"My Orders\".\n\nQ: Do you ship internationally?\nA: Yes, we ship to most countries worldwide. International shipping rates are calculated at checkout based on your location and order weight. Please note that customers are responsible for any customs duties or import taxes.",
+          "metadata": {
+            "id": "doc_faq_chunk_1",
+            "title": "FAQ - Shipping Details",
+            "task_type": "RETRIEVAL_DOCUMENT",
+            "batch_id": "emb_batch_0_20240919_143052",
+            "document_id": "doc_faq_001",
+            "file_id": "drive_file_faq_001",
+            "file_name": "sample_faq.txt",
+            "file_path": "/support/faqs/sample_faq.txt",
+            "document_type": "faq",
+            "chunk_index": 1,
+            "total_chunks": 5,
+            "section": "ORDERING AND SHIPPING",
+            "last_updated": "2024-09-15T00:00:00Z"
+          }
+        }
+      ],
+      "size": 2
+    },
+    {
+      "batch_id": "emb_batch_1_20240919_143052",
+      "batch_number": 1,
+      "requests": [
+        {
+          "text": "SECTION 2: RETURNS AND REFUNDS\n===============================\n\nQ: What is your return policy?\nA: We accept returns within 30 days of delivery for most items in original condition with tags attached. Items must be unworn and unwashed. Final sale items, intimate apparel, and customized products cannot be returned.",
+          "metadata": {
+            "id": "doc_faq_chunk_2",
+            "title": "FAQ - Returns and Refunds",
+            "task_type": "RETRIEVAL_DOCUMENT",
+            "batch_id": "emb_batch_1_20240919_143052",
+            "document_id": "doc_faq_001",
+            "file_id": "drive_file_faq_001",
+            "file_name": "sample_faq.txt",
+            "file_path": "/support/faqs/sample_faq.txt",
+            "document_type": "faq",
+            "chunk_index": 2,
+            "total_chunks": 5,
+            "section": "RETURNS AND REFUNDS",
+            "last_updated": "2024-09-15T00:00:00Z"
+          }
+        }
+      ],
+      "size": 1
+    }
+  ],
+  "total_batches": 2,
+  "total_texts": 3,
+  "task_type": "RETRIEVAL_DOCUMENT",
+  "batch_generation_timestamp": "2024-09-19T14:30:52Z",
+  "batch_metadata": {
+    "source": "drive_sync",
+    "processing_id": "job_faq_20240919_143052",
+    "total_documents": 1,
+    "processing_strategy": "incremental",
+    "chunk_size": 1000,
+    "chunk_overlap": 100
+  }
+}

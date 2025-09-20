@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "id": "file_001",
+      "name": "FAQ_Document.txt",
+      "mimeType": "text/plain",
+      "modifiedTime": "2024-09-18T10:00:00Z",
+      "size": 2048
+    },
+    {
+      "id": "file_002", 
+      "name": "Employee_Manual.docx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "modifiedTime": "2024-09-17T15:30:00Z",
+      "size": 524288
+    }
+  ],
+  "nextPageToken": "token_abc123"
+}

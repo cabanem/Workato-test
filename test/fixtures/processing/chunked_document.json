@@ -1,0 +1,25 @@
+{
+  "document_id": "doc_123",
+  "file_id": "1234567890abcdef",
+  "chunks": [
+    {
+      "chunk_id": "doc_123_chunk_0",
+      "chunk_index": 0,
+      "text": "COMPANY POLICY DOCUMENT\nEffective Date: January 1, 2024\n\nSection 1: Return Policy\nAll products may be returned within 30 days of purchase with original receipt.",
+      "token_count": 42,
+      "metadata": {
+        "document_id": "doc_123",
+        "file_id": "1234567890abcdef",
+        "file_name": "Company_Policy_2024.pdf",
+        "chunk_index": 0,
+        "total_chunks": 3,
+        "section": "Return Policy"
+      }
+    }
+  ],
+  "stats": {
+    "total_chunks": 3,
+    "total_tokens": 126,
+    "average_chunk_size": 42
+  }
+}
