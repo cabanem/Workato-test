@@ -583,12 +583,13 @@
         call('sample_record_output', 'analyze_image')
       end
     },
-    # --- Embedding and Vector Search actions ---
+    # --- Embedding and Vector Search actions (4)---
     generate_embeddings: {
-      title: 'Generate text embeddings (Batch)',
-      subtitle: 'Generate embeddings for multiple texts in batch',
-      description: "Generate text <span class='provider'>embeddings</span> for multiple texts using " \
-                   "Google models in <span class='provider'>Google Vertex AI</span>",
+      title: '[EMBEDDING] Generate text embeddings (Batch)',
+      subtitle: '[EMBEDDING] Generate embeddings for multiple texts in batch',
+      description: 'Generate text embeddings for multiple texts using Google models in Google Vertex AI',
+      batch: true,
+      display_priority: 4,
       help: {
         body: 'Batch text embedding generates numerical vectors for multiple text inputs efficiently. ' \
               'It processes an array of texts and returns vectors that capture the meaning ' \
@@ -689,10 +690,10 @@
       end
     },
     generate_embedding_single: {
-      title: 'Generate single text embedding',
-      subtitle: 'Generate embedding for a single text input',
-      description: "Generate text <span class='provider'>embedding</span> for a single text using " \
-                   "Google models in <span class='provider'>Google Vertex AI</span>",
+      title: '[EMBEDDING] Generate single text embedding',
+      subtitle: '[EMBEDDING] Generate embedding for a single text input',
+      description: 'Generate text embedding for a single text using Google models in Google Vertex AI',
+      display_priority: 4,
       help: {
         body: 'Generate a numerical vector for a single text input. This is optimized for RAG query flows ' \
               'where you need to embed a single user query to find similar documents. The vector captures ' \
@@ -773,10 +774,10 @@
       end
     },
     find_neighbors: {
-      title: 'Find neighbors (Vector Search)',
-      subtitle: 'K-NN query on a deployed Vertex AI index endpoint',
-      description: "Query a <span class='provider'>Vertex AI Vector Search</span> index endpoint "\
-                  "to retrieve nearest neighbors.",
+      title: '[VECTOR_SEARCH] Find neighbors',
+      subtitle: '[VECTOR_SEARCH] K-NN query on a deployed Vertex AI index endpoint',
+      display_priority: 4,
+      description: "Query a Vertex AI Vector Search index endpoint to retrieve nearest neighbors.",
       retry_on_request: ['POST'],
       retry_on_response: [429, 500, 502, 503, 504],
       max_retries: 3,
@@ -878,9 +879,10 @@
       end
     },
     upsert_index_datapoints: {
-      title: 'Upsert index datapoints',
-      subtitle: 'Add or update vector datapoints in Vertex AI Vector Search index',
-      description: 'Upsert vector datapoints to <span class="provider">Vertex AI Vector Search</span> index',
+      title: '[VECTOR_SEARCH] Upsert index datapoints',
+      subtitle: '[VECTOR_SEARCH] Add or update vector datapoints in Vertex AI Vector Search index',
+      description: 'Upsert vector datapoints to Vertex AI Vector Search index',
+      display_priority: 4,
 
       help: lambda do
         {
@@ -1029,9 +1031,10 @@
 
     # --- Test connection action ---
     test_connection: {
-      title: 'Test connection and permissions',
-      subtitle: 'Verify API access and permissions',
-      description: 'Tests connectivity to Vertex AI and Google Drive APIs, validates permissions, and returns diagnostic information',   
+      title: '[TEST] Test connection and permissions',
+      subtitle: '[TEST] Verify API access and permissions',
+      display_priority: 2,
+      description: 'Tests connectivity to Vertex AI and Google Drive APIs, validates permissions, and returns diagnostic information',
       help: {
         body: 'Use this action to verify your connection is working and has the required permissions. ' \
               'Useful for debugging and monitoring connection health.',
@@ -1359,10 +1362,10 @@
     },
     # --- Legacy Text Bison action kept for backward compatibility ---
     get_prediction: {
-      title: 'Get prediction',
-      subtitle: 'Get prediction in Google Vertex AI',
-      description: "Get <span class='provider'>prediction in <span class='provider'>" \
-                   'Google Vertex AI</span>',
+      title: '[LEGACY] Get prediction',
+      subtitle: '[LEGACY]Get prediction in Google Vertex AI',
+      display_priority: 1,
+      description: "Get prediction in Google Vertex AI",
       help: lambda do
         {
           body: 'This action will retrieve prediction using the PaLM 2 for Text ' \
@@ -1411,8 +1414,9 @@
 
     # --- Google Drive File Fetching ---
     fetch_drive_file: {
-      title: 'Fetch Google Drive file',
-      subtitle: 'Download file content from Google Drive',
+      title: '[DRIVE] Fetch Google Drive file',
+      subtitle: '[DRIVE] Download file content from Google Drive',
+      display_priority: 5,
       description: lambda do |input|
         file_id = input['file_id']
         if file_id.present?
@@ -1476,10 +1480,10 @@
         metadata_response.merge(content_result)
       end
     },
-
     list_drive_files: {
-      title: 'List Google Drive files',
-      subtitle: 'Retrieve a list of files from Google Drive',
+      title: '[DRIVE] List Google Drive files',
+      subtitle: '[DRIVE] Retrieve a list of files from Google Drive',
+      diplay_priority: 5,
       description: lambda do |input|
         folder_id = input['folder_id']
         if folder_id.present?
@@ -1637,10 +1641,11 @@
         }
       end
     },
-
     batch_fetch_drive_files: {
-      title: 'Batch fetch Google Drive files',
-      subtitle: 'Fetch content from multiple Google Drive files',
+      title: '[DRIVE] Batch fetch Google Drive files',
+      subtitle: '[DRIVE] Fetch content from multiple Google Drive files',
+      display_priority: 5,
+      batch: true,
       description: lambda do |input|
         file_ids = input['file_ids'] || []
         count = file_ids.length
@@ -1809,372 +1814,373 @@
         }
       end
     },
-monitor_drive_changes: {
-  title: 'Monitor Google Drive changes',
-  subtitle: 'Track file changes since last check',
-  description: lambda do |input|
-    if input['page_token'].present?
-      'Continue monitoring Drive changes from saved checkpoint'
-    else
-      'Start monitoring Drive changes (initial scan)'
-    end
-  end,
+    monitor_drive_changes: {
+      title: '[DRIVE] Monitor Google Drive changes',
+      subtitle: '[DRIVE] Track file changes since last check',
+      display_priority: 5,
+      description: lambda do |input|
+        if input['page_token'].present?
+          'Continue monitoring Drive changes from saved checkpoint'
+        else
+          'Start monitoring Drive changes (initial scan)'
+        end
+      end,
 
-  help: {
-    body: 'This action tracks changes in Google Drive since the last check. ' \
-          'Use page tokens to maintain state between checks for incremental updates. ' \
-          'On first run, it returns a start token. Subsequent runs return actual changes.',
-    learn_more_url: 'https://developers.google.com/drive/api/v3/manage-changes',
-    learn_more_text: 'Google Drive Changes API Documentation'
-  },
+      help: {
+        body: 'This action tracks changes in Google Drive since the last check. ' \
+              'Use page tokens to maintain state between checks for incremental updates. ' \
+              'On first run, it returns a start token. Subsequent runs return actual changes.',
+        learn_more_url: 'https://developers.google.com/drive/api/v3/manage-changes',
+        learn_more_text: 'Google Drive Changes API Documentation'
+      },
 
-  input_fields: lambda do |object_definitions|
-    [
-      {
-        name: 'page_token', 
-        label: 'Page token', 
-        type: 'string',
-        optional: true,
-        hint: 'Token from previous response for incremental updates. Leave empty for initial setup.'
-      },
-      {
-        name: 'folder_id',
-        label: 'Folder ID or URL',
-        type: 'string', 
-        optional: true,
-        hint: 'Specific folder to monitor (leave empty to monitor all accessible files)'
-      },
-      {
-        name: 'include_removed',
-        label: 'Include removed files',
-        type: 'boolean',
-        control_type: 'checkbox',
-        optional: true,
-        default: false,
-        hint: 'Include files that have been removed or trashed'
-      },
-      {
-        name: 'include_shared_drives',
-        label: 'Include shared drives',
-        type: 'boolean',
-        control_type: 'checkbox',
-        optional: true, 
-        default: false,
-        hint: 'Include changes from shared drives (requires additional permissions)'
-      },
-      {
-        name: 'page_size',
-        label: 'Page size',
-        type: 'integer',
-        optional: true,
-        default: 100,
-        hint: 'Number of changes to return per page (1-1000, default: 100)'
-      }
-    ]
-  end,
+      input_fields: lambda do |object_definitions|
+        [
+          {
+            name: 'page_token', 
+            label: 'Page token', 
+            type: 'string',
+            optional: true,
+            hint: 'Token from previous response for incremental updates. Leave empty for initial setup.'
+          },
+          {
+            name: 'folder_id',
+            label: 'Folder ID or URL',
+            type: 'string', 
+            optional: true,
+            hint: 'Specific folder to monitor (leave empty to monitor all accessible files)'
+          },
+          {
+            name: 'include_removed',
+            label: 'Include removed files',
+            type: 'boolean',
+            control_type: 'checkbox',
+            optional: true,
+            default: false,
+            hint: 'Include files that have been removed or trashed'
+          },
+          {
+            name: 'include_shared_drives',
+            label: 'Include shared drives',
+            type: 'boolean',
+            control_type: 'checkbox',
+            optional: true, 
+            default: false,
+            hint: 'Include changes from shared drives (requires additional permissions)'
+          },
+          {
+            name: 'page_size',
+            label: 'Page size',
+            type: 'integer',
+            optional: true,
+            default: 100,
+            hint: 'Number of changes to return per page (1-1000, default: 100)'
+          }
+        ]
+      end,
 
-  output_fields: lambda do |object_definitions|
-    [
-      {
-        name: 'changes',
-        label: 'All changes',
-        type: 'array',
-        of: 'object',
-        properties: [
-          { name: 'changeType', label: 'Change type', type: 'string' },
-          { name: 'time', label: 'Change time', type: 'date_time' },
-          { name: 'removed', label: 'File removed', type: 'boolean' },
-          { name: 'fileId', label: 'File ID', type: 'string' },
-          { name: 'file', label: 'File details', type: 'object',
+      output_fields: lambda do |object_definitions|
+        [
+          {
+            name: 'changes',
+            label: 'All changes',
+            type: 'array',
+            of: 'object',
+            properties: [
+              { name: 'changeType', label: 'Change type', type: 'string' },
+              { name: 'time', label: 'Change time', type: 'date_time' },
+              { name: 'removed', label: 'File removed', type: 'boolean' },
+              { name: 'fileId', label: 'File ID', type: 'string' },
+              { name: 'file', label: 'File details', type: 'object',
+                properties: [
+                  { name: 'id', label: 'File ID', type: 'string' },
+                  { name: 'name', label: 'File name', type: 'string' },
+                  { name: 'mimeType', label: 'MIME type', type: 'string' },
+                  { name: 'modifiedTime', label: 'Modified time', type: 'date_time' },
+                  { name: 'size', label: 'File size', type: 'integer' },
+                  { name: 'md5Checksum', label: 'MD5 checksum', type: 'string' },
+                  { name: 'trashed', label: 'Is trashed', type: 'boolean' }
+                ]
+              }
+            ],
+            hint: 'Complete list of all changes detected'
+          },
+          {
+            name: 'new_page_token',
+            label: 'New page token',
+            type: 'string',
+            hint: 'Save this token for the next incremental check'
+          },
+          {
+            name: 'files_added',
+            label: 'Files added',
+            type: 'array',
+            of: 'object',
+            properties: [
+              { name: 'id', label: 'File ID', type: 'string' },
+              { name: 'name', label: 'File name', type: 'string' },
+              { name: 'mimeType', label: 'MIME type', type: 'string' },
+              { name: 'modifiedTime', label: 'Modified time', type: 'date_time' }
+            ],
+            hint: 'New files created since last check'
+          },
+          {
+            name: 'files_modified', 
+            label: 'Files modified',
+            type: 'array',
+            of: 'object',
             properties: [
               { name: 'id', label: 'File ID', type: 'string' },
               { name: 'name', label: 'File name', type: 'string' },
               { name: 'mimeType', label: 'MIME type', type: 'string' },
               { name: 'modifiedTime', label: 'Modified time', type: 'date_time' },
-              { name: 'size', label: 'File size', type: 'integer' },
-              { name: 'md5Checksum', label: 'MD5 checksum', type: 'string' },
-              { name: 'trashed', label: 'Is trashed', type: 'boolean' }
-            ]
+              { name: 'checksum', label: 'New checksum', type: 'string' }
+            ],
+            hint: 'Files that have been modified'
+          },
+          {
+            name: 'files_removed',
+            label: 'Files removed', 
+            type: 'array',
+            of: 'object',
+            properties: [
+              { name: 'fileId', label: 'File ID', type: 'string' },
+              { name: 'time', label: 'Removal time', type: 'date_time' }
+            ],
+            hint: 'Files that have been deleted or trashed'
+          },
+          {
+            name: 'summary',
+            label: 'Change summary',
+            type: 'object',
+            properties: [
+              { name: 'total_changes', label: 'Total changes', type: 'integer' },
+              { name: 'added_count', label: 'Files added', type: 'integer' },
+              { name: 'modified_count', label: 'Files modified', type: 'integer' },
+              { name: 'removed_count', label: 'Files removed', type: 'integer' },
+              { name: 'has_more', label: 'Has more changes', type: 'boolean' }
+            ],
+            hint: 'Summary statistics of changes'
+          },
+          {
+            name: 'is_initial_token',
+            label: 'Is initial token',
+            type: 'boolean',
+            hint: 'True if this was the initial setup (no changes returned)'
           }
-        ],
-        hint: 'Complete list of all changes detected'
-      },
-      {
-        name: 'new_page_token',
-        label: 'New page token',
-        type: 'string',
-        hint: 'Save this token for the next incremental check'
-      },
-      {
-        name: 'files_added',
-        label: 'Files added',
-        type: 'array',
-        of: 'object',
-        properties: [
-          { name: 'id', label: 'File ID', type: 'string' },
-          { name: 'name', label: 'File name', type: 'string' },
-          { name: 'mimeType', label: 'MIME type', type: 'string' },
-          { name: 'modifiedTime', label: 'Modified time', type: 'date_time' }
-        ],
-        hint: 'New files created since last check'
-      },
-      {
-        name: 'files_modified', 
-        label: 'Files modified',
-        type: 'array',
-        of: 'object',
-        properties: [
-          { name: 'id', label: 'File ID', type: 'string' },
-          { name: 'name', label: 'File name', type: 'string' },
-          { name: 'mimeType', label: 'MIME type', type: 'string' },
-          { name: 'modifiedTime', label: 'Modified time', type: 'date_time' },
-          { name: 'checksum', label: 'New checksum', type: 'string' }
-        ],
-        hint: 'Files that have been modified'
-      },
-      {
-        name: 'files_removed',
-        label: 'Files removed', 
-        type: 'array',
-        of: 'object',
-        properties: [
-          { name: 'fileId', label: 'File ID', type: 'string' },
-          { name: 'time', label: 'Removal time', type: 'date_time' }
-        ],
-        hint: 'Files that have been deleted or trashed'
-      },
-      {
-        name: 'summary',
-        label: 'Change summary',
-        type: 'object',
-        properties: [
-          { name: 'total_changes', label: 'Total changes', type: 'integer' },
-          { name: 'added_count', label: 'Files added', type: 'integer' },
-          { name: 'modified_count', label: 'Files modified', type: 'integer' },
-          { name: 'removed_count', label: 'Files removed', type: 'integer' },
-          { name: 'has_more', label: 'Has more changes', type: 'boolean' }
-        ],
-        hint: 'Summary statistics of changes'
-      },
-      {
-        name: 'is_initial_token',
-        label: 'Is initial token',
-        type: 'boolean',
-        hint: 'True if this was the initial setup (no changes returned)'
-      }
-    ]
-  end,
+        ]
+      end,
 
-  execute: lambda do |connection, input|
-    # Step 1: Determine if we need a start token or have one
-    page_token = input['page_token']
-    folder_id = input['folder_id'].present? ? call('extract_drive_file_id', input['folder_id']) : nil
-    include_removed = input['include_removed'] || false
-    include_shared_drives = input['include_shared_drives'] || false
-    page_size = [input.fetch('page_size', 100), 1000].min
+      execute: lambda do |connection, input|
+        # Step 1: Determine if we need a start token or have one
+        page_token = input['page_token']
+        folder_id = input['folder_id'].present? ? call('extract_drive_file_id', input['folder_id']) : nil
+        include_removed = input['include_removed'] || false
+        include_shared_drives = input['include_shared_drives'] || false
+        page_size = [input.fetch('page_size', 100), 1000].min
 
-    # Step 2: Get start token if not provided
-    if page_token.blank?
-      # Initial setup - get starting page token
-      start_params = {
-        supportsAllDrives: include_shared_drives
-      }
-      
-      # Add folder restriction if specified
-      if folder_id.present?
-        start_params[:driveId] = folder_id if include_shared_drives
-        start_params[:spaces] = 'drive'
-      end
-      
-      start_response = get('https://www.googleapis.com/drive/v3/changes/startPageToken').
-        params(start_params).
-        after_error_response(/.*/) do |code, body, _header, message|
-          error_msg = call('handle_drive_error', connection, code, body, message)
-          error(error_msg)
-        end
-      
-      # Return initial token for future use
-      return {
-        'changes' => [],
-        'new_page_token' => start_response['startPageToken'],
-        'files_added' => [],
-        'files_modified' => [],
-        'files_removed' => [],
-        'summary' => {
-          'total_changes' => 0,
-          'added_count' => 0,
-          'modified_count' => 0,
-          'removed_count' => 0,
-          'has_more' => false
-        },
-        'is_initial_token' => true
-      }
-    end
-
-    # Step 3: Get actual changes using the token
-    changes_params = {
-      pageToken: page_token,
-      pageSize: page_size,
-      fields: 'nextPageToken,newStartPageToken,changes(changeType,time,removed,fileId,file(id,name,mimeType,modifiedTime,size,md5Checksum,trashed,parents))',
-      supportsAllDrives: include_shared_drives,
-      includeRemoved: include_removed
-    }
-    
-    # Add folder restriction if specified
-    if folder_id.present? && include_shared_drives
-      changes_params[:driveId] = folder_id
-    end
-    
-    changes_response = get('https://www.googleapis.com/drive/v3/changes').
-      params(changes_params).
-      after_error_response(/.*/) do |code, body, _header, message|
-        error_msg = call('handle_drive_error', connection, code, body, message)
-        error(error_msg)
-      end
-
-    # Step 4: Process the changes
-    all_changes = changes_response['changes'] || []
-    
-    # Filter by folder if specified and not using shared drives
-    if folder_id.present? && !include_shared_drives
-      all_changes = all_changes.select do |change|
-        if change['file'] && change['file']['parents']
-          change['file']['parents'].include?(folder_id)
-        else
-          false
-        end
-      end
-    end
-
-    # Step 5: Categorize changes
-    files_added = []
-    files_modified = []
-    files_removed = []
-    
-    # Track seen files to avoid duplicates
-    seen_files = {}
-    
-    all_changes.each do |change|
-      file_id = change['fileId']
-      
-      if change['removed']
-        # File was removed
-        files_removed << {
-          'fileId' => file_id,
-          'time' => change['time']
-        }
-      elsif change['file']
-        file = change['file']
-        
-        # Skip trashed files unless explicitly requested
-        next if file['trashed'] && !include_removed
-        
-        file_summary = {
-          'id' => file['id'],
-          'name' => file['name'],
-          'mimeType' => file['mimeType'],
-          'modifiedTime' => file['modifiedTime'],
-          'checksum' => file['md5Checksum']
-        }
-        
-        # Determine if file is new or modified
-        # This is simplified - in production, you'd track file creation time
-        if seen_files[file_id]
-          # Already seen in this batch, treat as modified
-          files_modified << file_summary
-        else
-          # First time seeing this file
-          # Check if it's a new file based on the change type
-          if change['changeType'] == 'file'
-            # Could be either new or modified
-            # For simplicity, we'll treat first occurrence as added
-            # In production, compare modifiedTime with change time
-            time_diff = if file['modifiedTime'] && change['time']
-              modified = Time.parse(file['modifiedTime'])
-              changed = Time.parse(change['time'])
-              (changed - modified).abs
-            else
-              0
-            end
-            
-            # If modified very recently relative to change, likely new
-            if time_diff < 60 # Within 60 seconds
-              files_added << file_summary
-            else
-              files_modified << file_summary
-            end
-          else
-            files_modified << file_summary
+        # Step 2: Get start token if not provided
+        if page_token.blank?
+          # Initial setup - get starting page token
+          start_params = {
+            supportsAllDrives: include_shared_drives
+          }
+          
+          # Add folder restriction if specified
+          if folder_id.present?
+            start_params[:driveId] = folder_id if include_shared_drives
+            start_params[:spaces] = 'drive'
           end
           
-          seen_files[file_id] = true
-        end
-      end
-    end
-
-    # Step 6: Determine next page token
-    next_token = changes_response['nextPageToken'] || changes_response['newStartPageToken']
-    has_more = changes_response['nextPageToken'].present?
-
-    # Step 7: Build response
-    {
-      'changes' => all_changes,
-      'new_page_token' => next_token,
-      'files_added' => files_added,
-      'files_modified' => files_modified, 
-      'files_removed' => files_removed,
-      'summary' => {
-        'total_changes' => all_changes.length,
-        'added_count' => files_added.length,
-        'modified_count' => files_modified.length,
-        'removed_count' => files_removed.length,
-        'has_more' => has_more
-      },
-      'is_initial_token' => false
-    }
-  end,
-
-  sample_output: lambda do |_connection, _input|
-    {
-      'changes' => [
-        {
-          'changeType' => 'file',
-          'time' => '2024-01-15T10:30:00Z',
-          'removed' => false,
-          'fileId' => 'abc123',
-          'file' => {
-            'id' => 'abc123',
-            'name' => 'document.pdf',
-            'mimeType' => 'application/pdf',
-            'modifiedTime' => '2024-01-15T10:29:45Z',
-            'size' => 1024000,
-            'md5Checksum' => 'abc123def456',
-            'trashed' => false
+          start_response = get('https://www.googleapis.com/drive/v3/changes/startPageToken').
+            params(start_params).
+            after_error_response(/.*/) do |code, body, _header, message|
+              error_msg = call('handle_drive_error', connection, code, body, message)
+              error(error_msg)
+            end
+          
+          # Return initial token for future use
+          return {
+            'changes' => [],
+            'new_page_token' => start_response['startPageToken'],
+            'files_added' => [],
+            'files_modified' => [],
+            'files_removed' => [],
+            'summary' => {
+              'total_changes' => 0,
+              'added_count' => 0,
+              'modified_count' => 0,
+              'removed_count' => 0,
+              'has_more' => false
+            },
+            'is_initial_token' => true
           }
+        end
+
+        # Step 3: Get actual changes using the token
+        changes_params = {
+          pageToken: page_token,
+          pageSize: page_size,
+          fields: 'nextPageToken,newStartPageToken,changes(changeType,time,removed,fileId,file(id,name,mimeType,modifiedTime,size,md5Checksum,trashed,parents))',
+          supportsAllDrives: include_shared_drives,
+          includeRemoved: include_removed
         }
-      ],
-      'new_page_token' => 'token_xyz789',
-      'files_added' => [
+        
+        # Add folder restriction if specified
+        if folder_id.present? && include_shared_drives
+          changes_params[:driveId] = folder_id
+        end
+        
+        changes_response = get('https://www.googleapis.com/drive/v3/changes').
+          params(changes_params).
+          after_error_response(/.*/) do |code, body, _header, message|
+            error_msg = call('handle_drive_error', connection, code, body, message)
+            error(error_msg)
+          end
+
+        # Step 4: Process the changes
+        all_changes = changes_response['changes'] || []
+        
+        # Filter by folder if specified and not using shared drives
+        if folder_id.present? && !include_shared_drives
+          all_changes = all_changes.select do |change|
+            if change['file'] && change['file']['parents']
+              change['file']['parents'].include?(folder_id)
+            else
+              false
+            end
+          end
+        end
+
+        # Step 5: Categorize changes
+        files_added = []
+        files_modified = []
+        files_removed = []
+        
+        # Track seen files to avoid duplicates
+        seen_files = {}
+        
+        all_changes.each do |change|
+          file_id = change['fileId']
+          
+          if change['removed']
+            # File was removed
+            files_removed << {
+              'fileId' => file_id,
+              'time' => change['time']
+            }
+          elsif change['file']
+            file = change['file']
+            
+            # Skip trashed files unless explicitly requested
+            next if file['trashed'] && !include_removed
+            
+            file_summary = {
+              'id' => file['id'],
+              'name' => file['name'],
+              'mimeType' => file['mimeType'],
+              'modifiedTime' => file['modifiedTime'],
+              'checksum' => file['md5Checksum']
+            }
+            
+            # Determine if file is new or modified
+            # This is simplified - in production, you'd track file creation time
+            if seen_files[file_id]
+              # Already seen in this batch, treat as modified
+              files_modified << file_summary
+            else
+              # First time seeing this file
+              # Check if it's a new file based on the change type
+              if change['changeType'] == 'file'
+                # Could be either new or modified
+                # For simplicity, we'll treat first occurrence as added
+                # In production, compare modifiedTime with change time
+                time_diff = if file['modifiedTime'] && change['time']
+                  modified = Time.parse(file['modifiedTime'])
+                  changed = Time.parse(change['time'])
+                  (changed - modified).abs
+                else
+                  0
+                end
+                
+                # If modified very recently relative to change, likely new
+                if time_diff < 60 # Within 60 seconds
+                  files_added << file_summary
+                else
+                  files_modified << file_summary
+                end
+              else
+                files_modified << file_summary
+              end
+              
+              seen_files[file_id] = true
+            end
+          end
+        end
+
+        # Step 6: Determine next page token
+        next_token = changes_response['nextPageToken'] || changes_response['newStartPageToken']
+        has_more = changes_response['nextPageToken'].present?
+
+        # Step 7: Build response
         {
-          'id' => 'abc123',
-          'name' => 'document.pdf',
-          'mimeType' => 'application/pdf',
-          'modifiedTime' => '2024-01-15T10:29:45Z'
+          'changes' => all_changes,
+          'new_page_token' => next_token,
+          'files_added' => files_added,
+          'files_modified' => files_modified, 
+          'files_removed' => files_removed,
+          'summary' => {
+            'total_changes' => all_changes.length,
+            'added_count' => files_added.length,
+            'modified_count' => files_modified.length,
+            'removed_count' => files_removed.length,
+            'has_more' => has_more
+          },
+          'is_initial_token' => false
         }
-      ],
-      'files_modified' => [],
-      'files_removed' => [],
-      'summary' => {
-        'total_changes' => 1,
-        'added_count' => 1,
-        'modified_count' => 0,
-        'removed_count' => 0,
-        'has_more' => false
-      },
-      'is_initial_token' => false
+      end,
+
+      sample_output: lambda do |_connection, _input|
+        {
+          'changes' => [
+            {
+              'changeType' => 'file',
+              'time' => '2024-01-15T10:30:00Z',
+              'removed' => false,
+              'fileId' => 'abc123',
+              'file' => {
+                'id' => 'abc123',
+                'name' => 'document.pdf',
+                'mimeType' => 'application/pdf',
+                'modifiedTime' => '2024-01-15T10:29:45Z',
+                'size' => 1024000,
+                'md5Checksum' => 'abc123def456',
+                'trashed' => false
+              }
+            }
+          ],
+          'new_page_token' => 'token_xyz789',
+          'files_added' => [
+            {
+              'id' => 'abc123',
+              'name' => 'document.pdf',
+              'mimeType' => 'application/pdf',
+              'modifiedTime' => '2024-01-15T10:29:45Z'
+            }
+          ],
+          'files_modified' => [],
+          'files_removed' => [],
+          'summary' => {
+            'total_changes' => 1,
+            'added_count' => 1,
+            'modified_count' => 0,
+            'removed_count' => 0,
+            'has_more' => false
+          },
+          'is_initial_token' => false
+        }
+      end
     }
-  end
-}
 
   },
 
