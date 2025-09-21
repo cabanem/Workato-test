@@ -24,9 +24,7 @@
         options: [ ['Client credentials', 'custom'], %w[OAuth2 oauth2] ] 
       },
       # Vertex AI environment
-      { # - region
-        name: 'region', label: 'Region', group: 'Vertex AI environment',
-        control_type: 'select',  optional: false,
+      { name: 'region', label: 'Region', group: 'Vertex AI environment', control_type: 'select',  optional: false,
         options: [
           ['US central 1', 'us-central1'],
           ['US east 1', 'us-east1'],
@@ -43,39 +41,22 @@
           ['Europe west 9', 'europe-west9'],
           ['Asia northeast 1', 'asia-northeast1'],
           ['Asia northeast 3', 'asia-northeast3'],
-          ['Asia southeast 1', 'asia-southeast1']
-        ],
-        hint: 'Select the Google Cloud Platform (GCP) region used for the Vertex model.',
-        toggle_hint: 'Select from list',
+          ['Asia southeast 1', 'asia-southeast1'] ],
+        hint: 'Select the Google Cloud Platform (GCP) region used for the Vertex model.', toggle_hint: 'Select from list',
         toggle_field: {
-          name: 'region', label: 'Region', type: 'string', control_type: 'text',
-          optional: false, toggle_hint: 'Use custom value',
-          hint: "Enter the region you want to use. See <a href='https://cloud.google." \
-                "com/vertex-ai/generative-ai/docs/learn/locations' " \
-                "target='_blank'>generative AI on Vertex AI locations</a> for a list " \
-                'of regions and model availability.'
-        }
-      },
+          name: 'region', label: 'Region', type: 'string', control_type: 'text', optional: false, 
+          toggle_hint: 'Use custom value', hint: "Enter the region you want to use" } },
       { name: 'project', label: 'Project', group: 'Vertex AI environment', optional: false,  hint: 'E.g abc-dev-1234' },
-      { name: 'version', label: 'Version', group: 'Vertex AI environment', optional: false,  default: 'v1', hint: 'E.g. v1beta1'
-      },
+      { name: 'version', label: 'Version', group: 'Vertex AI environment', optional: false,  default: 'v1', hint: 'E.g. v1beta1' },
       # Model discovery and validation
-      { name: 'dynamic_models', label: 'Refresh model list from API (Model Garden)', group: 'Model discovery and validation',
-        type: 'boolean', control_type: 'checkbox', optional: true,
-        hint: 'Fetch available Gemini/Embedding models at runtime. Falls back to a curated static list on errors.' },
-      { name: 'include_preview_models', label: 'Include preview/experimental models', group: 'Model discovery and validation',
-        type: 'boolean', control_type: 'checkbox', optional: true, sticky: true,
-        hint: 'Also include Experimental/Private/Public Preview models. Leave unchecked for GA-only in production.' 
-      },
-      { # - validate_model_on_run
-        name: 'validate_model_on_run', label: 'Validate model before run', group: 'Model discovery and validation',
-        type: 'boolean', control_type: 'checkbox', optional: true, sticky: true,
-        hint: 'Pre-flight check the chosen model and your project access before sending the request. Recommended.' },
-      { # - enable_rate_limiting
-        name: 'enable_rate_limiting', label: 'Enable rate limiting', group: 'Model discovery and validation',
-        type: 'boolean', control_type: 'checkbox', optional: true, default: true,
-        hint: 'Automatically throttle requests to stay within Vertex AI quotas' }
-
+      { name: 'dynamic_models', label: 'Refresh model list from API (Model Garden)', group: 'Model discovery and validation', type: 'boolean', 
+        control_type: 'checkbox', optional: true, hint: 'Fetch available Gemini/Embedding models at runtime. Falls back to a curated static list on errors.' },
+      { name: 'include_preview_models', label: 'Include preview/experimental models', group: 'Model discovery and validation', type: 'boolean', control_type: 'checkbox', 
+        optional: true, sticky: true, hint: 'Also include Experimental/Private/Public Preview models. Leave unchecked for GA-only in production.' },
+      { name: 'validate_model_on_run', label: 'Validate model before run', group: 'Model discovery and validation', type: 'boolean', control_type: 'checkbox',
+        optional: true, sticky: true, hint: 'Pre-flight check the chosen model and your project access before sending the request. Recommended.' },
+      { name: 'enable_rate_limiting', label: 'Enable rate limiting', group: 'Model discovery and validation', type: 'boolean', control_type: 'checkbox', 
+        optional: true, default: true, hint: 'Automatically throttle requests to stay within Vertex AI quotas' }
     ],
     authorization: {
       type: 'multi',
@@ -88,8 +69,7 @@
         oauth2: {
           type: 'oauth2',
           fields: [
-            { # - client_id
-              name: 'client_id', group: 'OAuth 2.0 (user delegated)',
+            { name: 'client_id', group: 'OAuth 2.0 (user delegated)', optional: false,
               hint: 'You can find your client ID by logging in to your ' \
                     "<a href='https://console.developers.google.com/' " \
                     "target='_blank'>Google Developers Console</a> account. " \
@@ -100,26 +80,18 @@
                     'oauth/callback</b> for the redirect URI when registering your ' \
                     'OAuth client. <br> More information about authentication ' \
                     "can be found <a href='https://developers.google.com/identity/" \
-                    "protocols/OAuth2?hl=en_US' target='_blank'>here</a>.",
-              optional: false
-             },
-            { # - client_secret
-              name: 'client_secret', group: 'OAuth 2.0 (user delegated)',
+                    "protocols/OAuth2?hl=en_US' target='_blank'>here</a>." },
+            { name: 'client_secret', group: 'OAuth 2.0 (user delegated)',optional: false, control_type: 'password',
               hint: 'You can find your client secret by logging in to your ' \
                     "<a href='https://console.developers.google.com/' " \
                     "target='_blank'>Google Developers Console</a> account. " \
                     'After logging in, click on Credentials to show your ' \
-                    'OAuth 2.0 client IDs and select your desired account name.',
-              optional: false, 
-              control_type: 'password' 
-            }
+                    'OAuth 2.0 client IDs and select your desired account name.' }
           ],
           authorization_url: lambda do |connection|
             scopes = [
-              # Vertex AI scope
-              'https://www.googleapis.com/auth/cloud-platform',
-              # Google Drive scope
-              'https://www.googleapis.com/auth/drive.readonly' 
+              'https://www.googleapis.com/auth/cloud-platform', # Vertex AI scope
+              'https://www.googleapis.com/auth/drive.readonly' # Google Drive readonly scope
             ].join(' ')
             params = {
               client_id: connection['client_id'],
@@ -160,18 +132,13 @@
           fields: [
             { name: 'service_account_email',
               optional: false, group: 'Service Account',
-              hint: 'The service account created to delegate other domain users. ' \
-                    'e.g. name@project.iam.gserviceaccount.com' },
+              hint: 'The service account created to delegate other domain users (e.g. name@project.iam.gserviceaccount.com)' },
             { name: 'client_id', optional: false },
-            { name: 'private_key',
-              control_type: 'password',
+            { name: 'private_key', ontrol_type: 'password',  multiline: true, optional: false,
               hint: 'Copy and paste the private key that came from the downloaded json. <br/>' \
                     "Click <a href='https://developers.google.com/identity/protocols/oauth2/' " \
                     "service-account/target='_blank'>here</a> to learn more about Google Service " \
-                    'Accounts.<br><br>Required scope: <b>https://www.googleapis.com/auth/' \
-                    'cloud-platform</b>',
-              multiline: true,
-              optional: false }
+                    'Accounts.<br><br>Required scope: <b>https://www.googleapis.com/auth/cloud-platform</b>' }
           ],
           acquire: lambda do |connection|
             jwt_body_claim = {
@@ -214,34 +181,25 @@
       "https://#{connection['region']}-aiplatform.googleapis.com/#{connection['version'] || 'v1'}/projects/#{connection['project']}/locations/#{connection['region']}/datasets",
       { params: { pageSize: 1 } }
     )
-
-      # Validate connection/access to Google Drive
-      begin
-        response = call('api_request', connection, :get,
-          call('drive_api_url', :files),
-          {
-            params: { pageSize: 1, q: "trashed = false" },
-            error_handler: lambda do |code, body, message|
-              if code == 403
-                error("Drive API not enabled or missing permissions")
-              else
-                call('handle_vertex_error', connection, code, body, message)
-              end
+    # Validate connection/access to Google Drive
+    begin
+      response = call('api_request', connection, :get,
+        call('drive_api_url', :files),
+        {
+          params: { pageSize: 1, q: "trashed = false" },
+          error_handler: lambda do |code, body, message|
+            if code == 403
+              error("Drive API not enabled or missing permissions")
+            else
+              call('handle_vertex_error', connection, code, body, message)
             end
-          }
-        )
-        
-        {
-          vertex_ai: "connected",
-          drive_access: "connected",
-          files_visible: response['files'].length
+          end
         }
-      rescue => e
-        {
-          vertex_ai: "connected",
-          drive_access: "error - #{e.message}"
-        }
-      end
+      )
+      { vertex_ai: "connected", drive_access: "connected", files_visible: response['files'].length }
+    rescue => e
+      { vertex_ai: "connected", drive_access: "error - #{e.message}" }
+    end
   end,
 
   actions: {
@@ -258,8 +216,7 @@
       end,
 
       help: {
-        body: 'This action sends a message to Vertex AI, and gathers a response ' \
-              'using the selected Gemini Model.'
+        body: 'This action sends a message to Vertex AI, and gathers a response using the selected Gemini Model.'
       },
 
       input_fields: lambda do |object_definitions|
@@ -304,9 +261,7 @@
       description: "Translate <span class='provider'>text</span> into a different " \
                    "language using Gemini models in <span class='provider'>Google Vertex AI</span>",
       help: {
-        body: 'This action translates inputted text into a different language. ' \
-              'While other languages may be possible, languages not on the predefined ' \
-              'list may not provide reliable translations.'
+        body: 'This action translates inputted text into a different language. While other languages may be possible, languages not on the predefined list may not provide reliable translations.'
       },
       input_fields: lambda do |object_definitions|
         object_definitions['translate_text_input']
@@ -481,40 +436,26 @@
 
       input_fields: lambda do |object_definitions|
         [
-          {
-            name: 'text', label: 'Text to classify', type: 'string',
-            optional: false, hint: 'Text content to classify (preferably from RAG_Utils prepare_for_ai)'
-          },
-          {
-            name: 'categories', label: 'Categories', type: 'array', of: 'object',
-            optional: false, list_mode_toggle: true,
+          { name: 'text', label: 'Text to classify', type: 'string', optional: false, hint: 'Text content to classify (preferably from RAG_Utils prepare_for_ai)' },
+          { name: 'categories', label: 'Categories', type: 'array', of: 'object', optional: false, list_mode_toggle: true,
             properties: [
               { name: 'key', label: 'Category key', type: 'string', optional: false },
               { name: 'description', label: 'Category description', type: 'string', optional: true }
             ],
-            hint: 'Array of categories with keys and optional descriptions'
-          },
-          {
-            name: 'model', label: 'Model', type: 'string',
-            optional: false, control_type: 'select',
-            pick_list: :available_text_models,
-            extends_schema: true,
-            hint: 'Select the Gemini model to use',
-            toggle_hint: 'Select from list',
+            hint: 'Array of categories with keys and optional descriptions' },
+          { name: 'model', label: 'Model', type: 'string', optional: false, control_type: 'select', extends_schema: true,
+            pick_list: :available_text_models, hint: 'Select the Gemini model to use', toggle_hint: 'Select from list',
             toggle_field: {
               name: 'model', label: 'Model (custom)', type: 'string',
               control_type: 'text', toggle_hint: 'Use custom value',
               hint: 'E.g., publishers/google/models/gemini-pro'
-            }
-          },
-          {
-            name: 'options', label: 'Classification options', type: 'object', optional: true,
+            } },
+          { name: 'options', label: 'Classification options', type: 'object', optional: true,
             properties: [
               { name: 'return_confidence', label: 'Return confidence score', type: 'boolean', control_type: 'checkbox', default: true },
               { name: 'return_alternatives', label: 'Return alternative classifications', type: 'boolean', control_type: 'checkbox', default: true },
               { name: 'temperature', label: 'Temperature', type: 'number', hint: 'Controls randomness (0.0-1.0)', default: 0.1 }
-            ]
-          }
+            ] }
         ].concat(object_definitions['config_schema'].only('safetySettings'))
       end,
 
@@ -572,13 +513,9 @@
     analyze_text: {
       title: 'Analyze text',
       subtitle: 'Contextual analysis of text to answer user-provided questions',
-      description: "Analyze <span class='provider'>text</span> to answer user-provided " \
-                   "questions using Gemini models in <span class='provider'>" \
-                   'Google Vertex AI</span>',
+      description: "Analyze text to answer user-provided questions using Gemini models Google Vertex AI",
       help: {
-        body: 'This action performs a contextual analysis of a text to answer ' \
-              "user-provided questions. If the answer isn't found in the text, " \
-              'the datapill will be empty.'
+        body: "This action performs a contextual analysis of a text to answer user-provided questions. If the answer isn't found in the text, the datapill will be empty."
       },
 
       input_fields: lambda do |object_definitions|
@@ -661,46 +598,24 @@
 
       input_fields: lambda do |object_definitions|
         [
-          {
-            name: 'batch_id', label: 'Batch ID', type: 'string',
-            optional: false, hint: 'Unique identifier for this batch of embeddings'
-          },
-          {
-            name: 'texts', label: 'Text objects', type: 'array', of: 'object',
-            optional: false, list_mode_toggle: true,
+          { name: 'batch_id', label: 'Batch ID', type: 'string', optional: false, hint: 'Unique identifier for this batch of embeddings' },
+          { name: 'texts', label: 'Text objects', type: 'array', of: 'object', optional: false, list_mode_toggle: true, hint: 'Array of text objects to generate embeddings for',
             properties: [
               { name: 'id', label: 'Text ID', type: 'string', optional: false },
-              { name: 'content', label: 'Text content', type: 'string', optional: false,
-                hint: 'Input text must not exceed 8192 tokens (approximately 6000 words).' },
+              { name: 'content', label: 'Text content', type: 'string', optional: false, hint: 'Input text must not exceed 8192 tokens (approximately 6000 words).' },
               { name: 'metadata', label: 'Metadata', type: 'object', optional: true }
-            ],
-            hint: 'Array of text objects to generate embeddings for'
-          },
-          {
-            name: 'model', label: 'Model', type: 'string',
-            optional: false, control_type: 'select',
-            pick_list: :available_embedding_models,
-            extends_schema: true,
-            hint: 'Select the embedding model to use',
-            toggle_hint: 'Select from list',
-            toggle_field: {
-              name: 'model', label: 'Model (custom)', type: 'string',
-              control_type: 'text', toggle_hint: 'Use custom value',
-              hint: 'E.g., publishers/google/models/text-embedding-004'
-            }
-          },
-          {
-            name: 'task_type', label: 'Task type', type: 'string',
-            optional: true, control_type: 'select',
-            pick_list: :embedding_task_list,
-            hint: 'Intended downstream application to help the model produce better embeddings',
-            toggle_hint: 'Select from list',
+            ] },
+          { name: 'model', label: 'Model', type: 'string', optional: false, control_type: 'select', pick_list: :available_embedding_models,
+            extends_schema: true, hint: 'Select the embedding model to use', toggle_hint: 'Select from list',
+            toggle_field: { 
+              name: 'model', label: 'Model (custom)', type: 'string', control_type: 'text', toggle_hint: 'Use custom value', hint: 'E.g., publishers/google/models/text-embedding-004' } },
+          { name: 'task_type', label: 'Task type', type: 'string', optional: true, control_type: 'select', pick_list: :embedding_task_list,
+            hint: 'Intended downstream application to help the model produce better embeddings', toggle_hint: 'Select from list',
             toggle_field: {
               name: 'task_type', label: 'Task type (custom)', type: 'string',
               control_type: 'text', toggle_hint: 'Use custom value',
               hint: 'E.g., RETRIEVAL_DOCUMENT, RETRIEVAL_QUERY, SEMANTIC_SIMILARITY'
-            }
-          }
+            } }
         ]
       end,
 
@@ -729,23 +644,17 @@
             ],
             hint: 'First embedding for quick recipe access'
           },
-          { name: 'embeddings_json', label: 'Embeddings as JSON string', type: 'string',
-            hint: 'All embeddings serialized as JSON for bulk operations' },
+          { name: 'embeddings_json', label: 'Embeddings as JSON string', type: 'string', hint: 'All embeddings serialized as JSON for bulk operations' },
           { name: 'model_used', label: 'Model used', type: 'string' },
           { name: 'total_processed', label: 'Total texts processed', type: 'integer' },
           { name: 'successful_requests', label: 'Successful requests', type: 'integer' },
           { name: 'failed_requests', label: 'Failed requests', type: 'integer' },
           { name: 'total_tokens', label: 'Total tokens', type: 'integer' },
-          { name: 'batches_processed', label: 'Batches processed', type: 'integer',
-            hint: 'Number of API calls made (including retries and fallbacks)' },
-          { name: 'api_calls_saved', label: 'API calls saved', type: 'integer',
-            hint: 'Number of API calls saved through batching' },
-          { name: 'estimated_cost_savings', label: 'Estimated cost savings', type: 'number',
-            hint: 'Estimated cost savings in USD from batching' },
-          { name: 'pass_fail', label: 'Batch success', type: 'boolean',
-            hint: 'True if all embeddings were generated successfully' },
-          { name: 'action_required', label: 'Action required', type: 'string',
-            hint: 'Next recommended action based on results' }
+          { name: 'batches_processed', label: 'Batches processed', type: 'integer', hint: 'Number of API calls made (including retries and fallbacks)' },
+          { name: 'api_calls_saved', label: 'API calls saved', type: 'integer', hint: 'Number of API calls saved through batching' },
+          { name: 'estimated_cost_savings', label: 'Estimated cost savings', type: 'number', hint: 'Estimated cost savings in USD from batching' },
+          { name: 'pass_fail', label: 'Batch success', type: 'boolean', hint: 'True if all embeddings were generated successfully' },
+          { name: 'action_required', label: 'Action required', type: 'string', hint: 'Next recommended action based on results' }
         ]
       end,
 
@@ -793,13 +702,7 @@
 
       input_fields: lambda do |object_definitions|
         [
-          {
-            name: 'text',
-            label: 'Text',
-            type: 'string',
-            optional: false,
-            hint: 'Single text string to embed. Must not exceed 8192 tokens (approximately 6000 words).'
-          },
+          { name: 'text', label: 'Text', type: 'string', optional: false, hint: 'Single text string to embed. Must not exceed 8192 tokens (approximately 6000 words).' },
           {
             name: 'model',
             label: 'Model',
@@ -853,31 +756,10 @@
 
       output_fields: lambda do |object_definitions|
         [
-          {
-            name: 'vector',
-            label: 'Embedding vector',
-            type: 'array',
-            of: 'number',
-            hint: 'Array of float values representing the text embedding'
-          },
-          {
-            name: 'dimensions',
-            label: 'Vector dimensions',
-            type: 'integer',
-            hint: 'Number of dimensions in the vector'
-          },
-          {
-            name: 'model_used',
-            label: 'Model used',
-            type: 'string',
-            hint: 'The embedding model that was used'
-          },
-          {
-            name: 'token_count',
-            label: 'Token count',
-            type: 'integer',
-            hint: 'Estimated number of tokens processed'
-          }
+          { name: 'vector', label: 'Embedding vector', type: 'array', of: 'number', hint: 'Array of float values representing the text embedding' },
+          { name: 'dimensions', label: 'Vector dimensions', type: 'integer', hint: 'Number of dimensions in the vector' },
+          { name: 'model_used', label: 'Model used', type: 'string', hint: 'The embedding model that was used' },
+          { name: 'token_count', label: 'Token count', type: 'integer', hint: 'Estimated number of tokens processed' }
         ]
       end,
 
@@ -1049,26 +931,9 @@
                 of: 'object',
                 optional: true,
                 properties: [
-                  {
-                    name: 'namespace',
-                    label: 'Namespace',
-                    type: 'string',
-                    optional: false
-                  },
-                  {
-                    name: 'allowList',
-                    label: 'Allow list',
-                    type: 'array',
-                    of: 'string',
-                    optional: true
-                  },
-                  {
-                    name: 'denyList',
-                    label: 'Deny list',
-                    type: 'array',
-                    of: 'string',
-                    optional: true
-                  }
+                  { name: 'namespace', label: 'Namespace', type: 'string', optional: false },
+                  { name: 'allowList', label: 'Allow list', type: 'array', of: 'string', optional: true },
+                  { name: 'denyList', label: 'Deny list', type: 'array', of: 'string', optional: true } 
                 ],
                 hint: 'Array of namespace/allowList/denyList filters for the datapoint'
               },
@@ -1117,86 +982,24 @@
 
       output_fields: lambda do |object_definitions|
         [
-          {
-            name: 'successfully_upserted_count',
-            label: 'Successfully upserted count',
-            type: 'integer',
-            hint: 'Number of datapoints successfully upserted'
-          },
-          {
-            name: 'total_processed',
-            label: 'Total processed',
-            type: 'integer',
-            hint: 'Total number of datapoints processed'
-          },
-          {
-            name: 'failed_upserts',
-            label: 'Failed upserts',
-            type: 'integer',
-            hint: 'Number of datapoints that failed to upsert'
-          },
-          {
-            name: 'failed_datapoints',
-            label: 'Failed datapoints',
-            type: 'array',
-            of: 'object',
+          { name: 'successfully_upserted_count', label: 'Successfully upserted count', type: 'integer', hint: 'Number of datapoints successfully upserted' },
+          { name: 'total_processed', label: 'Total processed', type: 'integer', hint: 'Total number of datapoints processed' },
+          { name: 'failed_upserts', label: 'Failed upserts', type: 'integer', hint: 'Number of datapoints that failed to upsert' },
+          { name: 'failed_datapoints', label: 'Failed datapoints', type: 'array', of: 'object', hint: 'Array of datapoints that failed to upsert with error details',
             properties: [
-              {
-                name: 'datapoint_id',
-                label: 'Datapoint ID',
-                type: 'string'
-              },
-              {
-                name: 'error',
-                label: 'Error message',
-                type: 'string'
-              }
-            ],
-            hint: 'Array of datapoints that failed to upsert with error details'
-          },
-          {
-            name: 'index_stats',
-            label: 'Index statistics',
-            type: 'object',
+              { name: 'datapoint_id', label: 'Datapoint ID', type: 'string' },
+              { name: 'error', label: 'Error message', type: 'string' }
+            ] },
+          { name: 'index_stats', label: 'Index statistics', type: 'object', hint: 'Index metadata and statistics',
             properties: [
-              {
-                name: 'index_id',
-                label: 'Index ID',
-                type: 'string'
-              },
-              {
-                name: 'deployed_state',
-                label: 'Deployed state',
-                type: 'string'
-              },
-              {
-                name: 'total_datapoints',
-                label: 'Total datapoints',
-                type: 'integer'
-              },
-              {
-                name: 'dimensions',
-                label: 'Vector dimensions',
-                type: 'integer'
-              },
-              {
-                name: 'display_name',
-                label: 'Display name',
-                type: 'string'
-              },
-              {
-                name: 'created_time',
-                label: 'Created time',
-                type: 'string'
-              },
-              {
-                name: 'updated_time',
-                label: 'Updated time',
-                type: 'string'
-              }
-            ],
-            hint: 'Index metadata and statistics'
-          }
+              { name: 'index_id',         label: 'Index ID',          type: 'string' },
+              { name: 'deployed_state',   label: 'Deployed state',    type: 'string' },
+              { name: 'total_datapoints', label: 'Total datapoints',  type: 'integer' },
+              { name: 'dimensions',       label: 'Vector dimensions', type: 'integer' },
+              { name: 'display_name',     label: 'Display name',      type: 'string' },
+              { name: 'created_time',     label: 'Created time',      type: 'string' },
+              { name: 'updated_time',     label: 'Updated time',      type: 'string' }
+            ] }
         ]
       end,
 
@@ -1238,41 +1041,12 @@
       
       input_fields: lambda do |object_definitions|
         [
-          { name: 'test_vertex_ai', label: 'Test Vertex AI', 
-            type: 'boolean', control_type: 'checkbox', default: true,
-            optional: true, hint: 'Test Vertex AI API access and permissions' },
-          { name: 'test_drive', label: 'Test Google Drive',
-            type: 'boolean', control_type: 'checkbox', default: true,
-            optional: true, hint: 'Test Google Drive API access (requires Drive scope)' },
-          { name: 'test_models', label: 'Test model access',
-            type: 'boolean', control_type: 'checkbox', default: false,
-            optional: true, hint: 'Validate access to specific AI models (slower)' },
-          {
-            name: 'test_index',
-            label: 'Test Vector Search index',
-            type: 'boolean',
-            control_type: 'checkbox',
-            default: false,
-            optional: true,
-            hint: 'Validate Vector Search index access'
-          },
-          {
-            name: 'index_id',
-            label: 'Index ID',
-            type: 'string',
-            optional: true,
-            ngIf: 'input.test_index == true',
-            hint: 'Vector Search index to test (projects/PROJECT/locations/REGION/indexes/INDEX_ID)'
-          },
-          {
-            name: 'verbose',
-            label: 'Verbose output',
-            type: 'boolean',
-            control_type: 'checkbox',
-            default: false,
-            optional: true,
-            hint: 'Include detailed diagnostic information'
-          }
+          { name: 'test_vertex_ai', label: 'Test Vertex AI', type: 'boolean', control_type: 'checkbox', default: true, optional: true, hint: 'Test Vertex AI API access and permissions' },
+          { name: 'test_drive', label: 'Test Google Drive', type: 'boolean', control_type: 'checkbox', default: true, optional: true, hint: 'Test Google Drive API access and permissions' },
+          { name: 'test_models', label: 'Test model access', type: 'boolean', control_type: 'checkbox', default: false, optional: true, hint: 'Validate access to specific AI models (slower)' },
+          { name: 'test_index', label: 'Test Vector Search index', type: 'boolean', control_type: 'checkbox', default: false, optional: true, hint: 'Validate Vector Search index access' },
+          { name: 'index_id', label: 'Index ID', type: 'string', optional: true, ngIf: 'input.test_index == true', hint: 'Vector Search index to test (projects/PROJECT/locations/REGION/indexes/INDEX_ID)' },
+          { name: 'verbose', label: 'Verbose output', type: 'boolean', control_type: 'checkbox', default: false, optional: true, hint: 'Include detailed diagnostic information' }
         ]
       end,
       
@@ -3435,7 +3209,6 @@ monitor_drive_changes: {
     # ─────────────────────────────────────────────────────────────────────────────
     # -- Unified payload construction system
     # ─────────────────────────────────────────────────────────────────────────────
-
     # Unified payload builder using templates
     build_ai_payload: lambda do |template_type, input, connection = nil|
       template = case template_type
@@ -3493,7 +3266,6 @@ monitor_drive_changes: {
       user_prompt = template[:user_prompt].call(input)
       call('build_base_payload', instruction, user_prompt, input['safetySettings'])
     end,
-
     # Custom payload builders for complex cases
     build_classify_payload: lambda do |input, connection|
       # Extract categories and options
@@ -3530,15 +3302,12 @@ monitor_drive_changes: {
       temperature = (options['temperature'] || 0.1).to_f
       call('build_base_payload', instruction, user_prompt, input['safetySettings'], temperature)
     end,
-
     build_image_payload: lambda do |input, connection|
       call('payload_for_analyze_image', input)  # Keep existing complex logic for now
     end,
-
     build_embedding_payload: lambda do |input, connection|
       call('payload_for_text_embedding', input)  # Keep existing logic
     end,
-
     build_neighbors_payload: lambda do |input, connection|
       call('payload_for_find_neighbors', input)  # Keep existing logic
     end,
@@ -3762,7 +3531,6 @@ monitor_drive_changes: {
         }
       }
     end,
-
     generate_embedding_single_exec: lambda do |connection, input|
       # Validate model
       call('validate_publisher_model!', connection, input['model'])
@@ -3817,7 +3585,6 @@ monitor_drive_changes: {
         error("Failed to generate embedding: #{e.message}")
       end
     end,
-
     transform_find_neighbors_response: lambda do |response|
       # Extract all neighbors from potentially multiple queries
       all_neighbors = []
@@ -3861,7 +3628,6 @@ monitor_drive_changes: {
         'nearestNeighbors' => nearest_neighbors  # Keep original for backward compatibility
       }
     end,
-
     payload_for_find_neighbors: lambda do |input|
       # We follow Google’s JSON casing for FindNeighbors REST:
       # top-level: deployedIndexId, returnFullDatapoint, queries[]
@@ -3958,7 +3724,6 @@ monitor_drive_changes: {
         error 'ERROR - The function call generated by the model is invalid.'
       end
     end,
-
     # Unified response extractor that handles all response types
     extract_response: lambda do |resp, options = {}|
       # Extract options with defaults
@@ -4049,7 +3814,6 @@ monitor_drive_changes: {
         error("Unknown response extraction type: #{type}")
       end
     end,
-
     # Helper method for standard error responses
     standard_error_response: lambda do |type, ratings|
       case type
@@ -4088,7 +3852,6 @@ monitor_drive_changes: {
       # If no pattern matches, return as-is and let API handle the error
       url_or_id
     end,
-
     get_export_mime_type: lambda do |mime_type|
       return nil if mime_type.blank?
 
@@ -4104,7 +3867,6 @@ monitor_drive_changes: {
         nil
       end
     end,
-
     build_drive_query: lambda do |options = {}|
       query_parts = ['trashed = false']
 
@@ -4133,7 +3895,6 @@ monitor_drive_changes: {
 
       query_parts.join(' and ')
     end,
-
     handle_drive_error: lambda do |connection, code, body, message|
       service_account_email = connection['service_account_email'] || 
                              connection['client_id']
@@ -4159,7 +3920,7 @@ monitor_drive_changes: {
  
     # ─────────────────────────────────────────────────────────────────────────────
     # -- Samples and UX helpers
-    # 
+    # ─────────────────────────────────────────────────────────────────────────────
     sample_record_output: lambda do |input|
       case input
       when 'send_message'
@@ -4291,7 +4052,6 @@ monitor_drive_changes: {
     # ─────────────────────────────────────────────────────────────────────────────
     # -- Index Management Methods
     # ─────────────────────────────────────────────────────────────────────────────
-
     validate_index_access: lambda do |connection, index_id|
       # Extract project, region, and index name from the index_id
       index_parts = index_id.split('/')
@@ -4367,7 +4127,6 @@ monitor_drive_changes: {
         end
       end
     end,
-
     batch_upsert_datapoints: lambda do |connection, index_id, datapoints, update_mask = nil|
       # Validate inputs
       if datapoints.nil? || datapoints.empty?
@@ -4502,15 +4261,15 @@ monitor_drive_changes: {
   },
 
   object_definitions: {
-    # ===== COMMON FIELD DEFINITIONS =====
-
+    # ─────────────────────────────────────────────────────────────────────────────
+    # -- Common field definitions
+    # ─────────────────────────────────────────────────────────────────────────────
     # Common text input field for AI operations
     text_input_field: {
       name: 'text', label: 'Text', type: 'string',
       control_type: 'text-area', optional: false,
       hint: 'Enter the text to be processed. Limit to 8000 words for optimal performance.'
     },
-
     # Shared Drive file fields used across multiple actions
     drive_file_fields: {
       fields: lambda do |_connection, _config_fields, _object_definitions|
@@ -4530,7 +4289,6 @@ monitor_drive_changes: {
         ]
       end
     },
-
     # Extended Drive file fields with content
     drive_file_extended: {
       fields: lambda do |_connection, _config_fields, object_definitions|
@@ -4558,7 +4316,6 @@ monitor_drive_changes: {
         extended
       end
     },
-
     # Common safety and usage fields
     safety_and_usage: {
       fields: lambda do |_connection, _config_fields, object_definitions|
@@ -4567,9 +4324,9 @@ monitor_drive_changes: {
         safety.concat(usage)
       end
     },
-    # ===== END COMMON FIELD DEFINITIONS =====
-
-    # Your existing object definitions continue here...
+    # ─────────────────────────────────────────────────────────────────────────────
+    # -- Standard object definitions
+    # ─────────────────────────────────────────────────────────────────────────────
     prediction: {
       fields: lambda do |_connection, _config_fields, _object_definitions|
         [
@@ -5053,27 +4810,12 @@ monitor_drive_changes: {
                          end
         object_definitions['text_model_schema'].concat(
           [
-            { name: 'message_type',
-              label: 'Message type',
-              type: 'string',
-              control_type: 'select',
-              pick_list: :message_types,
-              extends_schema: true,
-              optional: false,
-              hint: 'Choose the type of the message to send.',
-              group: 'Message' },
-            { name: 'messages',
-              label: is_single_message ? 'Message' : 'Messages',
-              type: 'object',
-              optional: false,
-              properties: message_schema,
-              group: 'Message' },
-            { name: 'formatted_prompt',
-              label: 'Formatted prompt (RAG_Utils)',
-              type: 'object',
-              optional: true,
-              hint: 'Pre-formatted prompt payload from RAG_Utils. When provided, this will be used directly instead of building from messages.',
-              group: 'Advanced' }
+            { name: 'message_type', label: 'Message type', type: 'string', control_type: 'select', pick_list: :message_types,
+              extends_schema: true, optional: false, hint: 'Choose the type of the message to send.', group: 'Message' },
+            { name: 'messages', label: is_single_message ? 'Message' : 'Messages',
+              type: 'object', optional: false, properties: message_schema, group: 'Message' },
+            { name: 'formatted_prompt', label: 'Formatted prompt (RAG_Utils)', type: 'object', optional: true, group: 'Advanced',
+              hint: 'Pre-formatted prompt payload from RAG_Utils. When provided, this will be used directly instead of building from messages.' }
           ].compact
         ).concat(object_definitions['config_schema'])
       end
@@ -5081,17 +4823,13 @@ monitor_drive_changes: {
     send_messages_output: {
       fields: lambda do |_connection, _config_fields, _object_definitions|
         [
-          { name: 'candidates',
-            type: 'array',
-            of: 'object',
+          { name: 'candidates', type: 'array', of: 'object',
             properties: [
               { name: 'content',
                 type: 'object',
                 properties: [
                   { name: 'role' },
-                  { name: 'parts',
-                    type: 'array',
-                    of: 'object',
+                  { name: 'parts', type: 'array', of: 'object',
                     properties: [
                       { name: 'text' },
                       { name: 'fileData',
@@ -5115,9 +4853,7 @@ monitor_drive_changes: {
                     ] }
                 ] },
               { name: 'finishReason' },
-              { name: 'safetyRatings',
-                type: 'array',
-                of: 'object',
+              { name: 'safetyRatings', type: 'array', of: 'object',
                 properties: [
                   { name: 'category' },
                   { name: 'probability' },
@@ -5125,9 +4861,7 @@ monitor_drive_changes: {
                   { name: 'severity' },
                   { name: 'severityScore', type: 'number' }
                 ] },
-              { name: 'avgLogprobs',
-                label: 'Average log probabilities',
-                type: 'number' }
+              { name: 'avgLogprobs', label: 'Average log probabilities', type: 'number' }
             ] },
           { name: 'usageMetadata',
             type: 'object',
@@ -5154,8 +4888,7 @@ monitor_drive_changes: {
           { name: 'modelVersion' },
           { name: 'createTime', type: 'date_time' },
           { name: 'responseId' },
-          { name: 'rate_limit_status',
-            type: 'object',
+          { name: 'rate_limit_status', type: 'object',
             properties: [
               { name: 'requests_last_minute', type: 'integer', label: 'Requests in last minute' },
               { name: 'limit', type: 'integer', label: 'Rate limit (requests/minute)' },
@@ -5169,29 +4902,11 @@ monitor_drive_changes: {
       fields: lambda do |_connection, _config_fields, object_definitions|
         object_definitions['text_model_schema'].concat(
           [
-            { name: 'to',
-              label: 'Output language',
-              optional: false,
-              control_type: 'select',
-              pick_list: :languages_picklist,
-              toggle_field: {
-                name: 'to',
-                control_type: 'text',
-                type: 'string',
-                optional: false,
-                label: 'Output language',
-                toggle_hint: 'Provide custom value',
-                hint: 'Enter the output language. Eg. English'
-              },
+            { name: 'to', label: 'Output language', group: 'Task input', optional: false, control_type: 'select', pick_list: :languages_picklist,
+              toggle_field: { name: 'to', label: 'Output language', control_type: 'text', type: 'string', optional: false, toggle_hint: 'Provide custom value', hint: 'Enter the output language. Eg. English' },
               toggle_hint: 'Select from list',
-              hint: 'Select the desired output language',
-              group: 'Task input' },
-            { name: 'from',
-              label: 'Source language',
-              optional: true,
-              sticky: true,
-              control_type: 'select',
-              pick_list: :languages_picklist,
+              hint: 'Select the desired output language' },
+            { name: 'from', label: 'Source language', group: 'Task input', optional: true, sticky: true, control_type: 'select', pick_list: :languages_picklist,
               toggle_field: {
                 name: 'from',
                 control_type: 'text',
@@ -5202,16 +4917,8 @@ monitor_drive_changes: {
                 hint: 'Enter the source language. Eg. English'
               },
               toggle_hint: 'Select from list',
-              hint: 'Select the source language. If this value is left blank, we will ' \
-                    'automatically attempt to identify it.',
-              group: 'Task input' },
-            { name: 'text',
-              label: 'Source text',
-              type: 'string',
-              control_type: 'text-area',
-              optional: false,
-              hint: 'Enter the text to be translated. Please limit to 2000 tokens',
-              group: 'Task input' }
+              hint: 'Select the source language. If this value is left blank, we will automatically attempt to identify it.' },
+            { name: 'text', label: 'Source text', group: 'Task input', type: 'string', control_type: 'text-area', optional: false, hint: 'Enter the text to be translated. Please limit to 2000 tokens' }
           ]
         ).concat(object_definitions['config_schema'].only('safetySettings'))
       end
@@ -5219,8 +4926,7 @@ monitor_drive_changes: {
     translate_text_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
         [
-          { name: 'answer',
-            label: 'Translation' }
+          { name: 'answer', label: 'Translation' }
         ].concat(object_definitions['safety_rating_schema']).
           concat(object_definitions['usage_schema'])
       end
@@ -5229,57 +4935,30 @@ monitor_drive_changes: {
       fields: lambda do |_connection, _config_fields, object_definitions|
         object_definitions['text_model_schema'].concat(
           [
-            { name: 'text',
-              label: 'Source text',
-              type: 'string',
-              control_type: 'text-area',
-              optional: false,
-              hint: 'Provide the text to be summarized',
-              group: 'Task input' },
-            { name: 'max_words',
-              label: 'Maximum words',
-              type: 'integer',
-              control_type: 'integer',
-              optional: true,
-              sticky: true,
-              hint: 'Enter the maximum number of words for the summary. ' \
-                    'If left blank, defaults to 200.',
-              group: 'Summary options' }
+            { name: 'text',       label: 'Source text',   group: 'Task input',      type: 'string',  control_type: 'text-area', optional: false, hint: 'Provide the text to be summarized' },
+            { name: 'max_words',  label: 'Maximum words', group: 'Summary options', type: 'integer', control_type: 'integer',   optional: true, sticky: true,
+              hint: 'Enter the maximum number of words for the summary. If left blank, defaults to 200.' }
           ]
         ).concat(object_definitions['config_schema'].only('safetySettings'))
       end
     },
     summarize_text_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [
-          { name: 'answer',
-            label: 'Summary' }
-        ].concat(object_definitions['safety_rating_schema']).
-          concat(object_definitions['usage_schema'])
+        [ { name: 'answer', label: 'Summary' } ].concat(object_definitions['safety_rating_schema'])
+                                                .concat(object_definitions['usage_schema'])
       end
     },
     parse_text_input: {
       fields: lambda do |_connection, _config_fields, object_definitions|
         object_definitions['text_model_schema'].concat(
           [
-            { name: 'text',
-              label: 'Source text',
-              control_type: 'text-area',
-              optional: false,
-              hint: 'Provide the text to be parsed',
-              group: 'Task input' },
-            { name: 'object_schema',
-              optional: false,
-              control_type: 'schema-designer',
-              extends_schema: true,
-              sample_data_type: 'json_http',
-              empty_schema_title: 'Provide output fields for your job output.',
-              label: 'Fields to identify',
+            { name: 'text', label: 'Source text', group: 'Task input', control_type: 'text-area', optional: false, hint: 'Provide the text to be parsed' },
+            { name: 'object_schema', label: 'Fields to identify', group: 'Schema', optional: false, control_type: 'schema-designer', extends_schema: true,
+              sample_data_type: 'json_http', empty_schema_title: 'Provide output fields for your job output.',
               hint: 'Enter the fields that you want to identify from the text. Add descriptions ' \
                     'for extracting the fields. Required fields take effect only on top level. ' \
                     'Nested fields are always optional.',
-              exclude_fields: %w[hint label],
-              exclude_fields_types: %w[integer date date_time],
+              exclude_fields: %w[hint label], exclude_fields_types: %w[integer date date_time],
               custom_properties: [
                 {
                   name: 'description',
@@ -5287,8 +4966,7 @@ monitor_drive_changes: {
                   optional: true,
                   label: 'Description'
                 }
-              ],
-              group: 'Schema' }
+              ] }
           ]
         ).concat(object_definitions['config_schema'].only('safetySettings'))
       end
@@ -5306,9 +4984,7 @@ monitor_drive_changes: {
       fields: lambda do |_connection, _config_fields, object_definitions|
         object_definitions['text_model_schema'].concat(
           [
-            { name: 'email_description', label: 'Email description',
-              type: 'string', control_type: 'text-area', group: 'Task Input',
-              optional: false, hint: 'Enter a description for the email' }
+            { name: 'email_description', label: 'Email description', type: 'string', control_type: 'text-area', group: 'Task Input', optional: false, hint: 'Enter a description for the email' }
           ]
         ).concat(object_definitions['config_schema'].only('safetySettings'))
       end
