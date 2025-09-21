@@ -237,20 +237,26 @@
 
   test: lambda do |connection|
     # Validate connection/access to Vertex AI
-    get("projects/#{connection['project']}/locations/#{connection['region']}/datasets").
-      after_error_response(/.*/) do |code, body, _header, message|
-        call('handle_vertex_error', connection, code, body, message)
-      end
+    call('api_request', connection, :get,
+      "https://#{connection['region']}-aiplatform.googleapis.com/#{connection['version'] || 'v1'}/projects/#{connection['project']}/locations/#{connection['region']}/datasets",
+      { params: { pageSize: 1 } }
+    )
 
       # Validate connection/access to Google Drive
       begin
-        response = get('https://www.googleapis.com/drive/v3/files').
-          params(pageSize: 1, q: "trashed = false").
-          after_error_response(/.*/) do |code, body, _header, message|
-            if code == 403
-              error("Drive API not enabled or missing permissions")
+        response = call('api_request', connection, :get,
+          call('drive_api_url', :files),
+          {
+            params: { pageSize: 1, q: "trashed = false" },
+            error_handler: lambda do |code, body, message|
+              if code == 403
+                error("Drive API not enabled or missing permissions")
+              else
+                call('handle_vertex_error', connection, code, body, message)
+              end
             end
-          end
+          }
+        )
         
         {
           vertex_ai: "connected",
@@ -305,19 +311,8 @@
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
 
-        # Apply rate limiting
-        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
-
-        # Make the request with 429 fallback
-        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
-          post(url, payload).
-            after_error_response(/.*/) do |code, body, _header, message|
-              call('handle_vertex_error', connection, code, body, message)
-            end
-        end
-
-        # Add rate limit info to response
-        response['rate_limit_status'] = rate_limit_info
+        # Make rate-limited request
+        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         response
       end,
 
@@ -347,22 +342,31 @@
       execute: lambda do |connection, input, _eis, _eos|
         # Validate model
         call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('payload_for_translate', input)
+        # Build payload with enhanced builder
+        instruction = if input['from'].present?
+          "You are an assistant helping to translate a user's input from #{input['from']} into #{input['to']}. " \
+          "Respond only with the user's translated text in #{input['to']} and nothing else. " \
+          "The user input is delimited with triple backticks."
+        else
+          "You are an assistant helping to translate a user's input into #{input['to']}. " \
+          "Respond only with the user's translated text in #{input['to']} and nothing else. " \
+          "The user input is delimited with triple backticks."
+        end
+
+        user_prompt = "```#{call('replace_backticks_with_hash', input['text'])}```"
+
+        payload = call('build_gemini_payload', instruction, user_prompt, {
+          safety_settings: input['safetySettings'],
+          json_output: true,
+          json_key: 'response',
+          temperature: 0
+        })
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
 
-        # Apply rate limiting
-        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
-
-        # Make the request with 429 fallback
-        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
-          post(url, payload).
-            after_error_response(/.*/) do |code, body, _header, message|
-              call('handle_vertex_error', connection, code, body, message)
-            end
-        end
+        # Make rate-limited request
+        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
         call('extract_generic_response', response, true)
       end,
@@ -397,16 +401,8 @@
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
 
-        # Apply rate limiting
-        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
-
-        # Make the request with 429 fallback
-        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
-          post(url, payload).
-            after_error_response(/.*/) do |code, body, _header, message|
-              call('handle_vertex_error', connection, code, body, message)
-            end
-        end
+        # Make rate-limited request
+        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
         call('extract_generic_response', response, false)
       end,
@@ -443,16 +439,8 @@
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
                         "/#{input['model']}:generateContent"
 
-        # Apply rate limiting
-        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
-
-        # Make the request with 429 fallback
-        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
-          post(url, payload).
-            after_error_response(/.*/) do |code, body, _header, message|
-              call('handle_vertex_error', connection, code, body, message)
-            end
-        end
+        # Make rate-limited request
+        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
         call('extract_parsed_response', response)
       end,
@@ -492,16 +480,8 @@
         url ="projects/#{connection['project']}/locations/#{connection['region']}" \
                         "/#{input['model']}:generateContent"
 
-        # Apply rate limiting
-        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
-
-        # Make the request with 429 fallback
-        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
-          post(url, payload).
-            after_error_response(/.*/) do |code, body, _header, message|
-              call('handle_vertex_error', connection, code, body, message)
-            end
-        end
+        # Make rate-limited request
+        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
         call('extract_generated_email_response', response)
       end,
@@ -609,16 +589,8 @@
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
                         "/#{input['model']}:generateContent"
 
-        # Apply rate limiting
-        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
-
-        # Make the request with 429 fallback
-        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
-          post(url, payload).
-            after_error_response(/.*/) do |code, body, _header, message|
-              call('handle_vertex_error', connection, code, body, message)
-            end
-        end
+        # Make rate-limited request
+        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
 
         # Extract and return the response
         call('extract_ai_classify_response', response, input)
@@ -649,16 +621,8 @@
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
 
-        # Apply rate limiting
-        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
-
-        # Make the request with 429 fallback
-        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
-          post(url, payload).
-            after_error_response(/.*/) do |code, body, _header, message|
-              call('handle_vertex_error', connection, code, body, message)
-            end
-        end
+        # Make rate-limited request
+        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
         call('extract_generic_response', response, true)
       end,
@@ -695,16 +659,8 @@
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
 
-        # Apply rate limiting
-        rate_limit_info = call('enforce_vertex_rate_limits', connection, input['model'], 'inference')
-
-        # Make the request with 429 fallback
-        response = call('handle_429_with_backoff', connection, 'inference', input['model']) do
-          post(url, payload).
-            after_error_response(/.*/) do |code, body, _header, message|
-              call('handle_vertex_error', connection, code, body, message)
-            end
-        end
+        # Make rate-limited request
+        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
         call('extract_generic_response', response, false)
       end,
@@ -1011,18 +967,21 @@
         url = "https://#{host}/#{version}/projects/#{project}/locations/#{region}/" \
               "indexEndpoints/#{endpoint_id}:findNeighbors"
         # Make the request
-        response = post(url, payload).
-          after_error_response(/404/) do |code, body, _headers, message|
-            # Use a custom message for 404s since they're often configuration errors
-            error("Index endpoint not found. Please verify:\n" \
-                  "• Host: #{host}\n" \
-                  "• Endpoint ID: #{endpoint_id}\n" \
-                  "• Region: #{region}")
-          end.
-          after_error_response(/.*/) do |code, body, _headers, message|
-            # Use the centralized handler for all other errors
-            call('handle_vertex_error', connection, code, body, message)
+        response = call('api_request', connection, :post, url, {
+          payload: payload,
+          error_handler: lambda do |code, body, message|
+            if code == 404
+              # Use a custom message for 404s since they're often configuration errors
+              error("Index endpoint not found. Please verify:\n" \
+                    "• Host: #{host}\n" \
+                    "• Endpoint ID: #{endpoint_id}\n" \
+                    "• Region: #{region}")
+            else
+              # Use the centralized handler for all other errors
+              call('handle_vertex_error', connection, code, body, message)
+            end
           end
+        })
 
         # Transform to recipe-friendly structure
         call('transform_find_neighbors_response', response)
@@ -1425,7 +1384,7 @@
           begin
             start_time = Time.now
             
-            drive_response = get('https://www.googleapis.com/drive/v3/files').
+            drive_response = get(call('drive_api_url', :files)).
               params(pageSize: 1, q: "trashed = false", fields: 'files(id,name,mimeType)').
               after_error_response(/.*/) do |code, body, _header, message|
                 if code == 403
@@ -1454,7 +1413,7 @@
             if drive_response['files'].any?
               file_id = drive_response['files'].first['id']
               begin
-                get("https://www.googleapis.com/drive/v3/files/#{file_id}").
+                get(call('drive_api_url', :file, file_id)).
                   params(fields: 'id,size')
                 drive_test['permissions_validated'] << 'drive.files.get'
                 drive_test['can_read_files'] = true
@@ -1740,56 +1699,7 @@
       end,
 
       output_fields: lambda do |object_definitions|
-        [
-          {
-            name: 'id', label: 'File ID', type: 'string',
-            hint: 'Google Drive file identifier'
-          },
-          {
-            name: 'name', label: 'File name', type: 'string',
-            hint: 'Original filename in Google Drive'
-          },
-          {
-            name: 'mime_type', label: 'MIME type', type: 'string',
-            hint: 'File MIME type (e.g., application/vnd.google-apps.document)'
-          },
-          {
-            name: 'size', label: 'File size', type: 'integer',
-            hint: 'File size in bytes (may be null for Google Workspace files)'
-          },
-          {
-            name: 'modified_time', label: 'Modified time', type: 'date_time',
-            hint: 'Last modification timestamp'
-          },
-          {
-            name: 'checksum', label: 'MD5 checksum', type: 'string',
-            hint: 'MD5 hash for change detection (may be null for Google Workspace files)'
-          },
-          {
-            name: 'owners', label: 'File owners', type: 'array', of: 'object',
-            properties: [
-              { name: 'displayName', label: 'Display name', type: 'string' },
-              { name: 'emailAddress', label: 'Email address', type: 'string' }
-            ],
-            hint: 'Array of file owners'
-          },
-          {
-            name: 'text_content', label: 'Text content', type: 'string',
-            hint: 'Extracted text content (empty for binary files or when include_content=false)'
-          },
-          {
-            name: 'needs_processing', label: 'Needs processing', type: 'boolean',
-            hint: 'True if file requires additional processing (PDFs, images, etc.)'
-          },
-          {
-            name: 'export_mime_type', label: 'Export MIME type', type: 'string',
-            hint: 'MIME type used for export (Google Workspace files only)'
-          },
-          {
-            name: 'fetch_method', label: 'Fetch method', type: 'string',
-            hint: 'Method used to retrieve content: export or download'
-          }
-        ]
+        object_definitions['drive_file_extended']
       end,
 
       execute: lambda do |connection, input|
@@ -1797,74 +1707,26 @@
         file_id = call('extract_drive_file_id', input['file_id'])
 
         # Step 2: Get file metadata
-        metadata_response = get("https://www.googleapis.com/drive/v3/files/#{file_id}").
-          params(fields: 'id,name,mimeType,size,modifiedTime,md5Checksum,owners').
-          after_error_response(/.*/) do |code, body, _header, message|
-            error_msg = call('handle_drive_error', connection, code, body, message)
-            error(error_msg)
-          end
-
-        # Step 3: Determine if we need to fetch content
-        include_content = input.fetch('include_content', true)
-        text_content = ''
-        needs_processing = false
-        export_mime_type = nil
-        fetch_method = nil
-
-        if include_content
-          # Step 4: Determine fetch method based on MIME type
-          export_mime_type = call('get_export_mime_type', metadata_response['mimeType'])
-
-          if export_mime_type.present?
-            # Google Workspace file - use export endpoint
-            fetch_method = 'export'
-            content_response = get("https://www.googleapis.com/drive/v3/files/#{file_id}/export").
-              params(mimeType: export_mime_type).
-              after_error_response(/.*/) do |code, body, _header, message|
-                error_msg = call('handle_drive_error', connection, code, body, message)
-                error(error_msg)
-              end
-
-            text_content = content_response.force_encoding('UTF-8')
-
-          else
-            # Regular file - use download endpoint
-            fetch_method = 'download'
-            content_response = get("https://www.googleapis.com/drive/v3/files/#{file_id}").
-              params(alt: 'media').
-              after_error_response(/.*/) do |code, body, _header, message|
-                error_msg = call('handle_drive_error', connection, code, body, message)
-                error(error_msg)
-              end
-
-            # Check if it's a text-based file we can process
-            if metadata_response['mimeType']&.start_with?('text/') ||
-               ['application/json', 'application/xml'].include?(metadata_response['mimeType'])
-              text_content = content_response.force_encoding('UTF-8')
-            else
-              # Binary file that needs processing
-              text_content = ''
-              needs_processing = ['application/pdf', 'image/'].any? { |prefix|
-                metadata_response['mimeType']&.start_with?(prefix)
-              }
+        metadata_response = call('api_request', connection, :get,
+          call('drive_api_url', :file, file_id),
+          {
+            params: { fields: 'id,name,mimeType,size,modifiedTime,md5Checksum,owners' },
+            error_handler: lambda do |code, body, message|
+              error(call('handle_drive_error', connection, code, body, message))
             end
-          end
-        end
+          }
+        )
 
-        # Step 5: Build response
-        {
-          'id' => metadata_response['id'],
-          'name' => metadata_response['name'],
-          'mime_type' => metadata_response['mimeType'],
-          'size' => metadata_response['size']&.to_i,
-          'modified_time' => metadata_response['modifiedTime'],
-          'checksum' => metadata_response['md5Checksum'],
-          'owners' => metadata_response['owners'] || [],
-          'text_content' => text_content,
-          'needs_processing' => needs_processing,
-          'export_mime_type' => export_mime_type,
-          'fetch_method' => fetch_method
-        }
+        # Step 3: Get content using unified fetcher
+        content_result = call('fetch_file_content',
+          connection,
+          file_id,
+          metadata_response,
+          input.fetch('include_content', true)
+        )
+
+        # Step 4: Merge metadata and content, then return
+        metadata_response.merge(content_result)
       end
     },
 
@@ -1932,14 +1794,7 @@
         [
           {
             name: 'files', label: 'Files', type: 'array', of: 'object',
-            properties: [
-              { name: 'id', label: 'File ID', type: 'string' },
-              { name: 'name', label: 'File name', type: 'string' },
-              { name: 'mime_type', label: 'MIME type', type: 'string' },
-              { name: 'size', label: 'File size', type: 'integer' },
-              { name: 'modified_time', label: 'Modified time', type: 'date_time' },
-              { name: 'checksum', label: 'MD5 checksum', type: 'string' }
-            ],
+            properties: object_definitions['drive_file_fields'],
             hint: 'Array of file objects matching the query'
           },
           {
@@ -2000,12 +1855,15 @@
         end
 
         # Step 4: Make API request
-        response = get('https://www.googleapis.com/drive/v3/files').
-          params(api_params).
-          after_error_response(/.*/) do |code, body, _header, message|
-            error_msg = call('handle_drive_error', connection, code, body, message)
-            error(error_msg)
-          end
+        response = call('api_request', connection, :get,
+          call('drive_api_url', :files),
+          {
+            params: api_params,
+            error_handler: lambda do |code, body, message|
+              error(call('handle_drive_error', connection, code, body, message))
+            end
+          }
+        )
 
         # Step 5: Process response
         files = response['files'] || []
@@ -2083,19 +1941,7 @@
         [
           {
             name: 'successful_files', label: 'Successful files', type: 'array', of: 'object',
-            properties: [
-              { name: 'id', label: 'File ID', type: 'string' },
-              { name: 'name', label: 'File name', type: 'string' },
-              { name: 'mime_type', label: 'MIME type', type: 'string' },
-              { name: 'size', label: 'File size', type: 'integer' },
-              { name: 'modified_time', label: 'Modified time', type: 'date_time' },
-              { name: 'checksum', label: 'MD5 checksum', type: 'string' },
-              { name: 'owners', label: 'File owners', type: 'array', of: 'object' },
-              { name: 'text_content', label: 'Text content', type: 'string' },
-              { name: 'needs_processing', label: 'Needs processing', type: 'boolean' },
-              { name: 'export_mime_type', label: 'Export MIME type', type: 'string' },
-              { name: 'fetch_method', label: 'Fetch method', type: 'string' }
-            ],
+            properties: object_definitions['drive_file_extended'],
             hint: 'Array of successfully fetched files with full content'
           },
           {
@@ -2149,85 +1995,29 @@
         file_ids.each do |file_id_input|
           begin
             # Extract clean file ID
-            clean_file_id = call('extract_drive_file_id', file_id_input)
-
-            # Reuse fetch_drive_file logic by calling it directly
-            fetch_input = {
-              'file_id' => clean_file_id,
-              'include_content' => include_content
-            }
-
-            # Call the existing fetch_drive_file action logic
-            file_id = call('extract_drive_file_id', fetch_input['file_id'])
+            file_id = call('extract_drive_file_id', file_id_input)
 
             # Get file metadata
-            metadata_response = get("https://www.googleapis.com/drive/v3/files/#{file_id}").
-              params(fields: 'id,name,mimeType,size,modifiedTime,md5Checksum,owners').
-              after_error_response(/.*/) do |code, body, _header, message|
-                error_msg = call('handle_drive_error', connection, code, body, message)
-                error(error_msg)
-              end
-
-            # Determine if we need to fetch content
-            text_content = ''
-            needs_processing = false
-            export_mime_type = nil
-            fetch_method = nil
-
-            if include_content
-              # Determine fetch method based on MIME type
-              export_mime_type = call('get_export_mime_type', metadata_response['mimeType'])
-
-              if export_mime_type.present?
-                # Google Workspace file - use export endpoint
-                fetch_method = 'export'
-                content_response = get("https://www.googleapis.com/drive/v3/files/#{file_id}/export").
-                  params(mimeType: export_mime_type).
-                  after_error_response(/.*/) do |code, body, _header, message|
-                    error_msg = call('handle_drive_error', connection, code, body, message)
-                    error(error_msg)
-                  end
-
-                text_content = content_response.force_encoding('UTF-8')
-
-              else
-                # Regular file - use download endpoint
-                fetch_method = 'download'
-                content_response = get("https://www.googleapis.com/drive/v3/files/#{file_id}").
-                  params(alt: 'media').
-                  after_error_response(/.*/) do |code, body, _header, message|
-                    error_msg = call('handle_drive_error', connection, code, body, message)
-                    error(error_msg)
-                  end
-
-                # Check if it's a text-based file we can process
-                if metadata_response['mimeType']&.start_with?('text/') ||
-                   ['application/json', 'application/xml'].include?(metadata_response['mimeType'])
-                  text_content = content_response.force_encoding('UTF-8')
-                else
-                  # Binary file that needs processing
-                  text_content = ''
-                  needs_processing = ['application/pdf', 'image/'].any? { |prefix|
-                    metadata_response['mimeType']&.start_with?(prefix)
-                  }
+            metadata_response = call('api_request', connection, :get,
+              call('drive_api_url', :file, file_id),
+              {
+                params: { fields: 'id,name,mimeType,size,modifiedTime,md5Checksum,owners' },
+                error_handler: lambda do |code, body, message|
+                  error(call('handle_drive_error', connection, code, body, message))
                 end
-              end
-            end
+              }
+            )
+
+            # Get content using unified fetcher
+            content_result = call('fetch_file_content',
+              connection,
+              file_id,
+              metadata_response,
+              include_content
+            )
 
             # Build successful file result
-            successful_file = {
-              'id' => metadata_response['id'],
-              'name' => metadata_response['name'],
-              'mime_type' => metadata_response['mimeType'],
-              'size' => metadata_response['size']&.to_i,
-              'modified_time' => metadata_response['modifiedTime'],
-              'checksum' => metadata_response['md5Checksum'],
-              'owners' => metadata_response['owners'] || [],
-              'text_content' => text_content,
-              'needs_processing' => needs_processing,
-              'export_mime_type' => export_mime_type,
-              'fetch_method' => fetch_method
-            }
+            successful_file = metadata_response.merge(content_result)
 
             successful_files << successful_file
 
@@ -2275,6 +2065,172 @@
   },
 
   methods: {
+    # Universal API request handler with standard error handling
+    api_request: lambda do |connection, method, url, options = {}|
+      # Build the request based on method
+      request = case method.to_sym
+      when :get
+        if options[:params]
+          get(url).params(options[:params])
+        else
+          get(url)
+        end
+      when :post
+        if options[:payload]
+          post(url, options[:payload])
+        else
+          post(url)
+        end
+      when :put
+        put(url, options[:payload])
+      when :delete
+        delete(url)
+      else
+        error("Unsupported HTTP method: #{method}")
+      end
+      
+      # Apply standard error handling
+      request.after_error_response(/.*/) do |code, body, _header, message|
+        # Check if custom error handler provided
+        if options[:error_handler]
+          options[:error_handler].call(code, body, message)
+        else
+          call('handle_vertex_error', connection, code, body, message)
+        end
+      end
+    end,
+
+    # Drive API URL builder for consistent endpoint construction
+    drive_api_url: lambda do |endpoint, file_id = nil, options = {}|
+      base = 'https://www.googleapis.com/drive/v3'
+
+      case endpoint.to_sym
+      when :file
+        error("file_id required for :file endpoint") if file_id.blank?
+        "#{base}/files/#{file_id}"
+      when :export
+        error("file_id required for :export endpoint") if file_id.blank?
+        "#{base}/files/#{file_id}/export"
+      when :download
+        error("file_id required for :download endpoint") if file_id.blank?
+        "#{base}/files/#{file_id}?alt=media"
+      when :files
+        "#{base}/files"
+      when :changes
+        "#{base}/changes"
+      when :start_token
+        "#{base}/changes/startPageToken"
+      else
+        error("Unknown Drive API endpoint: #{endpoint}")
+      end
+    end,
+
+    # Unified file content fetcher - eliminates duplication between actions
+    fetch_file_content: lambda do |connection, file_id, metadata, include_content = true|
+      # Skip content fetching if not requested
+      unless include_content
+        return {
+          'text_content' => '',
+          'needs_processing' => false,
+          'fetch_method' => 'skipped',
+          'export_mime_type' => nil
+        }
+      end
+
+      # Determine export type for Google Workspace files
+      export_mime_type = call('get_export_mime_type', metadata['mimeType'])
+
+      if export_mime_type.present?
+        # Google Workspace file - use export endpoint
+        content_response = call('api_request', connection, :get,
+          call('drive_api_url', :export, file_id),
+          {
+            params: { mimeType: export_mime_type },
+            error_handler: lambda do |code, body, message|
+              error(call('handle_drive_error', connection, code, body, message))
+            end
+          }
+        )
+
+        # Return workspace file result
+        {
+          'text_content' => content_response.force_encoding('UTF-8'),
+          'needs_processing' => false,
+          'fetch_method' => 'export',
+          'export_mime_type' => export_mime_type
+        }
+      else
+        # Regular file - use download endpoint
+        content_response = call('api_request', connection, :get,
+          call('drive_api_url', :download, file_id),
+          {
+            error_handler: lambda do |code, body, message|
+              error(call('handle_drive_error', connection, code, body, message))
+            end
+          }
+        )
+
+        # Check if it's a text-based file
+        is_text_file = metadata['mimeType']&.start_with?('text/') ||
+                       ['application/json', 'application/xml'].include?(metadata['mimeType'])
+
+        # Check if it needs additional processing
+        needs_processing = ['application/pdf', 'image/'].any? { |prefix|
+          metadata['mimeType']&.start_with?(prefix)
+        }
+
+        # Return regular file result
+        {
+          'text_content' => is_text_file ? content_response.force_encoding('UTF-8') : '',
+          'needs_processing' => needs_processing,
+          'fetch_method' => 'download',
+          'export_mime_type' => nil
+        }
+      end
+    end,
+
+    # Unified rate-limited AI request handler
+    rate_limited_ai_request: lambda do |connection, model, action_type, url, payload|
+      # Apply rate limiting before request
+      rate_limit_info = call('enforce_vertex_rate_limits', connection, model, action_type)
+
+      # Make request with 429 retry handling
+      response = call('handle_429_with_backoff', connection, action_type, model) do
+        call('api_request', connection, :post, url, { payload: payload })
+      end
+
+      # Add rate limit info to response if it's a hash
+      if response.is_a?(Hash)
+        response['rate_limit_status'] = rate_limit_info
+      end
+
+      response
+    end,
+
+    # Enhanced Gemini payload builder with JSON output support
+    build_gemini_payload: lambda do |instruction, prompt, options = {}|
+      # Use existing base builder
+      base = call('build_base_payload', instruction, prompt, options[:safety_settings])
+
+      # Add JSON output instruction if requested
+      if options[:json_output]
+        json_key = options[:json_key] || 'response'
+        json_instruction = "\n\nOutput as a JSON object with key \"#{json_key}\". " \
+                          "Only respond with valid JSON and nothing else."
+
+        # Append to the user prompt
+        current_text = base['contents'][0]['parts'][0]['text']
+        base['contents'][0]['parts'][0]['text'] = current_text + json_instruction
+      end
+
+      # Set temperature if provided
+      if options[:temperature]
+        base['generationConfig'] ||= {}
+        base['generationConfig']['temperature'] = options[:temperature]
+      end
+
+      base
+    end,
     # ─────────────────────────────────────────────────────────────────────────────
     # -- Core error and HTTP utilities
     # ─────────────────────────────────────────────────────────────────────────────
@@ -2550,8 +2506,7 @@
             params(
               page_size: 500,  # Increased from 200 - get more models per request
               page_token: page_token,
-              view: 'PUBLISHER_MODEL_VIEW_BASIC',  # Changed from FULL - we only need basic info
-              # filter: build_model_filter(connection)  # << server-side filtering is limited, stick to client-side
+              view: 'PUBLISHER_MODEL_VIEW_BASIC'  # Changed from FULL - we only need basic info
             ).
             after_error_response(/.*/) do |code, body, _hdrs, message|
               # Log but don't fail completely
@@ -2822,7 +2777,6 @@
       static_fallback
     end,
 
-
     # ─────────────────────────────────────────────────────────────────────────────
     # -- Payload construction
     # ─────────────────────────────────────────────────────────────────────────────
@@ -3021,7 +2975,6 @@
 
       call('build_base_payload', instruction, user_prompt, input['safetySettings'])
     end,
-
     payload_for_ai_classify: lambda do |connection, input|
       # Extract categories and options
       categories = Array(input['categories'] || [])
@@ -3149,16 +3102,8 @@
 
             payload = { 'instances' => instances }
 
-            # Apply rate limiting
-            rate_limit_info = call('enforce_vertex_rate_limits', connection, model, 'embedding')
-
-            # Make batch API call with 429 fallback
-            response = call('handle_429_with_backoff', connection, 'embedding', model) do
-              post(url, payload).
-                after_error_response(/.*/) do |code, body, _header, message|
-                  call('handle_vertex_error', connection, code, body, message)
-                end
-            end
+            # Make rate-limited batch request
+            response = call('rate_limited_ai_request', connection, model, 'embedding', url, payload)
 
             # Process batch response - each prediction corresponds to each instance
             predictions = response['predictions'] || []
@@ -3216,10 +3161,7 @@
                   }
 
                   # Make individual API call
-                  individual_response = post(url, individual_payload).
-                    after_error_response(/.*/) do |code, body, _header, message|
-                      call('handle_vertex_error', connection, code, body, message)
-                    end
+                  individual_response = call('api_request', connection, :post, url, { payload: individual_payload })
 
                   # Extract embedding from individual response
                   vals = individual_response&.dig('predictions', 0, 'embeddings', 'values') ||
@@ -3317,16 +3259,8 @@
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{model}:predict"
 
-        # Apply rate limiting
-        rate_limit_info = call('enforce_vertex_rate_limits', connection, model, 'embedding')
-
-        # Make the request with 429 fallback
-        response = call('handle_429_with_backoff', connection, 'embedding', model) do
-          post(url, payload).
-            after_error_response(/.*/) do |code, body, _header, message|
-              call('handle_vertex_error', connection, code, body, message)
-            end
-        end
+        # Make rate-limited request
+        response = call('rate_limited_ai_request', connection, model, 'embedding', url, payload)
 
         # Extract embedding from response
         vector = response&.dig('predictions', 0, 'embeddings', 'values') ||
@@ -3739,10 +3673,6 @@
         error("Invalid index_id format. Expected: projects/PROJECT/locations/REGION/indexes/INDEX_ID")
       end
 
-      # Extract for future use if needed
-      # project = index_parts[1]
-      # region = index_parts[3]
-      # index_name = index_parts[5]
 
       begin
         # Get index details
@@ -3946,6 +3876,66 @@
   },
 
   object_definitions: {
+    # ===== COMMON FIELD DEFINITIONS =====
+    # Shared Drive file fields used across multiple actions
+    drive_file_fields: {
+      fields: lambda do |_connection, _config_fields, _object_definitions|
+        [
+          { name: 'id', label: 'File ID', type: 'string',
+            hint: 'Google Drive file identifier' },
+          { name: 'name', label: 'File name', type: 'string',
+            hint: 'Original filename in Google Drive' },
+          { name: 'mime_type', label: 'MIME type', type: 'string',
+            hint: 'File MIME type' },
+          { name: 'size', label: 'File size', type: 'integer',
+            hint: 'File size in bytes' },
+          { name: 'modified_time', label: 'Modified time', type: 'date_time',
+            hint: 'Last modification timestamp' },
+          { name: 'checksum', label: 'MD5 checksum', type: 'string',
+            hint: 'MD5 hash for change detection' }
+        ]
+      end
+    },
+
+    # Extended Drive file fields with content
+    drive_file_extended: {
+      fields: lambda do |_connection, _config_fields, object_definitions|
+        # Start with base fields
+        base_fields = object_definitions['drive_file_fields']
+
+        # Add extended fields
+        extended = base_fields.concat([
+          { name: 'owners', label: 'File owners', type: 'array', of: 'object',
+            properties: [
+              { name: 'displayName', label: 'Display name', type: 'string' },
+              { name: 'emailAddress', label: 'Email address', type: 'string' }
+            ],
+            hint: 'Array of file owners' },
+          { name: 'text_content', label: 'Text content', type: 'string',
+            hint: 'Extracted text content' },
+          { name: 'needs_processing', label: 'Needs processing', type: 'boolean',
+            hint: 'True if file requires additional processing' },
+          { name: 'export_mime_type', label: 'Export MIME type', type: 'string',
+            hint: 'MIME type used for export' },
+          { name: 'fetch_method', label: 'Fetch method', type: 'string',
+            hint: 'Method used to retrieve content' }
+        ])
+
+        extended
+      end
+    },
+
+    # Common safety and usage fields
+    safety_and_usage: {
+      fields: lambda do |_connection, _config_fields, object_definitions|
+        safety = object_definitions['safety_rating_schema'] || []
+        usage = object_definitions['usage_schema'] || []
+        safety.concat(usage)
+      end
+    },
+    # ===== END COMMON FIELD DEFINITIONS =====
+
+    # Your existing object definitions continue here...
     prediction: {
       fields: lambda do |_connection, _config_fields, _object_definitions|
         [
