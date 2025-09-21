@@ -2081,3 +2081,16 @@ Task 12 - Test Error Scenarios
 ```
 
 ---
+1. Vertex:
+2. Drive :
+
+Vertex-Embed
+Vertex-GenAI
+Vertex-Vector
+
+Drive-Monitor
+Drive
+
+1. Generate:
+2. Analyze :
+3  

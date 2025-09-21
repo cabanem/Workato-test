@@ -204,7 +204,7 @@
 
   actions: {
     send_messages: {
-      title: 'Send messages to Gemini models',
+      title: 'Vertex -- Send messages to Gemini models',
       subtitle: 'Converse with Gemini models in Google Vertex AI',
       description: lambda do |input|
         model = input['model']
@@ -256,10 +256,9 @@
     },
     # --- Generative actions (text models) [6] ---
     translate_text: {
-      title: '[GEN-AI] Translate text',
-      subtitle: '[GEN-AI] Translate text between languages',
+      title: 'Vertex -- Translate text',
+      subtitle: 'Translate text between languages',
       description: "Translate text into a different language using models from Google Vertex AI",
-      display_priority: 6,
       help: {
         body: 'This action translates inputted text into a different language. While other languages may be possible, languages not on the predefined list may not provide reliable translations.'
       },
@@ -308,10 +307,9 @@
       end
     },
     summarize_text: {
-      title: '[GEN-AI] Summarize text',
-      subtitle: '[GEN-AI] Get a summary of the input text in configurable length',
+      title: 'Vertex -- Summarize text',
+      subtitle: 'Get a summary of the input text in configurable length',
       description: "Summarize text using models from Google Vertex AI",
-      display_priority: 6,
       help: {
         body: 'This action summarizes input text into a shorter version. The length of the summary can be configured.'
       },
@@ -343,9 +341,8 @@
       end
     },
     parse_text: {
-      title: '[GEN-AI] Parse text',
-      subtitle: '[GEN-AI] Extract structured data from freeform text',
-      display_priority: 6,
+      title: 'Vertex -- Parse text',
+      subtitle: 'Extract structured data from freeform text',
       help: {
         body: 'This action helps process input text to find specific information based on defined guidelines. The processed information is then available as datapills.'
       },
@@ -381,10 +378,9 @@
       end
     },
     draft_email: {
-      title: '[GEN-AI] Draft email',
-      subtitle: '[GEN-AI] Generate an email based on user description',
+      title: 'Vertex -- Draft email',
+      subtitle: 'Generate an email based on user description',
       description: "Generate draft email using models from Google Vertex AI",
-      display_priority: 6,
       help: {
         body: 'This action generates an email and parses input into datapills ' \
               'containing a subject line and body for easy mapping into future ' \
@@ -421,10 +417,9 @@
     },
     # --- Analysis actions (text models) [7] ---
     ai_classify: {
-      title: '[ANALYZE] AI Classification',
-      subtitle: '[ANALYZE] Classify text using AI with confidence scoring',
-      description: "[ANALYZE] Classify text into predefined categories using models from Google Vertex AI with confidence scores and alternatives",
-      display_priority: 7,
+      title: 'Vertex -- AI Classification',
+      subtitle: 'Classify text using AI with confidence scoring',
+      description: "Classify text into predefined categories using models from Google Vertex AI with confidence scores and alternatives",
       help: {
         body: 'This action uses AI to classify text into one of the provided categories. ' \
               'Returns confidence scores and alternative classifications. Designed to work ' \
@@ -508,9 +503,8 @@
       end
     },
     analyze_text: {
-      title: '[ANALYZE] Analyze text',
-      subtitle: '[ANALYZE] Contextual analysis of text to answer user-provided questions',
-      display_priority: 7,
+      title: 'Vertex -- Analyze text',
+      subtitle: 'Contextual analysis of text to answer user-provided questions',
       description: "Analyze text to answer user-provided questions using models from Google Vertex AI",
       help: {
         body: "This action performs a contextual analysis of a text to answer user-provided questions. If the answer isn't found in the text, the datapill will be empty."
@@ -546,9 +540,8 @@
 
     # --- Generative and Analysis actions (multimodal models) ---
     analyze_image: {
-      title: '[MULTI] Analyze image',
-      subtitle: '[MULTI] Analyze image based on the provided question',
-      display_priority: 3,
+      title: 'Vertex -- Analyze image',
+      subtitle: 'Analyze image based on the provided question',
       description: "Analyses passed <span class='provider'>image</span> using " \
                    "Gemini models in <span class='provider'>Google Vertex AI</span>",
       help: {
@@ -584,11 +577,10 @@
     },
     # --- Embedding and Vector Search actions (4)---
     generate_embeddings: {
-      title: '[EMBEDDING] Generate text embeddings (Batch)',
-      subtitle: '[EMBEDDING] Generate embeddings for multiple texts in batch',
+      title: 'Vertex -- Generate text embeddings (Batch)',
+      subtitle: 'Generate embeddings for multiple texts in batch',
       description: 'Generate text embeddings for multiple texts using Google models in Google Vertex AI',
       batch: true,
-      display_priority: 4,
       help: {
         body: 'Batch text embedding generates numerical vectors for multiple text inputs efficiently. ' \
               'It processes an array of texts and returns vectors that capture the meaning ' \
@@ -689,10 +681,9 @@
       end
     },
     generate_embedding_single: {
-      title: '[EMBEDDING] Generate single text embedding',
-      subtitle: '[EMBEDDING] Generate embedding for a single text input',
+      title: 'Vertex -- Generate single text embedding',
+      subtitle: 'Generate embedding for a single text input',
       description: 'Generate text embedding for a single text using Google models in Google Vertex AI',
-      display_priority: 4,
       help: {
         body: 'Generate a numerical vector for a single text input. This is optimized for RAG query flows ' \
               'where you need to embed a single user query to find similar documents. The vector captures ' \
@@ -773,9 +764,8 @@
       end
     },
     find_neighbors: {
-      title: '[VECTOR_SEARCH] Find neighbors',
-      subtitle: '[VECTOR_SEARCH] K-NN query on a deployed Vertex AI index endpoint',
-      display_priority: 4,
+      title: 'Vertex -- Find neighbors',
+      subtitle: 'K-NN query on a deployed Vertex AI index endpoint',
       description: "Query a Vertex AI Vector Search index endpoint to retrieve nearest neighbors.",
       retry_on_request: ['POST'],
       retry_on_response: [429, 500, 502, 503, 504],
@@ -878,10 +868,9 @@
       end
     },
     upsert_index_datapoints: {
-      title: '[VECTOR_SEARCH] Upsert index datapoints',
-      subtitle: '[VECTOR_SEARCH] Add or update vector datapoints in Vertex AI Vector Search index',
+      title: 'Vertex -- Upsert index datapoints',
+      subtitle: 'Add or update vector datapoints in Vertex AI Vector Search index',
       description: 'Upsert vector datapoints to Vertex AI Vector Search index',
-      display_priority: 4,
 
       help: lambda do
         {
@@ -1030,9 +1019,8 @@
 
     # --- Test connection action (2) ---
     test_connection: {
-      title: '[TEST] Test connection and permissions',
-      subtitle: '[TEST] Verify API access and permissions',
-      display_priority: 2,
+      title: 'Setup -- Test connection and permissions',
+      subtitle: 'Verify API access and permissions',
       description: 'Tests connectivity to Vertex AI and Google Drive APIs, validates permissions, and returns diagnostic information',
       help: {
         body: 'Use this action to verify your connection is working and has the required permissions. ' \
@@ -1361,9 +1349,8 @@
     },
     # --- Legacy Text Bison action kept for backward compatibility (1) ---
     get_prediction: {
-      title: '[LEGACY] Get prediction',
-      subtitle: '[LEGACY]Get prediction in Google Vertex AI',
-      display_priority: 1,
+      title: 'Vertex -- Get prediction (legacy)',
+      subtitle: 'Get prediction in Google Vertex AI',
       description: "Get prediction in Google Vertex AI",
       help: lambda do
         {
@@ -1413,9 +1400,8 @@
 
     # --- Google Drive File Fetching (5) ---
     fetch_drive_file: {
-      title: '[DRIVE] Fetch Google Drive file',
-      subtitle: '[DRIVE] Download file content from Google Drive',
-      display_priority: 5,
+      title: 'Drive -- Fetch Google Drive file',
+      subtitle: 'Download file content from Google Drive',
       description: lambda do |input|
         file_id = input['file_id']
         if file_id.present?
@@ -1480,9 +1466,8 @@
       end
     },
     list_drive_files: {
-      title: '[DRIVE] List Google Drive files',
-      subtitle: '[DRIVE] Retrieve a list of files from Google Drive',
-      diplay_priority: 5,
+      title: 'Drive -- List Google Drive files',
+      subtitle: 'Retrieve a list of files from Google Drive',
       description: lambda do |input|
         folder_id = input['folder_id']
         if folder_id.present?
@@ -1641,9 +1626,8 @@
       end
     },
     batch_fetch_drive_files: {
-      title: '[DRIVE] Batch fetch Google Drive files',
-      subtitle: '[DRIVE] Fetch content from multiple Google Drive files',
-      display_priority: 5,
+      title: 'Drive -- Batch fetch Google Drive files',
+      subtitle: 'Fetch content from multiple Google Drive files',
       batch: true,
       description: lambda do |input|
         file_ids = input['file_ids'] || []
@@ -1814,9 +1798,8 @@
       end
     },
     monitor_drive_changes: {
-      title: '[DRIVE] Monitor Google Drive changes',
-      subtitle: '[DRIVE] Track file changes since last check',
-      display_priority: 5,
+      title: 'Drive -- Monitor Google Drive changes',
+      subtitle: 'Track file changes since last check',
       description: lambda do |input|
         if input['page_token'].present?
           'Continue monitoring Drive changes from saved checkpoint'
