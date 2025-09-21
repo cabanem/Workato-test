@@ -254,12 +254,12 @@
         call('sample_record_output', 'send_message')
       end
     },
-    # --- Generative and Analysis actions (text models) ---
+    # --- Generative actions (text models) [6] ---
     translate_text: {
-      title: 'Translate text',
-      subtitle: 'Translate text between languages',
-      description: "Translate <span class='provider'>text</span> into a different " \
-                   "language using Gemini models in <span class='provider'>Google Vertex AI</span>",
+      title: '[GEN-AI] Translate text',
+      subtitle: '[GEN-AI] Translate text between languages',
+      description: "Translate text into a different language using models from Google Vertex AI",
+      display_priority: 6,
       help: {
         body: 'This action translates inputted text into a different language. While other languages may be possible, languages not on the predefined list may not provide reliable translations.'
       },
@@ -308,13 +308,12 @@
       end
     },
     summarize_text: {
-      title: 'Summarize text',
-      subtitle: 'Get a summary of the input text in configurable length',
-      description: "Summarize <span class='provider'>text</span> " \
-                   "using Gemini models in <span class='provider'>Google Vertex AI</span>",
+      title: '[GEN-AI] Summarize text',
+      subtitle: '[GEN-AI] Get a summary of the input text in configurable length',
+      description: "Summarize text using models from Google Vertex AI",
+      display_priority: 6,
       help: {
-        body: 'This action summarizes inputted text into a shorter version. ' \
-              'The length of the summary can be configured.'
+        body: 'This action summarizes input text into a shorter version. The length of the summary can be configured.'
       },
       input_fields: lambda do |object_definitions|
         object_definitions['summarize_text_input']
@@ -344,15 +343,13 @@
       end
     },
     parse_text: {
-      title: 'Parse text',
-      subtitle: 'Extract structured data from freeform text',
+      title: '[GEN-AI] Parse text',
+      subtitle: '[GEN-AI] Extract structured data from freeform text',
+      display_priority: 6,
       help: {
-        body: 'This action helps process inputted text to find specific information ' \
-              'based on defined guidelines. The processed information is then available as datapills.'
+        body: 'This action helps process input text to find specific information based on defined guidelines. The processed information is then available as datapills.'
       },
-      description: "Parse <span class='provider'>text</span> to find specific " \
-                   "information using Gemini models in <span class='provider'>" \
-                   'Google Vertex AI</span>',
+      description: "Parse text to find specific information using models from Google Vertex AI",
 
       input_fields: lambda do |object_definitions|
         object_definitions['parse_text_input']
@@ -384,10 +381,10 @@
       end
     },
     draft_email: {
-      title: 'Draft email',
-      subtitle: 'Generate an email based on user description',
-      description: "Generate draft <span class='provider'>email</span> " \
-                   "using Gemini models in <span class='provider'>Google Vertex AI</span>",
+      title: '[GEN-AI] Draft email',
+      subtitle: '[GEN-AI] Generate an email based on user description',
+      description: "Generate draft email using models from Google Vertex AI",
+      display_priority: 6,
       help: {
         body: 'This action generates an email and parses input into datapills ' \
               'containing a subject line and body for easy mapping into future ' \
@@ -422,12 +419,12 @@
         call('sample_record_output', 'draft_email')
       end
     },
+    # --- Analysis actions (text models) [7] ---
     ai_classify: {
-      title: 'AI Classification',
-      subtitle: 'Classify text using AI with confidence scoring',
-      description: "Classify <span class='provider'>text</span> into predefined categories " \
-                   'using Gemini models in ' \
-                   "<span class='provider'>Google Vertex AI</span> with confidence scores and alternatives",
+      title: '[ANALYZE] AI Classification',
+      subtitle: '[ANALYZE] Classify text using AI with confidence scoring',
+      description: "[ANALYZE] Classify text into predefined categories using models from Google Vertex AI with confidence scores and alternatives",
+      display_priority: 7,
       help: {
         body: 'This action uses AI to classify text into one of the provided categories. ' \
               'Returns confidence scores and alternative classifications. Designed to work ' \
@@ -511,9 +508,10 @@
       end
     },
     analyze_text: {
-      title: 'Analyze text',
-      subtitle: 'Contextual analysis of text to answer user-provided questions',
-      description: "Analyze text to answer user-provided questions using Gemini models Google Vertex AI",
+      title: '[ANALYZE] Analyze text',
+      subtitle: '[ANALYZE] Contextual analysis of text to answer user-provided questions',
+      display_priority: 7,
+      description: "Analyze text to answer user-provided questions using models from Google Vertex AI",
       help: {
         body: "This action performs a contextual analysis of a text to answer user-provided questions. If the answer isn't found in the text, the datapill will be empty."
       },
@@ -548,8 +546,9 @@
 
     # --- Generative and Analysis actions (multimodal models) ---
     analyze_image: {
-      title: 'Analyze image',
-      subtitle: 'Analyze image based on the provided question',
+      title: '[MULTI] Analyze image',
+      subtitle: '[MULTI] Analyze image based on the provided question',
+      display_priority: 3,
       description: "Analyses passed <span class='provider'>image</span> using " \
                    "Gemini models in <span class='provider'>Google Vertex AI</span>",
       help: {
@@ -1029,7 +1028,7 @@
       end
     },
 
-    # --- Test connection action ---
+    # --- Test connection action (2) ---
     test_connection: {
       title: '[TEST] Test connection and permissions',
       subtitle: '[TEST] Verify API access and permissions',
@@ -1360,7 +1359,7 @@
         }
       end
     },
-    # --- Legacy Text Bison action kept for backward compatibility ---
+    # --- Legacy Text Bison action kept for backward compatibility (1) ---
     get_prediction: {
       title: '[LEGACY] Get prediction',
       subtitle: '[LEGACY]Get prediction in Google Vertex AI',
@@ -1412,7 +1411,7 @@
       end
     },
 
-    # --- Google Drive File Fetching ---
+    # --- Google Drive File Fetching (5) ---
     fetch_drive_file: {
       title: '[DRIVE] Fetch Google Drive file',
       subtitle: '[DRIVE] Download file content from Google Drive',
