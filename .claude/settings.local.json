@@ -5,9 +5,12 @@
       "Bash(ruby:*)",
       "Bash(make:*)",
       "Bash(workato exec console:*)",
-      "Bash(workato:*)"
+      "Bash(workato:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "outputStyle": "Explanatory"
 }

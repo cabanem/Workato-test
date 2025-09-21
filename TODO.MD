@@ -10,7 +10,7 @@ File: connectors/rag_utils/v2.0_proposed.rb
 
 ```
 # Iteration 3: Critical Issues
-1. Rate limiting cache reliability
+## 1. Rate limiting cache reliability
    - PROBLEM: RACE condition risk w/60 cache keys; multiple concurrent executions could miss the other's count. 
     ```ruby
       60.times do |i|
@@ -19,10 +19,10 @@ File: connectors/rag_utils/v2.0_proposed.rb
         count = workato.cache.get(cache_key) || 0
     ```
   - SOLUTION: use a sliding window w/atomic operations; single cache key w/array of timestamps
-2. Model validation performance
+## 2. Model validation performance
   - PROBLEM: `validate_publisher_model!` makes an API per model per execution; doesn't persist across recipe runs due to instance variable caching (`@validated_models`)
   - SOLUTION: use workato.cache with reasonable TTL
-3. Batch embedding memory management
+## 3. Batch embedding memory management
   - PROBLEM: processing large batches could cause memory issues
     ```ruby
     texts.each_slice(batch_size) do |batch_texts|
@@ -31,13 +31,13 @@ File: connectors/rag_utils/v2.0_proposed.rb
     end
     ```
   - RECOMMENDATION: add streaming/chunked processeing options for large datasets
-4. Error recovery in batch operations
+## 4. Error recovery in batch operations
   - PROBLEM: the batch retry logic has complex, nested logic
   - SOLUTION: extract to dedicated retry handler w/circuit breaker pattern
-5. Consolidate response extractors
+## 5. Consolidate response extractors
   - There are multiple similar methods (extract_generic_response, extract_generated_email_response) &rarr; single configurable extractor
 
-6. Improve dynamic model discovery
+## 6. Improve dynamic model discovery
   - Add fallback cascade:
     - Check cache > make API call > use static list
     - Log each fallback level for observability

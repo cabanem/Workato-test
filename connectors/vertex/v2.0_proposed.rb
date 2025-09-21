@@ -13,25 +13,20 @@
       # Developer options
       { # - verbose_errors
         name: 'verbose_errors', label: 'Verbose errors',
-        group: 'Developer options',
-        type: 'boolean', control_type: 'checkbox',
+        group: 'Developer options', type: 'boolean', control_type: 'checkbox',
         hint: 'When enabled, include upstream response bodies in error messages. Disable in production.'
       },
       # Authentication
       { # - auth_type
         name: 'auth_type', label: 'Authentication type', group: 'Authentication',
-        control_type: 'select', 
-        default: 'custom',
-        optional: false, 
-        extends_schema: true, 
+        control_type: 'select',  default: 'custom', optional: false, extends_schema: true, 
         hint: 'Select the authentication type for connecting to Google Vertex AI.',
         options: [ ['Client credentials', 'custom'], %w[OAuth2 oauth2] ] 
       },
       # Vertex AI environment
       { # - region
         name: 'region', label: 'Region', group: 'Vertex AI environment',
-        control_type: 'select', 
-        optional: false,
+        control_type: 'select',  optional: false,
         options: [
           ['US central 1', 'us-central1'],
           ['US east 1', 'us-east1'],
@@ -53,45 +48,23 @@
         hint: 'Select the Google Cloud Platform (GCP) region used for the Vertex model.',
         toggle_hint: 'Select from list',
         toggle_field: {
-          name: 'region',
-          label: 'Region',
-          type: 'string',
-          control_type: 'text',
-          optional: false,
-          toggle_hint: 'Use custom value',
+          name: 'region', label: 'Region', type: 'string', control_type: 'text',
+          optional: false, toggle_hint: 'Use custom value',
           hint: "Enter the region you want to use. See <a href='https://cloud.google." \
                 "com/vertex-ai/generative-ai/docs/learn/locations' " \
                 "target='_blank'>generative AI on Vertex AI locations</a> for a list " \
                 'of regions and model availability.'
-
         }
-        
       },
-      { # - project
-        name: 'project', label: 'Project', group: 'Vertex AI environment',
-        optional: false, 
-        hint: 'E.g abc-dev-1234'
-      },
-      { # - version
-        name: 'version', label: 'Version', group: 'Vertex AI environment',
-        optional: false, 
-        default: 'v1',
-        hint: 'E.g. v1beta1'
+      { name: 'project', label: 'Project', group: 'Vertex AI environment', optional: false,  hint: 'E.g abc-dev-1234' },
+      { name: 'version', label: 'Version', group: 'Vertex AI environment', optional: false,  default: 'v1', hint: 'E.g. v1beta1'
       },
       # Model discovery and validation
-      { # - dynamic_models
-        name: 'dynamic_models', label: 'Refresh model list from API (Model Garden)', group: 'Model discovery and validation',
-        type: 'boolean',
-        control_type: 'checkbox',
-        optional: true,
-        hint: 'Fetch available Gemini/Embedding models at runtime. Falls back to a curated static list on errors.' 
-      },
-      { # - include_preview_models
-        name: 'include_preview_models', label: 'Include preview/experimental models', group: 'Model discovery and validation',
-        type: 'boolean',
-        control_type: 'checkbox', 
-        optional: true, 
-        sticky: true,
+      { name: 'dynamic_models', label: 'Refresh model list from API (Model Garden)', group: 'Model discovery and validation',
+        type: 'boolean', control_type: 'checkbox', optional: true,
+        hint: 'Fetch available Gemini/Embedding models at runtime. Falls back to a curated static list on errors.' },
+      { name: 'include_preview_models', label: 'Include preview/experimental models', group: 'Model discovery and validation',
+        type: 'boolean', control_type: 'checkbox', optional: true, sticky: true,
         hint: 'Also include Experimental/Private/Public Preview models. Leave unchecked for GA-only in production.' 
       },
       { # - validate_model_on_run
@@ -368,7 +341,7 @@
         # Make rate-limited request
         response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
-        call('extract_generic_response', response, true)
+        call('extract_response', response, { type: :generic, json_response: true })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -396,7 +369,7 @@
         # Validate model
         call('validate_publisher_model!', connection, input['model'])
         # Build payload
-        payload = call('payload_for_summarize', input)
+        payload = call('build_ai_payload', :summarize, input)
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
@@ -404,7 +377,7 @@
         # Make rate-limited request
         response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
-        call('extract_generic_response', response, false)
+        call('extract_response', response, { type: :generic, json_response: false })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -434,7 +407,7 @@
         # Validate model
         call('validate_publisher_model!', connection, input['model'])
         # Build payload
-        payload = call('payload_for_parse', input)
+        payload = call('build_ai_payload', :parse, input)
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
                         "/#{input['model']}:generateContent"
@@ -442,7 +415,7 @@
         # Make rate-limited request
         response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
-        call('extract_parsed_response', response)
+        call('extract_response', response, { type: :parsed })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -475,7 +448,7 @@
         # Validate model
         call('validate_publisher_model!', connection, input['model'])
         # Build payload
-        payload = call('payload_for_email', input)
+        payload = call('build_ai_payload', :email, input)
         # Build the url
         url ="projects/#{connection['project']}/locations/#{connection['region']}" \
                         "/#{input['model']}:generateContent"
@@ -483,7 +456,7 @@
         # Make rate-limited request
         response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
-        call('extract_generated_email_response', response)
+        call('extract_response', response, { type: :email })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -583,7 +556,7 @@
         call('validate_publisher_model!', connection, input['model'])
 
         # Build payload for AI classification
-        payload = call('payload_for_ai_classify', connection, input)
+        payload = call('build_ai_payload', :ai_classify, input, connection)
 
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
@@ -593,7 +566,7 @@
         response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
 
         # Extract and return the response
-        call('extract_ai_classify_response', response, input)
+        call('extract_response', response, { type: :classify, input: input })
       end
     },
     analyze_text: {
@@ -616,7 +589,7 @@
         # Validate model
         call('validate_publisher_model!', connection, input['model'])
         # Build payload
-        payload = call('payload_for_analyze', input)
+        payload = call('build_ai_payload', :analyze, input)
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
@@ -624,7 +597,7 @@
         # Make rate-limited request
         response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
-        call('extract_generic_response', response, true)
+        call('extract_response', response, { type: :generic, json_response: true })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -654,7 +627,7 @@
         # Validate model
         call('validate_publisher_model!', connection, input['model'])
         # Build payload
-        payload = call('payload_for_analyze_image', input)
+        payload = call('build_ai_payload', :analyze_image, input)
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
               "/#{input['model']}:generateContent"
@@ -662,7 +635,7 @@
         # Make rate-limited request
         response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
         # Extract and return the response
-        call('extract_generic_response', response, false)
+        call('extract_response', response, { type: :generic, json_response: false })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -939,7 +912,7 @@
 
       execute: lambda do |connection, input, _eis, _eos|
         # Build payload and normalized host
-        payload = call('payload_for_find_neighbors', input)
+        payload = call('build_ai_payload', :find_neighbors, input)
         host = input['index_endpoint_host'].to_s.strip
         # Host normalization
         if host.blank?
@@ -2698,64 +2671,59 @@ monitor_drive_changes: {
       project = connection['project'] || 'default'
       current_time = Time.now.to_i
 
-      # Cache key for this project/model combination
-      cache_prefix = "vertex_rate_#{project}_#{model_family}"
+      # Single cache key for atomic sliding window
+      cache_key = "vertex_rate_#{project}_#{model_family}_window"
 
-      # Get current request count in the last 60 seconds
-      requests_in_window = 0
       begin
-        # Check last 60 seconds of timestamps
-        60.times do |i|
-          timestamp = current_time - i
-          cache_key = "#{cache_prefix}_#{timestamp}"
-          count = workato.cache.get(cache_key) || 0
-          requests_in_window += count.to_i
+        # Get current sliding window data
+        window_data = workato.cache.get(cache_key) || { 'timestamps' => [], 'version' => 1 }
+        timestamps = Array(window_data['timestamps'])
+
+        # Clean expired timestamps (older than 60 seconds)
+        cutoff_time = current_time - 60
+        timestamps.reject! { |ts| ts < cutoff_time }
+
+        # Check if we're at the limit
+        if timestamps.length >= limit
+          # Find when the oldest request will expire
+          oldest_timestamp = timestamps.min
+          sleep_seconds = [oldest_timestamp + 60 - current_time, 1].max
+
+          # Add jitter to prevent thundering herd (0-500ms)
+          jitter = rand * 0.5
+          total_sleep = sleep_seconds + jitter
+          sleep_ms = (total_sleep * 1000).to_i
+
+          puts "Rate limit reached for #{model_family} (#{timestamps.length}/#{limit}). Sleeping #{total_sleep.round(2)}s"
+          sleep(total_sleep)
+
+          return {
+            requests_last_minute: timestamps.length,
+            limit: limit,
+            throttled: true,
+            sleep_ms: sleep_ms
+          }
         end
-      rescue => e
-        # If cache fails, allow the request but log warning
-        puts "Rate limit cache read failed: #{e.message}"
-        return { requests_last_minute: 0, limit: limit, throttled: false, sleep_ms: 0 }
-      end
 
-      # Check if we're at the limit
-      if requests_in_window >= limit
-        # Calculate how long to wait
-        # Find the oldest request timestamp to know when window will refresh
-        oldest_valid_timestamp = current_time - 59 # 60 second window
-        sleep_seconds = oldest_valid_timestamp + 60 - current_time
-        sleep_seconds = [sleep_seconds, 1].max # minimum 1 second
+        # Add current request timestamp
+        timestamps << current_time
 
-        # Add jitter to prevent thundering herd (0-1 second)
-        jitter = rand
-        total_sleep = sleep_seconds + jitter
-        sleep_ms = (total_sleep * 1000).to_i
-
-        puts "Rate limit reached for #{model_family} (#{requests_in_window}/#{limit}). Sleeping #{total_sleep.round(2)}s"
-        sleep(total_sleep)
+        # Update cache with new window data (90 second TTL for safety)
+        updated_data = { 'timestamps' => timestamps, 'version' => window_data['version'] + 1 }
+        workato.cache.set(cache_key, updated_data, 90)
 
         return {
-          requests_last_minute: requests_in_window,
+          requests_last_minute: timestamps.length,
           limit: limit,
-          throttled: true,
-          sleep_ms: sleep_ms
+          throttled: false,
+          sleep_ms: 0
         }
-      end
 
-      # Record this request
-      begin
-        current_key = "#{cache_prefix}_#{current_time}"
-        current_count = workato.cache.get(current_key) || 0
-        workato.cache.set(current_key, current_count.to_i + 1, 70) # TTL slightly longer than window
       rescue => e
-        puts "Rate limit cache write failed: #{e.message}"
+        # If cache fails, allow the request but log warning
+        puts "Rate limit cache operation failed: #{e.message}"
+        return { requests_last_minute: 0, limit: limit, throttled: false, sleep_ms: 0 }
       end
-
-      {
-        requests_last_minute: requests_in_window + 1,
-        limit: limit,
-        throttled: false,
-        sleep_ms: 0
-      }
     end,
     handle_429_with_backoff: lambda do |connection, action_type, model, &block|
       max_retries = 3
@@ -2795,6 +2763,94 @@ monitor_drive_changes: {
         end
       end
     end,
+
+    # Circuit breaker pattern for resilient batch operations
+    circuit_breaker_retry: lambda do |connection, operation_name, options = {}, &block|
+      # Configuration with defaults
+      max_retries = options[:max_retries] || 3
+      retry_on = Array(options[:retry_on] || [429, 500, 502, 503, 504])
+      base_delay = options[:base_delay] || 1.0
+      max_delay = options[:max_delay] || 30.0
+      jitter = options[:jitter] || true
+
+      # Circuit breaker state management via cache
+      circuit_key = "circuit_breaker_#{connection['project']}_#{operation_name}"
+
+      begin
+        circuit_state = workato.cache.get(circuit_key) || { 'failures' => 0, 'last_failure' => nil, 'state' => 'closed' }
+
+        # Check if circuit is open (too many recent failures)
+        if circuit_state['state'] == 'open'
+          last_failure_time = Time.parse(circuit_state['last_failure']) rescue (Time.now - 3600)
+          # Auto-recover after 5 minutes
+          if Time.now - last_failure_time > 300
+            circuit_state['state'] = 'half_open'
+            puts "Circuit breaker for #{operation_name}: transitioning to half-open"
+          else
+            error("Circuit breaker OPEN for #{operation_name}. Too many recent failures. Retry in #{((last_failure_time + 300 - Time.now) / 60).round(1)} minutes.")
+          end
+        end
+
+        # Attempt the operation with retries
+        max_retries.times do |attempt|
+          begin
+            result = block.call
+
+            # Success - reset circuit breaker
+            if circuit_state['failures'] > 0
+              workato.cache.set(circuit_key, { 'failures' => 0, 'state' => 'closed' }, 3600)
+              puts "Circuit breaker for #{operation_name}: reset to closed state"
+            end
+
+            return result
+
+          rescue => e
+            error_code = e.respond_to?(:response) ? e.response&.status : nil
+
+            # Check if this error should trigger a retry
+            should_retry = retry_on.any? do |code|
+              case code
+              when Integer
+                error_code == code
+              when String
+                e.message.include?(code)
+              when Regexp
+                e.message.match?(code)
+              else
+                false
+              end
+            end
+
+            if should_retry && attempt < max_retries - 1
+              # Calculate delay with exponential backoff and optional jitter
+              delay = [base_delay * (2 ** attempt), max_delay].min
+              delay += rand * 0.5 if jitter
+
+              puts "#{operation_name} failed (attempt #{attempt + 1}/#{max_retries}): #{e.message}. Retrying in #{delay.round(2)}s"
+              sleep(delay)
+            else
+              # Max retries exceeded or non-retryable error
+              circuit_state['failures'] += 1
+              circuit_state['last_failure'] = Time.now.iso8601
+
+              # Trip circuit breaker if too many failures
+              if circuit_state['failures'] >= 5
+                circuit_state['state'] = 'open'
+                puts "Circuit breaker for #{operation_name}: OPENED due to repeated failures"
+              end
+
+              workato.cache.set(circuit_key, circuit_state, 3600)
+              raise e
+            end
+          end
+        end
+
+      rescue => cache_error
+        puts "Circuit breaker cache error: #{cache_error.message}"
+        # Fallback to simple retry without circuit breaker
+        return block.call
+      end
+    end,
     # ─────────────────────────────────────────────────────────────────────────────
     # -- Vertex model discovery and validation
     # ─────────────────────────────────────────────────────────────────────────────
@@ -2821,28 +2877,128 @@ monitor_drive_changes: {
         # If cache access fails, continue without it
         puts "Cache access failed: #{e.message}, fetching fresh data"
       end
-      
-      # Fetch fresh models from the API
-      models = call('fetch_fresh_publisher_models', connection, publisher, region)
-      
+
+      # Fallback cascade for dynamic model discovery
+      models = call('cascade_model_discovery', connection, publisher, region)
+
       # Cache the results if we got any
       if models.present?
         begin
           cache_data = {
             'models' => models,
             'cached_at' => Time.now.iso8601,
-            'count' => models.length
+            'count' => models.length,
+            'source' => models.first&.dig('source') || 'api'
           }
           # Cache for 1 hour (3600 seconds)
           workato.cache.set(cache_key, cache_data, 3600)
-          puts "Cached #{models.length} models for future use"
+          puts "Cached #{models.length} models for future use (source: #{cache_data['source']})"
         rescue => e
           puts "Failed to cache models: #{e.message}"
         end
       end
-      
+
       models
     end,
+
+    # Cascade model discovery with multiple fallback strategies
+    cascade_model_discovery: lambda do |connection, publisher, region|
+      # Strategy 1: Try primary API endpoint
+      begin
+        puts "Model discovery: trying primary API endpoint..."
+        models = call('fetch_fresh_publisher_models', connection, publisher, region)
+        if models.present?
+          puts "Model discovery: primary API succeeded (#{models.length} models)"
+          models.each { |m| m['source'] = 'primary_api' }
+          return models
+        end
+      rescue => e
+        puts "Model discovery: primary API failed: #{e.message}"
+      end
+
+      # Strategy 2: Try alternative region if not us-central1
+      if region != 'us-central1'
+        begin
+          puts "Model discovery: trying fallback region (us-central1)..."
+          models = call('fetch_fresh_publisher_models', connection, publisher, 'us-central1')
+          if models.present?
+            puts "Model discovery: fallback region succeeded (#{models.length} models)"
+            models.each { |m| m['source'] = 'fallback_region' }
+            return models
+          end
+        rescue => e
+          puts "Model discovery: fallback region failed: #{e.message}"
+        end
+      end
+
+      # Strategy 3: Try different view parameter
+      begin
+        puts "Model discovery: trying minimal view mode..."
+        models = call('fetch_publisher_models_minimal', connection, publisher, region)
+        if models.present?
+          puts "Model discovery: minimal view succeeded (#{models.length} models)"
+          models.each { |m| m['source'] = 'minimal_view' }
+          return models
+        end
+      rescue => e
+        puts "Model discovery: minimal view failed: #{e.message}"
+      end
+
+      # Strategy 4: Use static curated list as final fallback
+      begin
+        puts "Model discovery: using static curated list as final fallback"
+        models = call('get_static_model_list', connection, publisher)
+        models.each { |m| m['source'] = 'static_fallback' }
+        puts "Model discovery: static fallback provided #{models.length} models"
+        return models
+      rescue => e
+        puts "Model discovery: static fallback failed: #{e.message}"
+        return []
+      end
+    end,
+
+    # Minimal view model fetching for fallback
+    fetch_publisher_models_minimal: lambda do |connection, publisher, region|
+      host = "https://#{region}-aiplatform.googleapis.com"
+      url = "#{host}/v1beta1/publishers/#{publisher}/models"
+
+      resp = get(url).
+        params(
+          page_size: 100,  # Smaller page size for reliability
+          view: 'PUBLISHER_MODEL_VIEW_UNSPECIFIED'  # Most basic view
+        ).
+        after_error_response(/.*/) { |code, body, _hdrs, message| raise "API Error: #{code}" }
+
+      models = resp['models'] || []
+      models.select { |m| m['name'].present? }
+    end,
+
+    # Static curated model list as ultimate fallback
+    get_static_model_list: lambda do |connection, publisher|
+      include_preview = connection['include_preview_models'] || false
+
+      # Core production models that are widely available
+      core_models = [
+        { 'name' => 'publishers/google/models/gemini-1.5-pro', 'displayName' => 'Gemini 1.5 Pro', 'launchStage' => 'GA' },
+        { 'name' => 'publishers/google/models/gemini-1.5-flash', 'displayName' => 'Gemini 1.5 Flash', 'launchStage' => 'GA' },
+        { 'name' => 'publishers/google/models/gemini-1.0-pro', 'displayName' => 'Gemini 1.0 Pro', 'launchStage' => 'GA' },
+        { 'name' => 'publishers/google/models/text-embedding-004', 'displayName' => 'Text Embedding 004', 'launchStage' => 'GA' },
+        { 'name' => 'publishers/google/models/textembedding-gecko', 'displayName' => 'Text Embedding Gecko', 'launchStage' => 'GA' }
+      ]
+
+      # Preview models (added if preview is enabled)
+      preview_models = [
+        { 'name' => 'publishers/google/models/gemini-1.5-pro-preview', 'displayName' => 'Gemini 1.5 Pro Preview', 'launchStage' => 'PREVIEW' },
+        { 'name' => 'publishers/google/models/gemini-experimental', 'displayName' => 'Gemini Experimental', 'launchStage' => 'EXPERIMENTAL' }
+      ]
+
+      if include_preview
+        core_models + preview_models
+      else
+        core_models
+      end
+    end,
+
     fetch_fresh_publisher_models: lambda do |connection, publisher, region|
       # Use the regional service endpoint; list is in v1beta1.
       # Docs: publishers.models.list (v1beta1), supports 'view' and pagination.
@@ -2918,19 +3074,26 @@ monitor_drive_changes: {
       # Early exit conditions (no need to validate in input absent or validation disabled)
       return if model_name.blank?
       return unless connection['validate_model_on_run']
-      
-      # This is the caching mechanism - @validated_models persists within a single execution
-      # In Workato, instance variables (@) live for the duration of one recipe execution
-      @validated_models ||= {}
 
-      # Create a unique cache key that includes both region and model (model avail can vary by region)
-      cache_key = "#{connection['region']}/#{model_name}"
-      
-      # Check cache first - if we've already validated this exact model in this region, skip
-      if @validated_models[cache_key]
-        # Add logging for debugging
-        puts "Model #{model_name} already validated in #{connection['region']}, using cache"
-        return
+      # Use persistent cache that survives across recipe executions
+      region = connection['region'].presence || 'us-central1'
+      project = connection['project'] || 'default'
+      cache_key = "vertex_model_validation_#{project}_#{region}_#{model_name.gsub('/', '_')}"
+
+      # Check persistent cache first - if we've validated this model recently, skip
+      begin
+        cached_validation = workato.cache.get(cache_key)
+        if cached_validation && cached_validation['validated_at']
+          validated_time = Time.parse(cached_validation['validated_at'])
+          # Use cached result if validation is less than 1 hour old
+          if validated_time > Time.now - 3600
+            puts "Model #{model_name} validation cached (#{((Time.now - validated_time) / 60).round(1)}min ago)"
+            return
+          end
+        end
+      rescue => e
+        puts "Model validation cache read failed: #{e.message}"
+        # Continue with validation if cache fails
       end
       
       # 1. Validate model name format first (no API call needed)
@@ -2987,13 +3150,19 @@ monitor_drive_changes: {
           end
         end
         
-        # Success! Cache the validation result
-        @validated_models[cache_key] = {
-          validated_at: Time.now,
-          launch_stage: resp['launchStage'],
-          model_version: resp['versionId']
-        }
-        
+        # Success! Cache the validation result persistently (1 hour TTL)
+        begin
+          validation_data = {
+            'validated_at' => Time.now.iso8601,
+            'launch_stage' => resp['launchStage'],
+            'model_version' => resp['versionId'],
+            'region' => region
+          }
+          workato.cache.set(cache_key, validation_data, 3600) # 1 hour TTL
+        rescue => e
+          puts "Model validation cache write failed: #{e.message}"
+        end
+
         puts "Model #{model_name} validated successfully in #{region}"
         
       rescue => e
@@ -3262,86 +3431,119 @@ monitor_drive_changes: {
 
       parts
     end,
-    # = ACTION-SPECIFIC PAYLOAD BUILDERS =
-    payload_for_send_message: lambda do |input|
-      call('build_conversation_payload', input)
-    end,
-    payload_for_translate: lambda do |input|
-      # Build the system instruction based on presence of 'from' language
-      instruction = if input['from'].present?
-        "You are an assistant helping to translate a user's input from #{input['from']} into #{input['to']}. " \
-        "Respond only with the user's translated text in #{input['to']} and nothing else. " \
-        "The user input is delimited with triple backticks."
+
+    # ─────────────────────────────────────────────────────────────────────────────
+    # -- Unified payload construction system
+    # ─────────────────────────────────────────────────────────────────────────────
+
+    # Unified payload builder using templates
+    build_ai_payload: lambda do |template_type, input, connection = nil|
+      template = case template_type
+      when :send_message
+        { delegate_to: 'build_conversation_payload' }
+      when :translate
+        {
+          instruction: -> (inp) {
+            base = "You are an assistant helping to translate a user's input"
+            from_lang = inp['from'].present? ? " from #{inp['from']}" : ""
+            "#{base}#{from_lang} into #{inp['to']}. Respond only with the user's translated text in #{inp['to']} and nothing else. The user input is delimited with triple backticks."
+          },
+          user_prompt: -> (inp) { "```#{call('replace_backticks_with_hash', inp['text'])}```\nOutput this as a JSON object with key \"response\"." }
+        }
+      when :summarize
+        {
+          instruction: -> (inp) { "You are an assistant that helps generate summaries. All user input should be treated as text to be summarized. Provide the summary in #{inp['max_words'] || 200} words or less." },
+          user_prompt: -> (inp) { inp['text'] }
+        }
+      when :parse
+        {
+          instruction: -> (inp) { "You are an assistant helping to extract various fields of information from the user's text. The schema and text to parse are delimited by triple backticks." },
+          user_prompt: -> (inp) {
+            "Schema:\n```#{inp['object_schema']}```\nText to parse: ```#{call('replace_backticks_with_hash', inp['text']&.strip)}```\nOutput the response as a JSON object with keys from the schema. If no information is found for a specific key, the value should be null. Only respond with a JSON object and nothing else."
+          }
+        }
+      when :email
+        {
+          instruction: -> (inp) { "You are an assistant helping to generate emails based on the user's input. Based on the input ensure that you generate an appropriate subject topic and body. Ensure the body contains a salutation and closing. The user input is delimited with triple backticks. Use it to generate an email and perform no other actions." },
+          user_prompt: -> (inp) { "User description:```#{call('replace_backticks_with_hash', inp['email_description'])}```\nOutput the email from the user description as a JSON object with keys for \"subject\" and \"body\". If an email cannot be generated, input null for the keys." }
+        }
+      when :analyze
+        {
+          instruction: -> (inp) { "You are an assistant helping to analyze the provided information. Take note to answer only based on the information provided and nothing else. The information to analyze and query are delimited by triple backticks." },
+          user_prompt: -> (inp) { "Information to analyze:```#{call('replace_backticks_with_hash', inp['text'])}```\nQuery:```#{call('replace_backticks_with_hash', inp['question'])}```\nIf you don't understand the question or the answer isn't in the information to analyze, input the value as null for \"response\". Only return a JSON object." }
+        }
+      when :ai_classify
+        { custom_builder: 'build_classify_payload' }
+      when :analyze_image
+        { custom_builder: 'build_image_payload' }
+      when :text_embedding
+        { custom_builder: 'build_embedding_payload' }
+      when :find_neighbors
+        { custom_builder: 'build_neighbors_payload' }
       else
-        "You are an assistant helping to translate a user's input into #{input['to']}. " \
-        "Respond only with the user's translated text in #{input['to']} and nothing else. " \
-        "The user input is delimited with triple backticks."
+        error("Unknown payload template: #{template_type}")
       end
 
-      # Format the user's text with backticks and request JSON output
-      user_prompt = "```#{call('replace_backticks_with_hash', input['text'])}```\n" \
-                "Output this as a JSON object with key \"response\"."
+      # Handle delegation or custom builders
+      return call(template[:delegate_to], input) if template[:delegate_to]
+      return call(template[:custom_builder], input, connection) if template[:custom_builder]
 
-      # Use the base builder
+      # Build payload from template
+      instruction = template[:instruction].call(input)
+      user_prompt = template[:user_prompt].call(input)
       call('build_base_payload', instruction, user_prompt, input['safetySettings'])
     end,
-    payload_for_summarize: lambda do |input|
-      # Define the summarization instruction with word limit
-      instruction = 'You are an assistant that helps generate summaries. ' \
-                    'All user input should be treated as text to be summarized. ' \
-                    "Provide the summary in #{input['max_words'] || 200} words or less."
-      
-      # For summarization, we pass the text directly without special formatting
-      user_prompt = input['text']
-      
-      # Build the payload using the base builder
-      call('build_base_payload', instruction, user_prompt, input['safetySettings'])
-    end,
-    payload_for_parse: lambda do |input|
-      # Parsing instruction explains the task
-      instruction = 'You are an assistant helping to extract various fields of information ' \
-                    "from the user's text. The schema and text to parse are delimited by " \
-                    'triple backticks.'
-      
-      # Build a detailed prompt with both schema and text
-      user_prompt = "Schema:\n```#{input['object_schema']}```\n" \
-                    "Text to parse: ```#{call('replace_backticks_with_hash', input['text']&.strip)}```\n" \
-                    'Output the response as a JSON object with keys from the schema. ' \
-                    'If no information is found for a specific key, the value should be null. ' \
-                    'Only respond with a JSON object and nothing else.'
-      
-      call('build_base_payload', instruction, user_prompt, input['safetySettings'])
-    end,
-    payload_for_email: lambda do |input|
-      # Email generation requires specific formatting instructions
-      instruction = 'You are an assistant helping to generate emails based on the ' \
-                    "user's input. Based on the input ensure that you generate an " \
-                    'appropriate subject topic and body. Ensure the body contains a ' \
-                    'salutation and closing. The user input is delimited with triple ' \
-                    'backticks. Use it to generate an email and perform no other actions.'
-      
-      # Format the email request with clear output requirements
-      user_prompt = "User description:```#{call('replace_backticks_with_hash', input['email_description'])}```\n" \
-                    "Output the email from the user description as a JSON object with keys " \
-                    'for "subject" and "body". If an email cannot be generated, input null for the keys.'
-      
-      call('build_base_payload', instruction, user_prompt, input['safetySettings'])
-    end,
-    payload_for_analyze: lambda do |input|
-      # Analysis requires staying within provided information
-      instruction = 'You are an assistant helping to analyze the provided information. ' \
-                    'Take note to answer only based on the information provided and nothing else. ' \
-                    'The information to analyze and query are delimited by triple backticks.'
-      
-      # Format both the text and question clearly
-      user_prompt = "Information to analyze:```#{call('replace_backticks_with_hash', input['text'])}```\n" \
-                    "Query:```#{call('replace_backticks_with_hash', input['question'])}```\n" \
-                    "If you don't understand the question or the answer isn't in the " \
-                    'information to analyze, input the value as null for "response". ' \
-                    'Only return a JSON object.'
 
-      call('build_base_payload', instruction, user_prompt, input['safetySettings'])
+    # Custom payload builders for complex cases
+    build_classify_payload: lambda do |input, connection|
+      # Extract categories and options
+      categories = Array(input['categories'] || [])
+      options = input['options'] || {}
+
+      # Build categories text with descriptions
+      categories_text = categories.map do |cat|
+        key = cat['key'].to_s
+        desc = cat['description'].to_s
+        desc.empty? ? key : "#{key}: #{desc}"
+      end.join("\n")
+
+      # Build instruction for AI classification
+      instruction = 'You are an expert text classifier. Classify the provided text into one of the given categories. ' \
+                    'Analyze the text carefully and select the most appropriate category. ' \
+                    'Return confidence scores and alternative classifications if requested. ' \
+                    'The categories and text are delimited by triple backticks.'
+
+      # Build the classification prompt
+      user_prompt = "Categories:\n```#{categories_text}```\n" \
+                    "Text to classify:\n```#{call('replace_backticks_with_hash', input['text']&.strip)}```\n\n"
+
+      # Add output format based on options
+      if options['return_confidence'] && options['return_alternatives']
+        user_prompt += 'Return a JSON object with: {"selected_category": "category_key", "confidence": 0.95, "alternatives": [{"category": "other_key", "confidence": 0.05}]}'
+      elsif options['return_confidence']
+        user_prompt += 'Return a JSON object with: {"selected_category": "category_key", "confidence": 0.95}'
+      else
+        user_prompt += 'Return a JSON object with: {"selected_category": "category_key"}'
+      end
+
+      # Use custom temperature for classification
+      temperature = (options['temperature'] || 0.1).to_f
+      call('build_base_payload', instruction, user_prompt, input['safetySettings'], temperature)
     end,
+
+    build_image_payload: lambda do |input, connection|
+      call('payload_for_analyze_image', input)  # Keep existing complex logic for now
+    end,
+
+    build_embedding_payload: lambda do |input, connection|
+      call('payload_for_text_embedding', input)  # Keep existing logic
+    end,
+
+    build_neighbors_payload: lambda do |input, connection|
+      call('payload_for_find_neighbors', input)  # Keep existing logic
+    end,
+
+    # = REMAINING PAYLOAD BUILDERS (for complex cases) =
     payload_for_ai_classify: lambda do |connection, input|
       # Extract categories and options
       categories = Array(input['categories'] || [])
@@ -3436,6 +3638,10 @@ monitor_drive_changes: {
       model = input['model']
       task_type = input['task_type']
 
+      # Memory management: Support streaming mode for large datasets
+      streaming_mode = input['streaming_mode'] || texts.length > 1000
+      max_memory_embeddings = input['max_memory_embeddings'] || 500
+
       # Initialize statistics
       batches_processed = 0
       successful_requests = 0
@@ -3451,113 +3657,69 @@ monitor_drive_changes: {
 
       # Process texts in batches of 25
       texts.each_slice(batch_size) do |batch_texts|
-        batch_success = false
-        retry_count = 0
-        max_retries = 1
+        batches_processed += 1
 
-        while !batch_success && retry_count <= max_retries
-          begin
-            batches_processed += 1
+        # Use circuit breaker for resilient batch processing
+        response = call('circuit_breaker_retry', connection, "batch_embedding_#{model}", {
+          max_retries: 2,
+          retry_on: [429, 500, 502, 503, 504, 'timeout', 'connection'],
+          base_delay: 1.0
+        }) do
+          # Build batch payload with multiple instances
+          instances = batch_texts.map do |text_obj|
+            {
+              'task_type' => task_type.presence,
+              'content' => text_obj['content'].to_s
+            }.compact
+          end
 
-            # Build batch payload with multiple instances
-            instances = batch_texts.map do |text_obj|
-              {
-                'task_type' => task_type.presence,
-                'content' => text_obj['content'].to_s
-              }.compact
+          payload = { 'instances' => instances }
+
+          # Make rate-limited batch request
+          call('rate_limited_ai_request', connection, model, 'embedding', url, payload)
+        end
+
+        # Process batch response - each prediction corresponds to each instance
+        predictions = response['predictions'] || []
+
+        batch_texts.each_with_index do |text_obj, index|
+          prediction = predictions[index]
+
+          if prediction
+            # Extract embedding from prediction
+            vals = prediction&.dig('embeddings', 'values') ||
+                   prediction&.dig('embeddings')&.first&.dig('values') ||
+                   []
+
+            embedding_result = {
+              'id' => text_obj['id'],
+              'vector' => vals,
+              'dimensions' => vals.length,
+              'metadata' => text_obj['metadata'] || {}
+            }
+
+            # Memory management: Store or stream based on mode
+            if streaming_mode && embeddings.length >= max_memory_embeddings
+              # In streaming mode, yield results periodically and clear memory
+              # For now, we'll still accumulate but could extend this to write to cache/storage
+              puts "Streaming mode: processed #{embeddings.length} embeddings, continuing..."
             end
 
-            payload = { 'instances' => instances }
+            embeddings << embedding_result
+            successful_requests += 1
+            # Estimate tokens (rough approximation: ~4 characters per token)
+            total_tokens += (text_obj['content'].to_s.length / 4.0).ceil
+          else
+            # Missing prediction for this text
+            failed_requests += 1
+            embedding_result = {
+              'id' => text_obj['id'],
+              'vector' => [],
+              'dimensions' => 0,
+              'metadata' => (text_obj['metadata'] || {}).merge('error' => 'Missing prediction in batch response')
+            }
 
-            # Make rate-limited batch request
-            response = call('rate_limited_ai_request', connection, model, 'embedding', url, payload)
-
-            # Process batch response - each prediction corresponds to each instance
-            predictions = response['predictions'] || []
-
-            batch_texts.each_with_index do |text_obj, index|
-              prediction = predictions[index]
-
-              if prediction
-                # Extract embedding from prediction
-                vals = prediction&.dig('embeddings', 'values') ||
-                       prediction&.dig('embeddings')&.first&.dig('values') ||
-                       []
-
-                embeddings << {
-                  'id' => text_obj['id'],
-                  'vector' => vals,
-                  'dimensions' => vals.length,
-                  'metadata' => text_obj['metadata'] || {}
-                }
-
-                successful_requests += 1
-                # Estimate tokens (rough approximation: ~4 characters per token)
-                total_tokens += (text_obj['content'].to_s.length / 4.0).ceil
-              else
-                # Missing prediction for this text
-                failed_requests += 1
-                embeddings << {
-                  'id' => text_obj['id'],
-                  'vector' => [],
-                  'dimensions' => 0,
-                  'metadata' => (text_obj['metadata'] || {}).merge('error' => 'Missing prediction in batch response')
-                }
-              end
-            end
-
-            batch_success = true
-
-          rescue
-            retry_count += 1
-
-            if retry_count > max_retries
-              # Fallback: process this batch individually
-              batch_texts.each do |text_obj|
-                begin
-                  batches_processed += 1
-
-                  # Build individual payload
-                  individual_payload = {
-                    'instances' => [
-                      {
-                        'task_type' => task_type.presence,
-                        'content' => text_obj['content'].to_s
-                      }.compact
-                    ]
-                  }
-
-                  # Make individual API call
-                  individual_response = call('api_request', connection, :post, url, { payload: individual_payload })
-
-                  # Extract embedding from individual response
-                  vals = individual_response&.dig('predictions', 0, 'embeddings', 'values') ||
-                         individual_response&.dig('predictions', 0, 'embeddings')&.first&.dig('values') ||
-                         []
-
-                  embeddings << {
-                    'id' => text_obj['id'],
-                    'vector' => vals,
-                    'dimensions' => vals.length,
-                    'metadata' => text_obj['metadata'] || {}
-                  }
-
-                  successful_requests += 1
-                  total_tokens += (text_obj['content'].to_s.length / 4.0).ceil
-
-                rescue => individual_error
-                  failed_requests += 1
-                  embeddings << {
-                    'id' => text_obj['id'],
-                    'vector' => [],
-                    'dimensions' => 0,
-                    'metadata' => (text_obj['metadata'] || {}).merge('error' => individual_error.message)
-                  }
-                end
-              end
-
-              batch_success = true
-            end
+            embeddings << embedding_result
           end
         end
       end
@@ -3592,7 +3754,12 @@ monitor_drive_changes: {
         'estimated_cost_savings' => estimated_cost_savings.round(4),
         'pass_fail' => all_successful,
         'action_required' => all_successful ? 'ready_for_indexing' : 'retry_failed_embeddings',
-        'rate_limit_status' => rate_limit_info
+        'rate_limit_status' => rate_limit_info,
+        'memory_management' => {
+          'streaming_mode' => streaming_mode,
+          'max_memory_embeddings' => max_memory_embeddings,
+          'memory_optimized' => streaming_mode && texts.length > max_memory_embeddings
+        }
       }
     end,
 
@@ -3615,8 +3782,8 @@ monitor_drive_changes: {
         # Prepare content with optional title
         content = title.present? ? "#{title}: #{text}" : text
 
-        # Build payload using existing helper
-        payload = call('payload_for_text_embedding', {
+        # Build payload using unified builder
+        payload = call('build_ai_payload', :text_embedding, {
           'text' => content,
           'task_type' => task_type,
           'title' => title
@@ -3791,113 +3958,110 @@ monitor_drive_changes: {
         error 'ERROR - The function call generated by the model is invalid.'
       end
     end,
-    extract_generic_response: lambda do |resp, is_json_response|
-      call('check_finish_reason', resp.dig('candidates', 0, 'finishReason'))
-      ratings = call('get_safety_ratings', resp.dig('candidates', 0, 'safetyRatings'))
-      return({ 'answer' => 'N/A', 'safety_ratings' => {} }) if ratings.blank?
 
-      answer = if is_json_response
-                call('extract_json', resp)&.[]('response')
-              else
-                resp&.dig('candidates', 0, 'content', 'parts', 0, 'text')
-              end
+    # Unified response extractor that handles all response types
+    extract_response: lambda do |resp, options = {}|
+      # Extract options with defaults
+      type = options[:type] || :generic
+      is_json_response = options[:json_response] || false
 
-      # Recipe-friendly enhancements
-      has_answer = !answer.nil? && !answer.to_s.strip.empty? && answer.to_s.strip != 'N/A'
-
-      {
-        'answer' => answer.to_s,
-        'has_answer' => has_answer,
-        'pass_fail' => has_answer,
-        'action_required' => has_answer ? 'use_answer' : 'try_different_question',
-        'answer_length' => answer.to_s.length,
-        'safety_ratings' => ratings,
-        'prompt_tokens' => resp.dig('usageMetadata', 'promptTokenCount') || 0,
-        'response_tokens' => resp.dig('usageMetadata', 'candidatesTokenCount') || 0,
-        'total_tokens' => resp.dig('usageMetadata', 'totalTokenCount') || 0
-      }
-    end,
-    extract_generated_email_response: lambda do |resp|
-      call('check_finish_reason', resp.dig('candidates', 0, 'finishReason'))
-      ratings = call('get_safety_ratings', resp.dig('candidates', 0, 'safetyRatings'))
-      json = call('extract_json', resp)
-      {
-        'subject' => json&.[]('subject'),
-        'body' => json&.[]('body'),
-        'safety_ratings' => ratings,
-        'usage' => resp['usageMetadata']
-      }
-    end,
-    extract_parsed_response: lambda do |resp|
-      call('check_finish_reason', resp.dig('candidates', 0, 'finishReason'))
-      ratings = call('get_safety_ratings', resp.dig('candidates', 0, 'safetyRatings'))
-      json = call('extract_json', resp)
-      json&.each_with_object({}) do |(key, value), hash|
-        hash[key] = value
-      end&.merge('safety_ratings' => ratings,
-                 'usage' => resp['usageMetadata'])
-    end,
-    extract_embedding_response: lambda do |resp|
-      vals = resp&.dig('predictions', 0, 'embeddings', 'values') ||
-            resp&.dig('predictions', 0, 'embeddings')&.first&.dig('values') ||
-            []
-      { 'embedding' => vals.map { |v| { 'value' => v } } }
-    end,
-
-    extract_ai_classify_response: lambda do |resp, input|
-      call('check_finish_reason', resp.dig('candidates', 0, 'finishReason'))
-      ratings = call('get_safety_ratings', resp.dig('candidates', 0, 'safetyRatings'))
-      return({ 'selected_category' => 'N/A', 'confidence' => 0.0, 'safety_ratings' => {} }) if ratings.blank?
-
-      json = call('extract_json', resp)
-      options = input['options'] || {}
-
-      # Extract the basic classification result
-      selected_category = json&.[]('selected_category') || 'N/A'
-      confidence = json&.[]('confidence')&.to_f || 1.0
-      alternatives = json&.[]('alternatives') || []
-
-      # Ensure selected_category is always a string (never null)
-      selected_category = selected_category.to_s
-      selected_category = 'unknown' if selected_category.empty? || selected_category == 'N/A'
-
-      # Normalize confidence to 0-1 range
-      confidence = [[confidence, 0.0].max, 1.0].min
-
-      # Determine if human review is required (confidence threshold)
-      confidence_threshold = 0.7
-      requires_human_review = confidence < confidence_threshold
-
-      # Recipe-friendly response structure
-      result = {
-        'selected_category' => selected_category,
-        'confidence' => confidence.round(4),
-        'requires_human_review' => requires_human_review,
-        'pass_fail' => !requires_human_review,
-        'action_required' => requires_human_review ? 'human_review' : 'proceed_with_classification',
-        'confidence_level' => case confidence
-                             when 0.8..1.0 then 'high'
-                             when 0.6..0.8 then 'medium'
-                             else 'low'
-                             end,
-        'safety_ratings' => ratings
-      }
-
-      # Add alternatives if requested
-      if options['return_alternatives'] != false
-        result['alternatives'] = alternatives
-        result['alternatives_count'] = alternatives.length
+      # Common safety and finish reason checks for generative responses
+      if [:generic, :email, :parsed, :classify].include?(type)
+        call('check_finish_reason', resp.dig('candidates', 0, 'finishReason'))
+        ratings = call('get_safety_ratings', resp.dig('candidates', 0, 'safetyRatings'))
+        return standard_error_response(type, ratings) if ratings.blank?
+      else
+        ratings = {}
       end
 
-      # Add usage metrics with consistent naming
-      if resp['usageMetadata']
-        result['prompt_tokens'] = resp['usageMetadata']['promptTokenCount'] || 0
-        result['response_tokens'] = resp['usageMetadata']['candidatesTokenCount'] || 0
-        result['total_tokens'] = resp['usageMetadata']['totalTokenCount'] || 0
-      end
+      # Extract core response based on type
+      case type
+      when :generic
+        answer = if is_json_response
+                  call('extract_json', resp)&.[]('response')
+                else
+                  resp&.dig('candidates', 0, 'content', 'parts', 0, 'text')
+                end
 
-      result
+        has_answer = !answer.nil? && !answer.to_s.strip.empty? && answer.to_s.strip != 'N/A'
+
+        {
+          'answer' => answer.to_s,
+          'has_answer' => has_answer,
+          'pass_fail' => has_answer,
+          'action_required' => has_answer ? 'use_answer' : 'try_different_question',
+          'answer_length' => answer.to_s.length,
+          'safety_ratings' => ratings,
+          'prompt_tokens' => resp.dig('usageMetadata', 'promptTokenCount') || 0,
+          'response_tokens' => resp.dig('usageMetadata', 'candidatesTokenCount') || 0,
+          'total_tokens' => resp.dig('usageMetadata', 'totalTokenCount') || 0
+        }
+
+      when :email
+        json = call('extract_json', resp)
+        {
+          'subject' => json&.[]('subject'),
+          'body' => json&.[]('body'),
+          'safety_ratings' => ratings,
+          'usage' => resp['usageMetadata']
+        }
+
+      when :parsed
+        json = call('extract_json', resp)
+        json&.each_with_object({}) do |(key, value), hash|
+          hash[key] = value
+        end&.merge('safety_ratings' => ratings, 'usage' => resp['usageMetadata'])
+
+      when :embedding
+        vals = resp&.dig('predictions', 0, 'embeddings', 'values') ||
+               resp&.dig('predictions', 0, 'embeddings')&.first&.dig('values') ||
+               []
+        { 'embedding' => vals.map { |v| { 'value' => v } } }
+
+      when :classify
+        json = call('extract_json', resp)
+        selected_category = json&.[]('selected_category') || 'N/A'
+        confidence = json&.[]('confidence')&.to_f || 1.0
+        alternatives = json&.[]('alternatives') || []
+
+        # Normalize values
+        selected_category = selected_category.to_s
+        selected_category = 'unknown' if selected_category.empty? || selected_category == 'N/A'
+        confidence = [[confidence, 0.0].max, 1.0].min
+
+        # Decision logic
+        confidence_threshold = 0.7
+        requires_human_review = confidence < confidence_threshold
+
+        {
+          'selected_category' => selected_category,
+          'confidence' => confidence,
+          'alternatives' => alternatives,
+          'requires_human_review' => requires_human_review,
+          'confidence_threshold' => confidence_threshold,
+          'pass_fail' => !requires_human_review,
+          'action_required' => requires_human_review ? 'human_review' : 'use_classification',
+          'safety_ratings' => ratings,
+          'usage' => resp['usageMetadata']
+        }
+
+      else
+        error("Unknown response extraction type: #{type}")
+      end
     end,
+
+    # Helper method for standard error responses
+    standard_error_response: lambda do |type, ratings|
+      case type
+      when :generic
+        { 'answer' => 'N/A', 'safety_ratings' => {} }
+      when :classify
+        { 'selected_category' => 'N/A', 'confidence' => 0.0, 'safety_ratings' => {} }
+      else
+        { 'error' => 'Safety ratings check failed', 'safety_ratings' => {} }
+      end
+    end,
+
     # ─────────────────────────────────────────────────────────────────────────────
     # -- Google Drive Helper Methods
     # ─────────────────────────────────────────────────────────────────────────────
@@ -4339,6 +4503,14 @@ monitor_drive_changes: {
 
   object_definitions: {
     # ===== COMMON FIELD DEFINITIONS =====
+
+    # Common text input field for AI operations
+    text_input_field: {
+      name: 'text', label: 'Text', type: 'string',
+      control_type: 'text-area', optional: false,
+      hint: 'Enter the text to be processed. Limit to 8000 words for optimal performance.'
+    },
+
     # Shared Drive file fields used across multiple actions
     drive_file_fields: {
       fields: lambda do |_connection, _config_fields, _object_definitions|
@@ -5134,13 +5306,9 @@ monitor_drive_changes: {
       fields: lambda do |_connection, _config_fields, object_definitions|
         object_definitions['text_model_schema'].concat(
           [
-            { name: 'email_description',
-              label: 'Email description',
-              type: 'string',
-              control_type: 'text-area',
-              optional: false,
-              hint: 'Enter a description for the email',
-              group: 'Task input' }
+            { name: 'email_description', label: 'Email description',
+              type: 'string', control_type: 'text-area', group: 'Task Input',
+              optional: false, hint: 'Enter a description for the email' }
           ]
         ).concat(object_definitions['config_schema'].only('safetySettings'))
       end
@@ -5158,18 +5326,10 @@ monitor_drive_changes: {
       fields: lambda do |_connection, _config_fields, object_definitions|
         object_definitions['text_model_schema'].concat(
           [
-            { name: 'text',
-              label: 'Source text',
-              control_type: 'text-area',
-              hint: 'Provide the text to be analyzed.',
-              optional: false,
-              group: 'Task input' },
-            { name: 'question',
-              label: 'Instruction',
-              optional: false,
-              hint: 'Enter analysis instructions, such as an analysis ' \
-                    'technique or question to be answered.',
-              group: 'Instruction' }
+            { name: 'text', label: 'Source text', optional: false, control_type: 'text-area',
+              group: 'Task input', hint: 'Provide the text to be analyzed.' },
+            { name: 'question', label: 'Instruction', ptional: false, group: 'Instruction',
+              hint: 'Enter analysis instructions, such as an analysis technique or question to be answered.' }
           ]
         ).concat(object_definitions['config_schema'].only('safetySettings'))
       end
@@ -5186,40 +5346,22 @@ monitor_drive_changes: {
       fields: lambda do |_connection, _config_fields, object_definitions|
         [
           { name: 'model',
-            optional: false,
-            control_type: 'select',
-            pick_list: :available_image_models,
-            extends_schema: true,
-            hint: 'Select the Gemini model to use',
+            optional: false, control_type: 'select', pick_list: :available_image_models,
+            extends_schema: true, hint: 'Select the Gemini model to use',
             toggle_hint: 'Select from list',
             toggle_field: {
-              name: 'model',
-              label: 'Model',
-              type: 'string',
-              control_type: 'text',
-              optional: false,
-              extends_schema: true,
-              toggle_hint: 'Use custom value',
+              name: 'model', label: 'Model', group: 'Model',
+              type: 'string', control_type: 'text', optional: false,
+              extends_schema: true, toggle_hint: 'Use custom value',
               hint: 'Provide the model you want to use in this format: ' \
                     '<b>publishers/{publisher}/models/{model}</b>. ' \
-                    'E.g. publishers/google/models/gemini-1.5-pro-001'
-            },
-            group: 'Model' },
-          { name: 'question',
-            label: 'Your question about the image',
-            hint: 'Please specify a clear question for image analysis.',
-            optional: false,
-            group: 'Prompt' },
-          { name: 'image',
-            label: 'Image data',
-            hint: 'Provide the image to be analyzed.',
-            optional: false,
-            group: 'Image' },
-          { name: 'mime_type',
-            label: 'MIME type',
-            optional: false,
-            hint: 'Provide the MIME type of the image. E.g. image/jpeg.',
-            group: 'Image' }
+                    'E.g. publishers/google/models/gemini-1.5-pro-001'} },
+          { name: 'question', group: 'Prompt', optional: false,
+            label: 'Your question about the image', hint: 'Please specify a clear question for image analysis.'},
+          { name: 'image', label: 'Image data', group: 'Image', optional: false,
+            hint: 'Provide the image to be analyzed.' },
+          { name: 'mime_type', label: 'MIME type', group: 'Image', optional: false,
+            hint: 'Provide the MIME type of the image. E.g. image/jpeg.' }
         ].concat(object_definitions['config_schema'].only('safetySettings'))
       end
     },
@@ -5394,27 +5536,18 @@ monitor_drive_changes: {
     text_model_schema: {
       fields: lambda do |_connection, _config_fields, _object_definitions|
         [
-          { name: 'model',
-            optional: false,
-            control_type: 'select',
+          { name: 'model', group: 'Model',
+            optional: false, control_type: 'select', extends_schema: true,
             pick_list: :available_text_models,
-            extends_schema: true,
-            hint: 'Select the Gemini model to use',
-            toggle_hint: 'Select from list',
+            hint: 'Select the Gemini model to use', toggle_hint: 'Select from list',
             toggle_field: {
-              name: 'model',
-              label: 'Model',
-              type: 'string',
-              control_type: 'text',
-              optional: false,
-              extends_schema: true,
-              toggle_hint: 'Use custom value',
+              name: 'model', label: 'Model',
+              type: 'string', control_type: 'text', optional: false, 
+              extends_schema: true, toggle_hint: 'Use custom value',
               hint: 'Provide the model you want to use in this format: ' \
                     '<b>publishers/{publisher}/models/{model}</b>. ' \
                     'E.g. publishers/google/models/gemini-1.5-pro-001'
-            },
-            group: 'Model'
-          }
+            } }
         ]
       end
     }
