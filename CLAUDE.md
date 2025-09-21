@@ -1,193 +1,239 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with the Vertex AI connector in this repository.
 
 ## Development Commands
 
 **Setup:**
 - `./setup.sh` - Initial setup (installs Workato SDK and dependencies)
 - `bundle install` - Install Ruby gems
-- `./setup-oauth.sh` - Configure OAuth2 for Google Drive (NEW)
+- `./setup-oauth.sh` - Configure OAuth2 for Google Drive
 
 **Testing:**
-- `make test` - Test default connector (sample_connector)
-- `make test CONNECTOR=name` - Test specific connector
-- `make console` - Open Workato console for default connector
-- `make console CONNECTOR=name` - Open console for specific connector
+- `make test CONNECTOR=vertex_ai` - Test Vertex AI connector
+- `make console CONNECTOR=vertex_ai` - Open Workato console for Vertex
+- `make test-drive CONNECTOR=vertex_ai` - Test Drive API connectivity
+- `make test-oauth CONNECTOR=vertex_ai` - Validate OAuth2 token and scopes
+- `make test-pipeline` - Test full document processing pipeline
 
-**Specialized Commands:**
-- `make validate-contract CONNECTOR=name` - Validate connector contracts
-- `make test-contract CONTRACT=name` - Test specific contract (v2.0 contracts)
-- `make debug-action CONNECTOR=name ACTION=action_name` - Debug specific action
-- `make diff-connectors` - Compare rag_utils.rb and vertex_ai.rb connectors
-- `make test-drive CONNECTOR=vertex_ai` - Test Drive API connectivity (NEW)
-- `make test-oauth CONNECTOR=vertex_ai` - Validate OAuth2 token and scopes (NEW)
-- `make test-pipeline` - Test full document processing pipeline (NEW)
+**Validation:**
+- `workato exec check connectors/vertex_ai.rb` - Syntax validation
+- `make validate-contract CONNECTOR=vertex_ai` - Validate connector contracts
+- `make debug-action CONNECTOR=vertex_ai ACTION=action_name` - Debug specific action
 
-**Services:**
-- `docker-compose up -d` - Start test services (MockAPI on port 3001, PostgreSQL on 5432)
-- `docker-compose up mockdrive -d` - Start mock Google Drive service on port 3002 (NEW)
+## Current State Assessment
+
+### Critical Issues Identified
+
+#### 1. Rate Limiting Race Condition (CRITICAL)
+**PROBLEM:** Race condition risk with 60 individual cache keys; concurrent executions could miss each other's counts.
+```ruby
+# Current problematic implementation
+60.times do |i|
+  timestamp = current_time - i
+  cache_key = "#{cache_prefix}_#{timestamp}"
+  count = workato.cache.get(cache_key) || 0
+```
+**SOLUTION:** Use sliding window with atomic operations; single cache key with array of timestamps.
+**Location:** `enforce_vertex_rate_limits` method (~line 4200)
+
+#### 2. Model Validation Performance (HIGH)
+**PROBLEM:** `validate_publisher_model!` makes API call per unique model per execution; doesn't persist across recipe runs due to instance variable caching (`@validated_models`).
+```ruby
+# Current issue
+@validated_models ||= {}  # Only lives for single execution
+```
+**SOLUTION:** Use `workato.cache` with reasonable TTL (1 hour).
+**Location:** `validate_publisher_model!` method (~line 4600)
+
+#### 3. Batch Embedding Memory Management (HIGH)
+**PROBLEM:** Processing large batches accumulates all results in memory.
+```ruby
+texts.each_slice(batch_size) do |batch_texts|
+  # All embeddings accumulated in memory
+  embeddings << result
+end
+```
+**SOLUTION:** Add streaming/chunked processing option for large datasets.
+**Location:** `generate_embeddings_batch_exec` method (~line 5000)
+
+#### 4. Error Recovery Complexity (MEDIUM)
+**PROBLEM:** Batch retry logic has complex nested structure that's hard to maintain.
+```ruby
+while !batch_success && retry_count <= max_retries
+  begin
+    # Complex nested logic
+  rescue
+    # More nested handling
+  end
+end
+```
+**SOLUTION:** Extract to dedicated retry handler with circuit breaker pattern.
+**Location:** Multiple batch operations (~lines 5800, 5900)
+
+### Size Optimization Opportunities
+
+#### 5. Consolidate Response Extractors (LOW)
+**PROBLEM:** Multiple similar methods doing essentially the same thing:
+- `extract_generic_response`
+- `extract_generated_email_response`  
+- `extract_parsed_response`
+- `extract_embedding_response`
+- `extract_ai_classify_response`
+
+**SOLUTION:** Single configurable extractor method.
+**Potential Savings:** ~300 lines
+
+#### 6. Consolidate Payload Builders (LOW)
+**PROBLEM:** 8 separate payload methods with similar patterns.
+**SOLUTION:** Template-based payload builder.
+**Potential Savings:** ~400 lines
+
+#### 7. Extract Drive Operations (MEDIUM)
+**PROBLEM:** Drive functionality mixed with Vertex AI logic.
+**SOLUTION:** Separate Drive module or companion connector.
+**Potential Savings:** ~800 lines
 
 ## Architecture
 
-This is a Workato connector development environment with:
-- **connectors/**: Workato connector Ruby files defining APIs, actions, triggers, and object definitions
-- **test/**: Test utilities including TestHelper module for contract validation
-- **Makefile**: Development commands and workflows
-- **docker-compose.yml**: Local test services (MockAPI, PostgreSQL, MockDrive)
-
 **Connector Structure:**
-Each connector file follows Workato SDK format with:
-- `connection`: Authentication and base URI configuration (NOW includes OAuth2 for Drive)
-- `actions`: Available operations (EXPANDED with Drive operations)
-- `triggers`: Event-based workflows
-- `object_definitions`: Data schemas and contracts (v2.0 with document metadata)
-- `methods`: Helper functions (NEW Drive utilities section)
+- **Total Lines:** ~6,200
+- **Actions:** 15 main actions + test connection
+- **Key Dependencies:** Google Cloud APIs (Vertex AI, Drive)
+- **Authentication:** OAuth2 + Service Account hybrid
 
-**Testing Approach:**
-- Use `workato exec check` for syntax validation
-- Use `workato exec console` for interactive testing
-- Contract validation through TestHelper.test_contract() method (v2.0 contracts)
-- Mock services available via docker-compose for integration testing
-- Drive API testing through mock service on port 3002 (NEW)
-
-## Project Context
-
-**Current Phase: Google Drive Integration (Phase 2 of 6)**
-Migrating Workato connectors for RAG email system (750 emails/day) with enhanced document processing:
-- RAG_Utils: Preparation layer (chunking, validation, Data Tables, document processing)
-- Vertex AI: AI layer (inference, embeddings, vector search, Drive access)
-- Environment: GitHub Codespaces with Ruby 3.3, Workato SDK installed
-- Working directory structure: /connectors/{connector_name}/v2.0_proposed.rb
-
-**Integration Status:**
-- ✅ Base connectors (v1.0)
-- ✅ Contract definitions (v2.0)
-- 🚧 Google Drive OAuth2 setup
-- 🚧 Document fetch/list actions
-- ⏳ Batch processing actions
-- ⏳ Change monitoring
-- ⏳ Recipe migration
-
-## Technical Constraints
-
-- Ruby in Workato's sandboxed environment (limited gems)
-- Lambda-based action definitions with call() pattern
-- No direct connector-to-connector communication
-- Service account + OAuth2 authentication for Google Cloud (UPDATED)
-- Contract validation required between connectors (v2.0)
-- Google Drive API rate limits: 12,000 requests/minute
-- Vertex AI embedding batch limit: 25 texts per request
-- Vector index update batch limit: 100 datapoints
-
-## OAuth2 Configuration
-
-**Required Scopes:**
-```ruby
-scopes = [
-  'https://www.googleapis.com/auth/cloud-platform',     # Vertex AI
-  'https://www.googleapis.com/auth/drive.readonly'      # Google Drive (NEW)
-]
-```
-
-**Authentication Strategy:**
-- OAuth2 for Drive access (user-delegated permissions)
-- Service account for Vertex AI operations (when OAuth not available)
-- Fallback: Share files with service account email
-
-## Development Standards
-
-- Test with: make test CONNECTOR=rag_utils
-- Console: make console CONNECTOR=vertex_ai
-- Mock API available on port 3001
-- Mock Drive available on port 3002 (NEW)
-- Use workato exec check for syntax validation
-- Maintain backward compatibility (v1.0 → v1.5 → v2.0)
-- Test Drive operations: make test-drive CONNECTOR=vertex_ai (NEW)
+**Performance Characteristics:**
+- Rate limits: Gemini Pro (300/min), Flash (600/min), Embeddings (600/min)
+- Batch limits: 25 texts per embedding request, 100 datapoints per index update
+- Cache usage: Model list (1hr), rate limiting (90s), validation (proposed 1hr)
 
 ## Code Patterns
 
-**Standard Patterns:**
-- Always use: lambda do |connection, input| ... end
-- Method calls: call('method_name', connection, params)
-- Error handling: error("message") not raise
-- Deprecation: Add warnings, don't break existing recipes
-
-**Drive-Specific Patterns (NEW):**
+**Current Anti-patterns to Fix:**
 ```ruby
-# OAuth token refresh
-call('refresh_drive_token', connection) if connection['oauth_token_expired']
-
-# Drive API error handling
-after_error_response(/404/) do |code, body, _header, message|
-  error("File not found in Drive: #{message}")
+# DON'T: Multiple cache keys for rate limiting
+60.times do |i|
+  cache_key = "#{cache_prefix}_#{timestamp}"
 end
 
-# Batch processing
-call('batch_with_retry', connection, file_ids, batch_size: 10)
+# DO: Single sliding window
+cache_key = "vertex_rate_#{project}_#{model_family}_window"
+window_data = workato.cache.get(cache_key) || { 'timestamps' => [] }
 ```
 
-## Active Contracts (v2.0)
+**Recommended Patterns:**
+```ruby
+# Circuit breaker for retries
+call('circuit_breaker_retry', connection, {
+  circuit_name: "operation_name",
+  max_retries: 3,
+  retry_on: [429, 500, 502, 503]
+}) do
+  # Operation logic
+end
 
-**Core Contracts:**
-- cleaned_text (enhanced with document_metadata)
-- embedding_request (enhanced with file tracking)
-- classification_request (unchanged)
+# Unified response extraction
+call('extract_response', response, {
+  type: :json,
+  json_key: 'response',
+  recipe_friendly: true
+})
+```
 
-**New Document Contracts:**
-- document_fetch_request/response
-- document_chunking_request/response
-- folder_monitor_request/response
-- document_processing_job
-- vector_index_request/response
+## Testing Protocol
 
-See data_contracts_v2.md for complete specifications
+**Before Making Changes:**
+1. Create connector backup
+2. Document current functionality
+3. Export working recipes
+4. Note current line count
 
-## Current Focus
+**After Each Change:**
+1. Syntax check: `workato exec check`
+2. Action test: Test modified action
+3. Recipe test: Run existing recipes
+4. Performance check: Monitor latency
 
-**Migration Phase 2: Document Processing Pipeline**
-Target: Process 100+ Drive documents → chunks → embeddings → vector index
+**Critical Test Cases:**
+- [ ] Rate limiting under concurrent load
+- [ ] Model validation cache persistence
+- [ ] Large batch embedding processing (>100 items)
+- [ ] Circuit breaker state management
+- [ ] Error message consistency
 
-**Priority Actions:**
-1. vertex::fetch_drive_file (CRITICAL)
-2. vertex::list_drive_files (CRITICAL)
-3. rag::process_document_for_rag (CRITICAL)
-4. vertex::batch_fetch_drive_files (HIGH)
-5. vertex::test_connection (HIGH)
+## Implementation Priority
 
-**Testing Checklist:**
-- [ ] OAuth2 token acquisition and refresh
-- [ ] Single file fetch with text extraction
-- [ ] Folder listing with filtering
-- [ ] Document chunking with metadata
-- [ ] Embedding generation with document tracking
-- [ ] Vector index update with restricts
-- [ ] Search with document filters
+### Phase 1: Critical Fixes (Immediate)
+1. Fix rate limiting race condition
+2. Implement persistent model validation cache
+
+### Phase 2: Performance (This Week)
+3. Add streaming for large batches
+4. Implement circuit breaker pattern
+
+### Phase 3: Maintenance (Next Week)
+5. Consolidate response extractors
+6. Consolidate payload builders
+
+### Phase 4: Architecture (Next Sprint)
+7. Extract Drive operations
+8. Optimize field definitions
 
 ## Migration Notes
 
-**Breaking Changes (v2.0):**
-- OAuth2 re-authentication required for Drive scope
-- Vector search response structure enhanced
-- Index datapoints require document metadata
+**Breaking Changes to Avoid:**
+- Keep all action names identical
+- Maintain exact input/output field structures
+- Preserve error message formats
+- Keep backward compatibility for 3 months
 
-**Backward Compatibility:**
-- All v1.0 actions continue to work
-- New fields are optional unless marked required
-- Gradual migration path over 3 months
+**Safe Optimizations:**
+- Internal method consolidation
+- Cache improvements
+- Performance enhancements
+- Code organization
 
-**Rollback Strategy:**
-- Feature flags for new capabilities
-- Compatibility mode for 3 months
-- Fallback to manual upload if Drive unavailable
+## Rollback Strategy
+
+**If Issues Arise:**
+1. Revert to backup version immediately
+2. Identify specific failure point
+3. Apply fix in isolation
+4. Re-test comprehensively
+5. Deploy with feature flag if uncertain
+
+**Monitoring:**
+- Track API call success rates
+- Monitor memory usage trends  
+- Watch rate limit hit frequency
+- Measure action latency
+
+## Constants to Define
+
+```ruby
+# Add at top of methods section
+RATE_LIMIT_WINDOW = 60
+CACHE_TTL_MODEL_LIST = 3600
+CACHE_TTL_MODEL_VALIDATION = 3600
+CACHE_TTL_CIRCUIT = 300
+MAX_BATCH_SIZE_EMBEDDING = 25
+MAX_BATCH_SIZE_INDEX = 100
+DEFAULT_RETRY_COUNT = 3
+BACKOFF_BASE_DELAY = 1.0
+BACKOFF_MAX_DELAY = 30.0
+```
 
 ## File Locations
 
-- RAG_Utils connector: `connectors/rag_utils/v2.0_proposed.rb`
-- Vertex connector: `connectors/vertex/v2.0_proposed.rb`
-- Data contracts: `docs/data/data_contracts_v2.md`
-  - Validation script:
+- Vertex connector: `connectors/vertex_ai.rb` (6,200 lines)
+- Test suite: `test/vertex_ai_test.rb`
+- Migration backup: `connectors/vertex_ai_backup_[date].rb`
+- Performance logs: `logs/vertex_performance.log`
 
-- Migration map: `docs/migration/migration_map.md`
-- Test fixtures: `test/fixtures/drive_responses/`
-- Please maintain a changelog at /.claude/CHANGELOG.txt.
+## Changelog
+
+Please maintain a detailed changelog at `/.claude/CHANGELOG_VERTEX.txt` documenting:
+- Each optimization applied
+- Lines saved/added
+- Performance improvements measured
+- Any behavioral changes
