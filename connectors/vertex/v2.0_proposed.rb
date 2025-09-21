@@ -4266,9 +4266,13 @@ monitor_drive_changes: {
     # ─────────────────────────────────────────────────────────────────────────────
     # Common text input field for AI operations
     text_input_field: {
-      name: 'text', label: 'Text', type: 'string',
-      control_type: 'text-area', optional: false,
-      hint: 'Enter the text to be processed. Limit to 8000 words for optimal performance.'
+      fields: lambda do |_connection, _config_fields, _object_definitions|
+        [
+          { name: 'text', label: 'Text', type: 'string',
+            control_type: 'text-area', optional: false,
+            hint: 'Enter the text to be processed. Limit to 8000 words for optimal performance.' }
+        ]
+      end
     },
     # Shared Drive file fields used across multiple actions
     drive_file_fields: {
