@@ -2011,6 +2011,9 @@
   },
 
   methods: {
+    picklist_for: lambda do |connection, bucket, static|
+      call('dynamic_model_picklist', connection, bucket, static)
+    end,
     log_debug: lambda { |msg| puts(msg) },
     rate_limit_defaults: lambda { { 'max_retries' => 3, 'base_delay' => 1.0, 'max_delay' => 30.0 } },
     normalize_host: lambda do |host|
@@ -4663,10 +4666,7 @@
     },
     translate_text_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [
-          { name: 'answer', label: 'Translation' }
-        ].concat(object_definitions['safety_rating_schema']).
-          concat(object_definitions['usage_schema'])
+        [{ name: 'answer', label: 'Translation' }].concat(object_definitions['safety_and_usage'])
       end
     },
     summarize_text_input: {
@@ -4682,8 +4682,7 @@
     },
     summarize_text_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [ { name: 'answer', label: 'Summary' } ].concat(object_definitions['safety_rating_schema'])
-                                                .concat(object_definitions['usage_schema'])
+        [{ name: 'answer', label: 'Summary' }].concat(object_definitions['safety_and_usage'])
       end
     },
     parse_text_input: {
@@ -4732,8 +4731,7 @@
         [
           { name: 'subject', label: 'Email subject' },
           { name: 'body', label: 'Email body' }
-        ].concat(object_definitions['safety_rating_schema']).
-          concat(object_definitions['usage_schema'])
+        ].concat(object_definitions['safety_and_usage'])
       end
     },
     analyze_text_input: {
@@ -4750,10 +4748,7 @@
     },
     analyze_text_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [
-          { name: 'answer', label: 'Analysis' }
-        ].concat(object_definitions['safety_rating_schema']).
-          concat(object_definitions['usage_schema'])
+        [{ name: 'answer', label: 'Analysis' }].concat(object_definitions['safety_and_usage'])
       end
     },
     analyze_image_input: {
@@ -4781,11 +4776,8 @@
     },
     analyze_image_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [
-          { name: 'answer',
-            label: 'Analysis' }
-        ].concat(object_definitions['safety_rating_schema']).
-          concat(object_definitions['usage_schema'])
+        [{ name: 'answer', label: 'Analysis' }].concat(object_definitions['safety_and_usage'])
+
       end
     },
     find_neighbors_input: {
@@ -4979,7 +4971,7 @@
         ['Gemini 2.5 Flash', 'publishers/google/models/gemini-2.5-flash'],
         ['Gemini 2.5 Flash Lite', 'publishers/google/models/gemini-2.5-flash-lite']
       ]
-      call('dynamic_model_picklist', connection, :text, static)
+      call('picklist_for', connection, :text, static)
     end,
     available_image_models: lambda do |connection|
       static = [
@@ -4992,7 +4984,7 @@
         ['Gemini 2.5 Flash', 'publishers/google/models/gemini-2.5-flash'],
         ['Gemini 2.5 Flash Lite', 'publishers/google/models/gemini-2.5-flash-lite']
       ]
-      call('dynamic_model_picklist', connection, :image, static)
+      call('picklist_for', connection, :image, static)
     end,
     available_embedding_models: lambda do |connection|
       static = [
@@ -5000,7 +4992,7 @@
         ['Text embedding gecko-003', 'publishers/google/models/textembedding-gecko@003'],
         ['Text embedding-004', 'publishers/google/models/text-embedding-004']
       ]
-      call('dynamic_model_picklist', connection, :embedding, static)
+      call('picklist_for', connection, :embedding, static)
     end,
     message_types: lambda do
       %w[single_message chat_transcript].map { |m| [m.humanize, m] }
