@@ -88,7 +88,7 @@
                     'OAuth 2.0 client IDs and select your desired account name.' }
           ],
           authorization_url: lambda do |connection|
-            scopes = call('oauth_scopes').join(' ').join(' ')
+            scopes = call('oauth_scopes').join(' ')
             params = {
               client_id: connection['client_id'],
               response_type: 'code',
@@ -2498,7 +2498,9 @@
         cached_data = workato.cache.get(cache_key)
         if cached_data.present?
           cache_time = (Time.parse(cached_data['cached_at']) rescue nil)
-          break if cache_time.nil?
+          if cache_time.nil?
+            # Missing timestamp - proceed to refresh cache (intentional fall through to fetch fresh)
+          end
 
           if cache_time > 1.hour.ago
             call('log_debug', "Using cached model list (#{cached_data['models'].length} models, cached #{((Time.now - cache_time) / 60).round} minutes ago)")
@@ -2526,9 +2528,9 @@
           }
           # Cache for 1 hour (3600 seconds)
           workato.cache.set(cache_key, cache_data, 3600)
-          puts "Cached #{models.length} models for future use (source: #{cache_data['source']})"
+          call('log_debug', "Cached #{models.length} models for future use (source: #{cache_data['source']})")
         rescue => e
-          puts "Failed to cache models: #{e.message}"
+          call('log_debug', "Failed to cache models: #{e.message}")
         end
       end
 
@@ -2616,7 +2618,7 @@
           
           # Stop if we've fetched enough pages
           if pages_fetched > max_pages
-            call('log_debug', "Fetched page #{pages_fetched}: #{batch.length} models in #{api_time.round(2)}s")
+            call('log_debug', "Reached max pages (#{max_pages}). Stopping.")
             break
           end
           
@@ -2632,9 +2634,9 @@
             after_error_response(/.*/) do |code, body, _hdrs, message|
               # Log but don't fail completely
               if connection['verbose_errors']
-                puts "Model listing failed (HTTP #{code}): #{body}"
+                call('log_debug', "Model listing failed (HTTP #{code}): #{body}")
               else
-                puts "Model listing failed (HTTP #{code}) - using static fallback"
+                call('log_debug', "Model listing failed (HTTP #{code}) - using static fallback")
               end
               raise "API Error"
             end
@@ -2645,7 +2647,7 @@
           batch = resp['publisherModels'] || []
           models.concat(batch)
           
-          puts "Fetched page #{pages_fetched}: #{batch.length} models in #{api_time.round(2)}s"
+          call('log_debug', "Fetched page #{pages_fetched}: #{batch.length} models in #{api_time.round(2)}s")
           
           # Check for pagination
           page_token = resp['nextPageToken']
@@ -2835,7 +2837,7 @@
       
       # Extract unique model IDs efficiently
       seen_ids = {}
-      unique_models = filtered.select do |m|
+      unique_models = eligible.select do |m|
         id = m['name'].to_s.split('/').last
         next false if id.blank?
         next false if seen_ids[id]
@@ -2889,19 +2891,19 @@
           
           # 3. Ensure we have options, otherwise fall back
           if options.present?
-            puts "Returning #{options.length} dynamic models for #{bucket}"
+            call('log_debug', "Returning #{options.length} dynamic models for #{bucket}")
             return options
           else
-            puts "No models matched criteria for #{bucket}, using static list"
+            call('log_debug', "No models matched criteria for #{bucket}, using static list")
             return static_fallback
           end
         end
       rescue => e
-        puts "Error in dynamic model fetch: #{e.message}"
+        call('log_debug', "Error in dynamic model fetch: #{e.message}")
       end
       
       # 4. Ultimate fallback to static list
-      puts "All dynamic fetch attempts failed, using static list"
+      call('log_debug', "All dynamic fetch attempts failed, using static list")
       static_fallback
     end,
     static_model_options: lambda do
