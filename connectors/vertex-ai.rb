@@ -177,9 +177,8 @@
   test: lambda do |connection|
     # Validate connection/access to Vertex AI
     call('api_request', connection, :get,
-      "https://#{connection['region']}-aiplatform.googleapis.com/#{connection['version'] || 'v1'}/projects/#{connection['project']}/locations/#{connection['region']}/datasets",
-      { params: { pageSize: 1 } }
-    )
+      "#{call('project_region_path', connection)}/datasets",
+      { params: { pageSize: 1 } })
     # Validate connection/access to Google Drive
     begin
       response = call('api_request', connection, :get,
@@ -696,17 +695,10 @@
         # Make the request
         response = call('api_request', connection, :post, url, {
           payload: payload,
+          context: { action: 'Find neighbors',
+                     host: host, endpoint_id: endpoint_id, region: region },
           error_handler: lambda do |code, body, message|
-            if code == 404
-              # Use a custom message for 404s since they're often configuration errors
-              error("Index endpoint not found. Please verify:\n" \
-                    "• Host: #{host}\n" \
-                    "• Endpoint ID: #{endpoint_id}\n" \
-                    "• Region: #{region}")
-            else
-              # Use the centralized handler for all other errors
-              call('handle_vertex_error', connection, code, body, message)
-            end
+            call('handle_vertex_error', connection, code, body, message, { action: 'Find neighbors', host: host, endpoint_id: endpoint_id, region: region })
           end
         })
 
@@ -1126,18 +1118,9 @@
         if input['verbose']
           begin
             # Check Vertex AI quotas
-            quotas = {
-              'api_calls_per_minute' => {
-                'gemini_pro' => 300,
-                'gemini_flash' => 600,
-                'embeddings' => 600
-              },
-              'notes' => 'These are default quotas. Actual quotas may vary by project.'
-            }
-            results['quota_info'] = {
-              'api_calls_per_minute' => { 'gemini_pro' => 300, 'gemini_flash' => 600, 'embeddings' => 600 },
-              'notes' => 'Defaults only. Your project quotas may differ.'
-            }
+            quotas = { 'api_calls_per_minute' => call('vertex_rpm_limits'),
+                       'notes' => 'These are default quotas. Actual quotas may vary by project.' }
+            results['quota_info'] = quotas
           rescue => e
             results['warnings'] << "Could not retrieve quota information: #{e.message}"
           end
@@ -1241,10 +1224,9 @@
       description: "Get prediction in Google Vertex AI",
       help: lambda do
         {
-          body: 'This action will retrieve prediction using the PaLM 2 for Text ' \
-                '(text-bison) model.',
-          learn_more_url: 'https://cloud.google.com/vertex-ai/docs/generative-ai/' \
-                          'model-reference/text',
+          body: '**Deprecated** - retained for backwards compatibility.' \
+                'This action will retrieve prediction using the PaLM 2 for Text (text-bison) model.',
+          learn_more_url: 'https://cloud.google.com/vertex-ai/docs/generative-ai/model-reference/text',
           learn_more_text: 'Learn more'
         }
       end,
@@ -1265,23 +1247,18 @@
         object_definitions['prediction']
       end,
 
-      sample_output: lambda do |connection|
-        payload = {
-          instances: [
-            {
-              prompt: 'action'
-            }
+        sample_output: lambda do |_connection|
+        {
+          'predictions' => [
+            { 'content' => 'Sample legacy prediction' }
           ],
-          parameters: {
-            temperature: 1,
-            topK: 2,
-            topP: 1,
-            maxOutputTokens: 50
+          'metadata' => {
+            'tokenMetadata' => {
+              'inputTokenCount' => { 'totalTokens' => 10, 'totalBillableCharacters' => 40 },
+              'outputTokenCount' => { 'totalTokens' => 20, 'totalBillableCharacters' => 80 }
+            }
           }
         }
-        post("projects/#{connection['project']}/locations/#{connection['region']}" \
-             '/publishers/google/models/text-bison:predict').
-          payload(payload)
       end
     },
 
@@ -1859,7 +1836,7 @@
             start_params[:spaces] = 'drive'
           end
           
-          start_response = get('https://www.googleapis.com/drive/v3/changes/startPageToken').
+          start_response = get(call('drive_api_url', :start_token)).
             params(start_params).
             after_error_response(/.*/) do |code, body, _header, message|
               error_msg = call('handle_drive_error', connection, code, body, message)
@@ -1898,7 +1875,7 @@
           changes_params[:driveId] = folder_id
         end
         
-        changes_response = get('https://www.googleapis.com/drive/v3/changes').
+        changes_response = get(call('drive_api_url', :changes)).
           params(changes_params).
           after_error_response(/.*/) do |code, body, _header, message|
             error_msg = call('handle_drive_error', connection, code, body, message)
@@ -2004,11 +1981,21 @@
   },
 
   methods: {
+    project_region_path: lambda do |connection|
+      "projects/#{connection['project']}/locations/#{connection['region']}"
+    end,
     picklist_for: lambda do |connection, bucket, static|
       call('dynamic_model_picklist', connection, bucket, static)
     end,
     log_debug: lambda { |msg| puts(msg) },
     rate_limit_defaults: lambda { { 'max_retries' => 3, 'base_delay' => 1.0, 'max_delay' => 30.0 } },
+    vertex_rpm_limits: lambda do
+      {
+        'gemini-pro' => 300,
+        'gemini-flash' => 600,
+        'embedding' => 600
+      }
+    end,
     normalize_host: lambda do |host|
       h = host.to_s.strip
       error('Index endpoint host is required') if h.blank?
@@ -2214,7 +2201,15 @@
       when 403
         "Permission denied - verify Vertex AI API is enabled"
       when 404
-        "Resource not found"
+        if context[:action] == 'Find neighbors'
+          "Index endpoint not found. Please verify:\n" \
+          "• Host: #{context[:host]}\n" \
+          "• Endpoint ID: #{context[:endpoint_id]}\n" \
+          "• Region: #{context[:region]}"
+        else
+          "Resource not found"
+        end
+
       when 429
         "Rate limit exceeded - please wait before retrying"
       when 500
@@ -2250,8 +2245,9 @@
         error("#{base_message}#{hint}")
       end
     end,
-    replace_backticks_with_hash: lambda do |text|
-      text&.gsub('```', '####')
+    sanitize_triple_backticks: lambda { |text| text&.gsub('```', '####') },
+    replace_backticks_with_hash: lambda do |text|  # backwards-compatible alias
+      call('sanitize_triple_backticks', text)
     end,
     # (Removed) truthy? -- unused
     # -- RATE LIMITING UTILITIES --
@@ -2273,13 +2269,7 @@
       end
 
       # Model-specific limits (requests per minute)
-      limits = {
-        'gemini-pro' => 300,
-        'gemini-flash' => 600,
-        'embedding' => 600
-      }
-
-      limit = limits[model_family]
+      limit = call('vertex_rpm_limits')[model_family]
       project = connection['project'] || 'default'
       current_time = Time.now.to_i
 
@@ -2357,6 +2347,16 @@
               retry_after = nil
               if e.respond_to?(:response) && e.response.respond_to?(:headers)
                 retry_after = e.response.headers['Retry-After']&.to_i
+              end
+
+              # Some Google APIs return retry info inside the JSON error body
+              if retry_after.nil? && e.respond_to?(:response)
+                begin
+                  body = e.response&.body
+                  info = parse_json(body)
+                  retry_after = info.dig('error', 'details')&.find { |d| d['@type']&.include?('RetryInfo') }&.dig('retryDelay', 'seconds')&.to_i
+                rescue
+                end
               end
 
               # Use Retry-After if available, otherwise use exponential backoff
@@ -2551,7 +2551,7 @@
       end
     end,
     # - Static curated model list as ultimate fallback
-    get_static_model_list: lambda do |connection, publisher|
+    get_static_model_list: lambda do |connection, _publisher|
       include_preview = connection['include_preview_models'] || false
 
       # Core production models that are widely available
@@ -2585,7 +2585,8 @@
       models = []
       page_token = nil
       pages_fetched = 0
-      max_pages = 5  # Reduced from 10 for faster response
+      max_pages = 5
+      page_size = 500
       total_api_time = 0
       
       begin
@@ -2603,7 +2604,7 @@
           
           resp = get(url).
             params(
-              page_size: 500,  # Increased from 200 - get more models per request
+              page_size: page_size,
               page_token: page_token,
               view: 'PUBLISHER_MODEL_VIEW_BASIC'  # Changed from FULL - we only need basic info
             ).
@@ -2851,7 +2852,7 @@
     dynamic_model_picklist: lambda do |connection, bucket, static_fallback|
       # 1. Check if dynamic models are enabled (return to static if not)
       unless connection['dynamic_models']
-        puts "Dynamic models disabled, using static list"
+        call('log_debug', "Dynamic models disabled, using static list")
         return static_fallback
       end
 
@@ -3175,6 +3176,7 @@
       # Process texts in batches of 25
       texts.each_slice(batch_size) do |batch_texts|
         batches_processed += 1
+        last_rate = nil
 
         # Use circuit breaker for resilient batch processing
         response = call('circuit_breaker_retry', connection, "batch_embedding_#{model}", {
@@ -3195,6 +3197,8 @@
           # Make rate-limited batch request
           call('rate_limited_ai_request', connection, model, 'embedding', url, payload)
         end
+
+        last_rate = response.is_a?(Hash) ? response['rate_limit_status'] : nil
 
         # Process batch response - each prediction corresponds to each instance
         predictions = response['predictions'] || []
@@ -3271,7 +3275,7 @@
         'estimated_cost_savings' => estimated_cost_savings.round(4),
         'pass_fail' => all_successful,
         'action_required' => all_successful ? 'ready_for_indexing' : 'retry_failed_embeddings',
-        'rate_limit_status' => rate_limit_info,
+        'rate_limit_status' => last_rate,
         'memory_management' => {
           'streaming_mode' => streaming_mode,
           'max_memory_embeddings' => max_memory_embeddings,
@@ -3591,18 +3595,12 @@
     end,
     get_export_mime_type: lambda do |mime_type|
       return nil if mime_type.blank?
-
-      case mime_type
-      when 'application/vnd.google-apps.document'
-        'text/plain'
-      when 'application/vnd.google-apps.spreadsheet'
-        'text/csv'
-      when 'application/vnd.google-apps.presentation'
-        'text/plain'
-      else
-        # Return nil for regular files (will be downloaded as-is)
-        nil
-      end
+      exports = {
+        'application/vnd.google-apps.document'     => 'text/plain',
+        'application/vnd.google-apps.spreadsheet'  => 'text/csv',
+        'application/vnd.google-apps.presentation' => 'text/plain'
+      }.freeze
++      exports[mime_type]
     end,
     build_drive_query: lambda do |options = {}|
       query_parts = ['trashed = false']
@@ -4661,7 +4659,7 @@
     },
     parse_text_input: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        object_definitions['text_model_schema'] + dup [
+        object_definitions['text_model_schema'].dup + [
             { name: 'text', label: 'Source text', group: 'Task input', control_type: 'text-area', optional: false, hint: 'Provide the text to be parsed' },
             { name: 'object_schema', label: 'Fields to identify', group: 'Schema', optional: false, control_type: 'schema-designer', extends_schema: true,
               sample_data_type: 'json_http', empty_schema_title: 'Provide output fields for your job output.',
