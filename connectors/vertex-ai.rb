@@ -2011,6 +2011,8 @@
   },
 
   methods: {
+    log_debug: lambda { |msg| puts(msg) },
+    rate_limit_defaults: lambda { { 'max_retries' => 3, 'base_delay' => 1.0, 'max_delay' => 30.0 } },
     normalize_host: lambda do |host|
       h = host.to_s.strip
       error('Index endpoint host is required') if h.blank?
@@ -2088,7 +2090,7 @@
         if options[:error_handler]
           options[:error_handler].call(code, body, message)
         else
-          call('handle_vertex_error', connection, code, body, message)
+          call('handle_vertex_error', connection, code, body, message, options[:context] || {})
         end
       end
     end,
@@ -2272,9 +2274,9 @@
 
       # Determine model family and limits
       model_family = case model.to_s.downcase
-      when /gemini.*pro/
+      when /gemini.*(2\.5\-)?pro/
         'gemini-pro'
-      when /gemini.*flash/
+      when /gemini.*(2\.5\-)?flash/
         'gemini-flash'
       when /embedding/
         'embedding'
@@ -2316,7 +2318,7 @@
           total_sleep = sleep_seconds + jitter
           sleep_ms = (total_sleep * 1000).to_i
 
-          puts "Rate limit reached for #{model_family} (#{timestamps.length}/#{limit}). Sleeping #{total_sleep.round(2)}s"
+          call('log_debug', "Rate limit reached for #{model_family} (#{timestamps.length}/#{limit}). Sleeping #{total_sleep.round(2)}s")
           sleep(total_sleep)
 
           return {
@@ -2343,13 +2345,14 @@
 
       rescue => e
         # If cache fails, allow the request but log warning
-        puts "Rate limit cache operation failed: #{e.message}"
+        call('log_debug', "Rate limit cache operation failed: #{e.message}")
         return { requests_last_minute: 0, limit: limit, throttled: false, sleep_ms: 0 }
       end
     end,
     handle_429_with_backoff: lambda do |connection, action_type, model, &block|
-      max_retries = 3
-      base_delay = 1.0
+      cfg = call('rate_limit_defaults')
+      max_retries = cfg['max_retries']
+      base_delay = cfg['base_delay']
 
       max_retries.times do |attempt|
         begin
@@ -2371,7 +2374,7 @@
               # Use Retry-After if available, otherwise use exponential backoff
               actual_delay = retry_after || delay
 
-              puts "429 rate limit hit for #{model} (attempt #{attempt + 1}/#{max_retries}). Retrying in #{actual_delay}s"
+              call('log_debug', "429 rate limit hit for #{model} (attempt #{attempt + 1}/#{max_retries}). Retrying in #{actual_delay}s")
               sleep(actual_delay)
             else
               # Max retries exceeded
@@ -2388,10 +2391,11 @@
     # Circuit breaker pattern for resilient batch operations
     circuit_breaker_retry: lambda do |connection, operation_name, options = {}, &block|
       # Configuration with defaults
-      max_retries = options[:max_retries] || 3
+      defaults = call('rate_limit_defaults')
+      max_retries = options[:max_retries] || defaults['max_retries']
       retry_on = Array(options[:retry_on] || [429, 500, 502, 503, 504])
-      base_delay = options[:base_delay] || 1.0
-      max_delay = options[:max_delay] || 30.0
+      base_delay = options[:base_delay] || defaults['base_delay']
+      max_delay = options[:max_delay] || defaults['max_delay']
       jitter = options[:jitter] || true
 
       # Circuit breaker state management via cache
@@ -2406,7 +2410,7 @@
           # Auto-recover after 5 minutes
           if Time.now - last_failure_time > 300
             circuit_state['state'] = 'half_open'
-            puts "Circuit breaker for #{operation_name}: transitioning to half-open"
+            call('log_debug', "Circuit breaker for #{operation_name}: transitioning to half-open")
           else
             error("Circuit breaker OPEN for #{operation_name}. Too many recent failures. Retry in #{((last_failure_time + 300 - Time.now) / 60).round(1)} minutes.")
           end
@@ -2420,7 +2424,7 @@
             # Success - reset circuit breaker
             if circuit_state['failures'] > 0
               workato.cache.set(circuit_key, { 'failures' => 0, 'state' => 'closed' }, 3600)
-              puts "Circuit breaker for #{operation_name}: reset to closed state"
+              call('log_debug', "Circuit breaker for #{operation_name}: reset to closed state")
             end
 
             return result
@@ -2447,7 +2451,7 @@
               delay = [base_delay * (2 ** attempt), max_delay].min
               delay += rand * 0.5 if jitter
 
-              puts "#{operation_name} failed (attempt #{attempt + 1}/#{max_retries}): #{e.message}. Retrying in #{delay.round(2)}s"
+              call('log_debug', "#{operation_name} failed (attempt #{attempt + 1}/#{max_retries}): #{e.message}. Retrying in #{delay.round(2)}s")
               sleep(delay)
             else
               # Max retries exceeded or non-retryable error
@@ -2457,7 +2461,7 @@
               # Trip circuit breaker if too many failures
               if circuit_state['failures'] >= 5
                 circuit_state['state'] = 'open'
-                puts "Circuit breaker for #{operation_name}: OPENED due to repeated failures"
+                call('log_debug', "Circuit breaker for #{operation_name}: OPENED due to repeated failures")
               end
 
               workato.cache.set(circuit_key, circuit_state, 3600)
@@ -2467,7 +2471,7 @@
         end
 
       rescue => cache_error
-        puts "Circuit breaker cache error: #{cache_error.message}"
+        call('log_debug', "Circuit breaker cache error: #{cache_error.message}")
         # Fallback to simple retry without circuit breaker
         return block.call
       end

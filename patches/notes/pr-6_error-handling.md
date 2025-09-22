@@ -104,13 +104,5 @@ diff --git a/connector.rb b/connector.rb
 ## Commit message
 
 ```bash
-git commit -m "refactor(errors/limits): centralize backoff defaults, pass context through, tidy logs" \
-  -m "Why: scattered retry constants and ad-hoc logging increase drift; errors lacked action context." \
-  -m "What:" \
-  -m "- Add rate_limit_defaults and use in 429/backoff + circuit breaker." \
-  -m "- api_request now forwards options[:context] to handle_vertex_error." \
-  -m "- Rate-limit model family aware of 2.5-* names." \
-  -m "- Add log_debug wrapper; replace puts in hot paths." \
-  -m "Impact: same behavior, clearer diagnostics, single place to tune retries." \
-  -m "Testing: forced 429 to observe structured backoff logs; 403 shows action context."
+git commit -m "refactor(errors/limits): centralize backoff defaults, pass context through, tidy logs |Why: scattered retry constants and ad-hoc logging increase drift; errors lacked action context. | What changed: - Add rate_limit_defaults and use in 429/backoff + circuit breaker. - api_request now forwards options[:context] to handle_vertex_error. - Rate-limit model family aware of 2.5-* names. - Add log_debug wrapper; replace puts in hot paths. | Impact: same behavior, clearer diagnostics, single place to tune retries. | Testing: forced 429 to observe structured backoff logs; 403 shows action context."
 ```
