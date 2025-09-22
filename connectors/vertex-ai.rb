@@ -223,16 +223,16 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        call('validate_publisher_model!', connection, input['model'])
-        payload = input['formatted_prompt'].presence || call('build_ai_payload', :send_message, input)
-
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-              "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        response
+        if input['formatted_prompt'].present?
+          call('rate_limited_ai_request',
+               connection,
+               input['model'],
+               'inference',
+               call('vertex_url_for', connection, input['model'], :generate),
+               input['formatted_prompt'])
+        else
+          call('run_vertex', connection, input, :send_message, verb: :generate)
+        end
       end,
 
       output_fields: lambda do |object_definitions|
@@ -413,21 +413,9 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-
-        # Build payload for AI classification
-        payload = call('build_ai_payload', :ai_classify, input, connection)
-
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-                        "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-
-        # Extract and return the response
-        call('extract_response', response, { type: :classify, input: input })
+        call('run_vertex', connection, input, :ai_classify,
+             verb: :generate,
+             extract: { type: :classify })
       end
     },
     analyze_text: {
@@ -1018,17 +1006,16 @@
           begin
             start_time = Time.now
             
-            drive_response = get(call('drive_api_url', :files)).
-              params(pageSize: 1, q: "trashed = false", fields: 'files(id,name,mimeType)').
-              after_error_response(/.*/) do |code, body, _header, message|
-                if code == 403
-                  raise "Drive API not enabled or missing scope"
-                elsif code == 401
-                  raise "Authentication failed - check OAuth token"
-                else
-                  raise "Drive API error (#{code}): #{message}"
-                end
-              end
+            drive_response = call('api_request', connection, :get,
+              call('drive_api_url', :files),
+              {
+                params: { pageSize: 1, q: "trashed = false", fields: 'files(id,name,mimeType)' },
+                error_handler: lambda do |code, body, message|
+                  error(call('handle_drive_error', connection, code, body, message))
+                end,
+                context: { action: 'List Drive files' }
+              }
+            )
             
             drive_test = {
               'service' => 'Google Drive',
@@ -2493,15 +2480,15 @@
           break if cache_time.nil?
 
           if cache_time > 1.hour.ago
-            puts "Using cached model list (#{cached_data['models'].length} models, cached #{((Time.now - cache_time) / 60).round} minutes ago)"
+            call('log_debug', "Using cached model list (#{cached_data['models'].length} models, cached #{((Time.now - cache_time) / 60).round} minutes ago)")
             return cached_data['models']
           else
-            puts "Model cache expired, refreshing..."
+            call('log_debug', "Model cache expired, refreshing...")
           end
         end
       rescue => e
         # If cache access fails, continue without it
-        puts "Cache access failed: #{e.message}, fetching fresh data"
+        call('log_debug', "Cache access failed: #{e.message}, fetching fresh data")
       end
 
       # Fallback cascade for dynamic model discovery
@@ -2529,37 +2516,37 @@
     # - Cascade model discovery with multiple fallback strategies
     cascade_model_discovery: lambda do |connection, publisher, region|
       begin
-        puts "Model discovery: primary API..."
+        call('log_debug', "Model discovery: primary API...")
         models = call('fetch_fresh_publisher_models', connection, publisher, region)
         if models.present?
           models.each { |m| m['source'] = 'primary_api' }
           return models
         end
       rescue => e
-        puts "Model discovery: primary failed: #{e.message}"
+        call('log_debug', "Model discovery: primary failed: #{e.message}")
       end
       if region != 'us-central1'
         begin
-          puts "Model discovery: fallback us-central1..."
+          call('log_debug', "Model discovery: fallback us-central1...")
           models = call('fetch_fresh_publisher_models', connection, publisher, 'us-central1')
           if models.present?
             models.each { |m| m['source'] = 'fallback_region' }
             return models
           end
         rescue => e
-          puts "Model discovery: fallback failed: #{e.message}"
+          call('log_debug', "Model discovery: fallback failed: #{e.message}")
         end
       end
       # Final: static curated list
       # Strategy 4: Use static curated list as final fallback
       begin
-        puts "Model discovery: using static curated list as final fallback"
+        call('log_debug', "Model discovery: using static curated list as final fallback")
         models = call('get_static_model_list', connection, publisher)
         models.each { |m| m['source'] = 'static_fallback' }
-        puts "Model discovery: static fallback provided #{models.length} models"
+        call('log_debug', "Model discovery: static fallback provided #{models.length} models")
         return models
       rescue => e
-        puts "Model discovery: static fallback failed: #{e.message}"
+        call('log_debug', "Model discovery: static fallback failed: #{e.message}")
         return []
       end
     end,
@@ -2607,7 +2594,7 @@
           
           # Stop if we've fetched enough pages
           if pages_fetched > max_pages
-            puts "Reached maximum page limit (#{max_pages}), stopping model fetch"
+            call('log_debug', "Fetched page #{pages_fetched}: #{batch.length} models in #{api_time.round(2)}s")
             break
           end
           
@@ -2643,18 +2630,19 @@
           
           # Smart early exit - if we have enough models, stop fetching
           if models.length >= 100 && !connection['fetch_all_models']
-            puts "Have #{models.length} models, stopping early for performance"
+            call('log_debug', "Have #{models.length} models, stopping early for performance")
             break
           end
           
           break if page_token.blank? || batch.empty?
         end
         
-        puts "Total model fetch: #{models.length} models in #{total_api_time.round(2)}s across #{pages_fetched} pages"
+        call('log_debug', "Total model fetch: #{models.length} models in #{total_api_time.round(2)}s across #{pages_fetched} pages")
+
         models
         
       rescue => e
-        puts "Failed to fetch models from API: #{e.message}"
+        call('log_debug', "Failed to fetch models from API: #{e.message}")
         # Return empty array to trigger static fallback
         []
       end
@@ -3182,8 +3170,7 @@
       rate_limit_info = { requests_last_minute: 0, limit: 0, throttled: false, sleep_ms: 0 }
 
       # Build the URL once
-      url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-            "/#{model}:predict"
+      url = call('vertex_url_for', connection, model, :predict)
 
       # Process texts in batches of 25
       texts.each_slice(batch_size) do |batch_texts|
@@ -3319,8 +3306,7 @@
         })
 
         # Build the URL
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-              "/#{model}:predict"
+        url = call('vertex_url_for', connection, model, :predict)
 
         # Make rate-limited request
         response = call('rate_limited_ai_request', connection, model, 'embedding', url, payload)
@@ -4058,7 +4044,7 @@
       fields: lambda do |_connection, _config_fields, object_definitions|
         safety = object_definitions['safety_rating_schema'] || []
         usage = object_definitions['usage_schema'] || []
-        safety.concat(usage)
+        safety + usage
       end
     },
     # -- STANDARD OBJECT DEFINITIONS --
@@ -4543,16 +4529,14 @@
                                hint: 'A list of messages describing the conversation so far.' }
                            ]
                          end
-        object_definitions['text_model_schema'].concat(
-          [
+        object_definitions['text_model_schema'].dup + [
             { name: 'message_type', label: 'Message type', type: 'string', control_type: 'select', pick_list: :message_types,
               extends_schema: true, optional: false, hint: 'Choose the type of the message to send.', group: 'Message' },
             { name: 'messages', label: is_single_message ? 'Message' : 'Messages',
               type: 'object', optional: false, properties: message_schema, group: 'Message' },
             { name: 'formatted_prompt', label: 'Formatted prompt (RAG_Utils)', type: 'object', optional: true, group: 'Advanced',
               hint: 'Pre-formatted prompt payload from RAG_Utils. When provided, this will be used directly instead of building from messages.' }
-          ].compact
-        ).concat(object_definitions['config_schema'])
+          ].compact + object_definitions['config_schema']
       end
     },
     send_messages_output: {
@@ -4635,8 +4619,7 @@
     },
     translate_text_input: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        object_definitions['text_model_schema'].concat(
-          [
+        object_definitions['text_model_schema'].dup + [
             { name: 'to', label: 'Output language', group: 'Task input', optional: false, control_type: 'select', pick_list: :languages_picklist,
               toggle_field: { name: 'to', label: 'Output language', control_type: 'text', type: 'string', optional: false, toggle_hint: 'Provide custom value', hint: 'Enter the output language. Eg. English' },
               toggle_hint: 'Select from list',
@@ -4654,8 +4637,7 @@
               toggle_hint: 'Select from list',
               hint: 'Select the source language. If this value is left blank, we will automatically attempt to identify it.' },
             { name: 'text', label: 'Source text', group: 'Task input', type: 'string', control_type: 'text-area', optional: false, hint: 'Enter the text to be translated. Please limit to 2000 tokens' }
-          ]
-        ).concat(object_definitions['config_schema'].only('safetySettings'))
+          ] + object_definitions['config_schema'].only('safetySettings')
       end
     },
     translate_text_output: {
@@ -4665,13 +4647,11 @@
     },
     summarize_text_input: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        object_definitions['text_model_schema'].concat(
-          [
-            { name: 'text',       label: 'Source text',   group: 'Task input',      type: 'string',  control_type: 'text-area', optional: false, hint: 'Provide the text to be summarized' },
-            { name: 'max_words',  label: 'Maximum words', group: 'Summary options', type: 'integer', control_type: 'integer',   optional: true, sticky: true,
+        object_definitions['text_model_schema'].dup + [
+          { name: 'text',       label: 'Source text',   group: 'Task input',      type: 'string',  control_type: 'text-area', optional: false, hint: 'Provide the text to be summarized' },
+          { name: 'max_words',  label: 'Maximum words', group: 'Summary options', type: 'integer', control_type: 'integer',   optional: true, sticky: true,
               hint: 'Enter the maximum number of words for the summary. If left blank, defaults to 200.' }
-          ]
-        ).concat(object_definitions['config_schema'].only('safetySettings'))
+        ] + object_definitions['config_schema'].only('safetySettings')
       end
     },
     summarize_text_output: {
@@ -4681,8 +4661,7 @@
     },
     parse_text_input: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        object_definitions['text_model_schema'].concat(
-          [
+        object_definitions['text_model_schema'] + dup [
             { name: 'text', label: 'Source text', group: 'Task input', control_type: 'text-area', optional: false, hint: 'Provide the text to be parsed' },
             { name: 'object_schema', label: 'Fields to identify', group: 'Schema', optional: false, control_type: 'schema-designer', extends_schema: true,
               sample_data_type: 'json_http', empty_schema_title: 'Provide output fields for your job output.',
@@ -4698,8 +4677,7 @@
                   label: 'Description'
                 }
               ] }
-          ]
-        ).concat(object_definitions['config_schema'].only('safetySettings'))
+          ] + object_definitions['config_schema'].only('safetySettings')
       end
     },
     parse_text_output: {
@@ -4713,11 +4691,9 @@
     },
     draft_email_input: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        object_definitions['text_model_schema'].concat(
-          [
+        object_definitions['text_model_schema'].dup + [
             { name: 'email_description', label: 'Email description', type: 'string', control_type: 'text-area', group: 'Task Input', optional: false, hint: 'Enter a description for the email' }
-          ]
-        ).concat(object_definitions['config_schema'].only('safetySettings'))
+          ] + object_definitions['config_schema'].only('safetySettings')
       end
     },
     draft_email_output: {
@@ -4730,14 +4706,12 @@
     },
     analyze_text_input: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        object_definitions['text_model_schema'].concat(
-          [
+        object_definitions['text_model_schema'].dup + [
             { name: 'text', label: 'Source text', optional: false, control_type: 'text-area',
               group: 'Task input', hint: 'Provide the text to be analyzed.' },
             { name: 'question', label: 'Instruction', optional: false, group: 'Instruction',
               hint: 'Enter analysis instructions, such as an analysis technique or question to be answered.' }
-          ]
-        ).concat(object_definitions['config_schema'].only('safetySettings'))
+          ] + object_definitions['config_schema'].only('safetySettings')
       end
     },
     analyze_text_output: {
