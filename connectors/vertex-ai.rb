@@ -133,7 +133,7 @@
               optional: false, group: 'Service Account',
               hint: 'The service account created to delegate other domain users (e.g. name@project.iam.gserviceaccount.com)' },
             { name: 'client_id', optional: false },
-            { name: 'private_key', ontrol_type: 'password',  multiline: true, optional: false,
+            { name: 'private_key', control_type: 'password',  multiline: true, optional: false,
               hint: 'Copy and paste the private key that came from the downloaded json. <br/>' \
                     "Click <a href='https://developers.google.com/identity/protocols/oauth2/' " \
                     "service-account/target='_blank'>here</a> to learn more about Google Service " \
@@ -223,18 +223,8 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Accepts prepared prompts from RAG_Utils
-        # Validate model
         call('validate_publisher_model!', connection, input['model'])
-
-        # Build payload - check for prepared input from RAG_Utils
-        payload = if input['formatted_prompt'].present?
-          # Use prepared prompt directly (from RAG_Utils)
-          input['formatted_prompt']
-        else
-          # Build payload using existing method (backward compatibility)
-          call('payload_for_send_message', input)
-        end
+        payload = input['formatted_prompt'].presence || call('build_ai_payload', :send_message, input)
 
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
@@ -1726,10 +1716,8 @@
         } if file_ids.empty?
 
         # Step 2: Process files
-        file_ids.each_slice(5) do |batch| # process 5 files concurrently
-        #file_ids.each do |file_id_input| # simple sequential processing
+        file_ids.each do |file_id_input|
           begin
-            # Extract clean file ID
             file_id = call('extract_drive_file_id', file_id_input)
 
             # Get file metadata
@@ -2615,8 +2603,9 @@
       begin
         cached_data = workato.cache.get(cache_key)
         if cached_data.present?
-          # Check if cache is still fresh (we'll cache for 1 hour)
-          cache_time = Time.parse(cached_data['cached_at'])
+          cache_time = (Time.parse(cached_data['cached_at']) rescue nil)
+          break if cache_time.nil?
+
           if cache_time > 1.hour.ago
             puts "Using cached model list (#{cached_data['models'].length} models, cached #{((Time.now - cache_time) / 60).round} minutes ago)"
             return cached_data['models']
@@ -2718,7 +2707,7 @@
         ).
         after_error_response(/.*/) { |code, body, _hdrs, message| raise "API Error: #{code}" }
 
-      models = resp['models'] || []
+      models = resp['publisherModels'] || []
       models.select { |m| m['name'].present? }
     end,
     # - Static curated model list as ultimate fallback
@@ -2992,10 +2981,12 @@
       end
       
       # Extract unique model IDs efficiently
-      seen_ids = Set.new
+      seen_ids = {}
       unique_models = filtered.select do |m|
         id = m['name'].to_s.split('/').last
-        seen_ids.add?(id)  # Returns true if added (wasn't present), false if already present
+        next false if id.blank?
+        next false if seen_ids[id]
+        seen_ids[id] = true
       end
       
       # Build options with better sorting
@@ -3543,7 +3534,7 @@
           'dimensions' => vector.length,
           'model_used' => model,
           'token_count' => token_count,
-          'rate_limit_status' => rate_limit_info
+          'rate_limit_status' => (response.is_a?(Hash) ? response['rate_limit_status'] : nil)
         }
 
       rescue => e
@@ -3696,7 +3687,7 @@
       if [:generic, :email, :parsed, :classify].include?(type)
         call('check_finish_reason', resp.dig('candidates', 0, 'finishReason'))
         ratings = call('get_safety_ratings', resp.dig('candidates', 0, 'safetyRatings'))
-        return standard_error_response(type, ratings) if ratings.blank?
+        return call('standard_error_response', type, ratings) if ratings.blank?
       else
         ratings = {}
       end
@@ -4955,7 +4946,7 @@
           [
             { name: 'text', label: 'Source text', optional: false, control_type: 'text-area',
               group: 'Task input', hint: 'Provide the text to be analyzed.' },
-            { name: 'question', label: 'Instruction', ptional: false, group: 'Instruction',
+            { name: 'question', label: 'Instruction', optional: false, group: 'Instruction',
               hint: 'Enter analysis instructions, such as an analysis technique or question to be answered.' }
           ]
         ).concat(object_definitions['config_schema'].only('safetySettings'))
