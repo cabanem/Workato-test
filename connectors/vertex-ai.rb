@@ -1352,7 +1352,7 @@
         metadata_response = call('api_request', connection, :get,
           call('drive_api_url', :file, file_id),
           {
-            params: { fields: 'id,name,mimeType,size,modifiedTime,md5Checksum,owners' },
+            params: { fields: call('drive_basic_fields') },
             error_handler: lambda do |code, body, message|
               error(call('handle_drive_error', connection, code, body, message))
             end
@@ -1638,10 +1638,10 @@
             file_id = call('extract_drive_file_id', file_id_input)
 
             # Get file metadata
-            metadata_response = call('api_request', connection, :get,
-              call('drive_api_url', :file, file_id),
-              {
-                params: { fields: 'id,name,mimeType,size,modifiedTime,md5Checksum,owners' },
+        metadata_response = call('api_request', connection, :get,
+          call('drive_api_url', :file, file_id),
+          {
+            params: { fields: call('drive_basic_fields') },
                 error_handler: lambda do |code, body, message|
                   error(call('handle_drive_error', connection, code, body, message))
                 end
@@ -1938,68 +1938,21 @@
           end
         end
 
-        # Step 5: Categorize changes
-        files_added = []
-        files_modified = []
-        files_removed = []
-        
-        # Track seen files to avoid duplicates
-        seen_files = {}
-        
+        files_added, files_modified, files_removed = [], [], []
+        seen = {}
         all_changes.each do |change|
           file_id = change['fileId']
-          
-          if change['removed']
-            # File was removed
-            files_removed << {
-              'fileId' => file_id,
-              'time' => change['time']
-            }
-          elsif change['file']
-            file = change['file']
-            
-            # Skip trashed files unless explicitly requested
-            next if file['trashed'] && !include_removed
-            
-            file_summary = {
-              'id' => file['id'],
-              'name' => file['name'],
-              'mimeType' => file['mimeType'],
-              'modifiedTime' => file['modifiedTime'],
-              'checksum' => file['md5Checksum']
-            }
-            
-            # Determine if file is new or modified
-            # This is simplified - in production, you'd track file creation time
-            if seen_files[file_id]
-              # Already seen in this batch, treat as modified
-              files_modified << file_summary
+          klass = call('classify_drive_change', change, include_removed)
+          next if klass[:kind] == :skip
+          case klass[:kind]
+          when :removed
+            files_removed << klass[:summary]
+          else
+            if seen[file_id]
+              files_modified << klass[:summary]
             else
-              # First time seeing this file
-              # Check if it's a new file based on the change type
-              if change['changeType'] == 'file'
-                # Could be either new or modified
-                # For simplicity, we'll treat first occurrence as added
-                # In production, compare modifiedTime with change time
-                time_diff = if file['modifiedTime'] && change['time']
-                  modified = Time.parse(file['modifiedTime'])
-                  changed = Time.parse(change['time'])
-                  (changed - modified).abs
-                else
-                  0
-                end
-                
-                # If modified very recently relative to change, likely new
-                if time_diff < 60 # Within 60 seconds
-                  files_added << file_summary
-                else
-                  files_modified << file_summary
-                end
-              else
-                files_modified << file_summary
-              end
-              
-              seen_files[file_id] = true
+              files_added << klass[:summary]
+              seen[file_id] = true
             end
           end
         end
@@ -2070,6 +2023,24 @@
   },
 
   methods: {
+    classify_drive_change: lambda do |change, include_removed|
+      return { kind: :removed, summary: { 'fileId' => change['fileId'], 'time' => change['time'] } } if change['removed']
+      file = change['file']
+      return { kind: :skip } if file.nil?
+      return { kind: :skip } if file['trashed'] && !include_removed
+      summary = {
+        'id' => file['id'],
+        'name' => file['name'],
+        'mimeType' => file['mimeType'],
+        'modifiedTime' => file['modifiedTime'],
+        'checksum' => file['md5Checksum']
+      }
+      # Heuristic: first seen ~added, else modified
+      { kind: :added, summary: summary }
+    end,
+    drive_basic_fields: lambda do
+      'id,name,mimeType,size,modifiedTime,md5Checksum,owners'
+    end,
     # Build fully-qualified Vertex endpoint for a model
     vertex_url_for: lambda do |connection, model, verb|
       base = "projects/#{connection['project']}/locations/#{connection['region']}"
