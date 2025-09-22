@@ -1,0 +1,19 @@
+diff --git a/connectors/vertex-ai.rb b/connectors/vertex-ai.rb
+--- a/connectors/vertex-ai.rb
++++ b/connectors/vertex-ai.rb
+@@ -2215,9 +2215,11 @@
+ begin
+   cached_data = workato.cache.get(cache_key)
+   if cached_data.present?
+     cache_time = (Time.parse(cached_data['cached_at']) rescue nil)
+-    break if cache_time.nil?
++    if cache_time.nil?
++      # Missing timestamp; proceed to refresh cache.
++      # (Avoid 'break' here; not inside a loop.)
++    end
+     if cache_time > 1.hour.ago
+       puts "Using cached model list (#{cached_data['models'].length} models, cached #{((Time.now - cache_time) / 60).round} minutes ago)"
+       return cached_data['models']
+     else
+       puts "Model cache expired, refreshing..."
+     end
