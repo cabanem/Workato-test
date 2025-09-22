@@ -941,8 +941,7 @@
             'project' => connection['project'],
             'region' => connection['region'],
             'api_version' => connection['version'] || 'v1',
-            'auth_type' => connection['auth_type'],
-            'host' => connection['developer_api_host']
+            'auth_type' => connection['auth_type']
           },
           'tests_performed' => [],
           'errors' => [],
@@ -956,11 +955,10 @@
             start_time = Time.now
             
             # Test basic connectivity
-            datasets_response = get("projects/#{connection['project']}/locations/#{connection['region']}/datasets").
-              params(pageSize: 1).
-              after_error_response(/.*/) do |code, body, _header, message|
-                raise "Vertex AI API error (#{code}): #{message}"
-              end
+            datasets_response = call('api_request', connection, :get,
+              "projects/#{connection['project']}/locations/#{connection['region']}/datasets",
+              { params: { pageSize: 1 }, context: { action: 'List datasets' } }
+            )
             
             vertex_test = {
               'service' => 'Vertex AI',
@@ -977,8 +975,10 @@
             # Test model access if requested
             if input['test_models']
               begin
-                models_response = get("projects/#{connection['project']}/locations/#{connection['region']}/models").
-                  params(pageSize: 1)
+                models_response = call('api_request', connection, :get,
+                  "projects/#{connection['project']}/locations/#{connection['region']}/models",
+                  { params: { pageSize: 1 }, context: { action: 'List models' } }
+                )
                 vertex_test['permissions_validated'] << 'aiplatform.models.list'
                 vertex_test['models_accessible'] = true
               rescue => e
@@ -988,7 +988,10 @@
               
               # Test specific model access
               begin
-                model_test = get("https://#{connection['region']}-aiplatform.googleapis.com/v1/publishers/google/models/gemini-1.5-pro")
+                model_test = call('api_request', connection, :get,
+                  "https://#{connection['region']}-aiplatform.googleapis.com/v1/publishers/google/models/gemini-1.5-pro",
+                  { context: { action: 'Get Gemini model' } }
+                )
                 vertex_test['gemini_access'] = true
                 vertex_test['permissions_validated'] << 'aiplatform.models.predict'
               rescue => e
@@ -1144,7 +1147,10 @@
               },
               'notes' => 'These are default quotas. Actual quotas may vary by project.'
             }
-            results['quota_info'] = quotas
+            results['quota_info'] = {
+              'api_calls_per_minute' => { 'gemini_pro' => 300, 'gemini_flash' => 600, 'embeddings' => 600 },
+              'notes' => 'Defaults only. Your project quotas may differ.'
+            }
           rescue => e
             results['warnings'] << "Could not retrieve quota information: #{e.message}"
           end
