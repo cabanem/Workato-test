@@ -2266,15 +2266,7 @@
     replace_backticks_with_hash: lambda do |text|
       text&.gsub('```', '####')
     end,
-    truthy?: lambda do |val|
-      case val
-      when TrueClass then true
-      when FalseClass then false
-      when Integer then val != 0
-      else
-        %w[true 1 yes y t].include?(val.to_s.strip.downcase)
-      end
-    end,
+    # (Removed) truthy? -- unused
     # -- RATE LIMITING UTILITIES --
     # Vertex AI rate limiting enforcement using atomic sliding window in cache
     enforce_vertex_rate_limits: lambda do |connection, model, action_type = 'inference'|
