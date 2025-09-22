@@ -4,8 +4,7 @@
   custom_action_help: {
     learn_more_url: 'https://cloud.google.com/vertex-ai/docs/reference/rest',
     learn_more_text: 'Google Vertex AI API documentation',
-    body: '<p>Build your own Google Vertex AI action with a HTTP request. The request will ' \
-          'be authorized with your Google Vertex AI connection.</p>'
+    body: '<p>Build your own Google Vertex AI action with a HTTP request. The request will be authorized with your Google Vertex AI connection.</p>'
   },
 
   connection: {
@@ -2163,7 +2162,6 @@
         }
       end
     }
-
   },
 
   methods: {
@@ -2201,7 +2199,6 @@
         end
       end
     end,
-
     # Drive API URL builder for consistent endpoint construction
     drive_api_url: lambda do |endpoint, file_id = nil, options = {}|
       base = 'https://www.googleapis.com/drive/v3'
@@ -2226,7 +2223,6 @@
         error("Unknown Drive API endpoint: #{endpoint}")
       end
     end,
-
     # Unified file content fetcher - eliminates duplication between actions
     fetch_file_content: lambda do |connection, file_id, metadata, include_content = true|
       # Skip content fetching if not requested
@@ -2290,7 +2286,6 @@
         }
       end
     end,
-
     # Unified rate-limited AI request handler
     rate_limited_ai_request: lambda do |connection, model, action_type, url, payload|
       # Apply rate limiting before request
@@ -2308,7 +2303,6 @@
 
       response
     end,
-
     # Enhanced Gemini payload builder with JSON output support
     build_gemini_payload: lambda do |instruction, prompt, options = {}|
       # Use existing base builder
@@ -2333,9 +2327,7 @@
 
       base
     end,
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Core error and HTTP utilities
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -- CORE ERROR AND HTTP UTILITIES --
     handle_vertex_error: lambda do |connection, code, body, message, context = {}|
       # Parse the body for structured error information
       error_details = begin
@@ -2403,9 +2395,8 @@
         %w[true 1 yes y t].include?(val.to_s.strip.downcase)
       end
     end,
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Rate limiting utilities
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -- RATE LIMITING UTILITIES --
+    # Vertex AI rate limiting enforcement using atomic sliding window in cache
     enforce_vertex_rate_limits: lambda do |connection, model, action_type = 'inference'|
       # Skip if rate limiting is disabled
       return { requests_last_minute: 0, limit: 0, throttled: false, sleep_ms: 0 } unless connection['enable_rate_limiting']
@@ -2525,7 +2516,6 @@
         end
       end
     end,
-
     # Circuit breaker pattern for resilient batch operations
     circuit_breaker_retry: lambda do |connection, operation_name, options = {}, &block|
       # Configuration with defaults
@@ -2613,9 +2603,8 @@
         return block.call
       end
     end,
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Vertex model discovery and validation
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -- VERTEX MODEL DISCOVERY UTILITIES --
+    # - Main model fetching with caching
     fetch_publisher_models: lambda do |connection, publisher = 'google'|
       # Build the cache key (incl all relevant param to ensure regions/publishers are cached separately)
       region = connection['region'].presence || 'us-central1'
@@ -2662,8 +2651,7 @@
 
       models
     end,
-
-    # Cascade model discovery with multiple fallback strategies
+    # - Cascade model discovery with multiple fallback strategies
     cascade_model_discovery: lambda do |connection, publisher, region|
       # Strategy 1: Try primary API endpoint
       begin
@@ -2718,8 +2706,7 @@
         return []
       end
     end,
-
-    # Minimal view model fetching for fallback
+    # - Minimal view model fetching for fallback
     fetch_publisher_models_minimal: lambda do |connection, publisher, region|
       host = "https://#{region}-aiplatform.googleapis.com"
       url = "#{host}/v1beta1/publishers/#{publisher}/models"
@@ -2734,8 +2721,7 @@
       models = resp['models'] || []
       models.select { |m| m['name'].present? }
     end,
-
-    # Static curated model list as ultimate fallback
+    # - Static curated model list as ultimate fallback
     get_static_model_list: lambda do |connection, publisher|
       include_preview = connection['include_preview_models'] || false
 
@@ -2760,7 +2746,6 @@
         core_models
       end
     end,
-
     fetch_fresh_publisher_models: lambda do |connection, publisher, region|
       # Use the regional service endpoint; list is in v1beta1.
       # Docs: publishers.models.list (v1beta1), supports 'view' and pagination.
@@ -3024,7 +3009,7 @@
       # Sort with a more sophisticated algorithm
       sort_model_options(options)
     end,
-    # - Context-aware model label creation
+    # = Context-aware model label creation
     create_model_label: lambda do |model_id, model_metadata = {}|
       # Start with the basic formatting
       label = model_id.gsub('-', ' ').split.map { |word| 
@@ -3074,11 +3059,8 @@
       puts "All dynamic fetch attempts failed, using static list"
       static_fallback
     end,
-
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Payload construction
-    # ─────────────────────────────────────────────────────────────────────────────
-    # = BASE PAYLOAD BUILDER =
+    # -- PAYLOAD CONSTRUCTION UTILITIES --
+    # - Base payload builder for simple prompts
     build_base_payload: lambda do |instruction, user_content, safety_settings = nil, options = {}|
       # Build the base structure
       payload = {
@@ -3193,10 +3175,7 @@
 
       parts
     end,
-
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Unified payload construction system
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -- UNIFIED PAYLOAD CONSTRUCTION SYSTEM --
     # Unified payload builder using templates
     build_ai_payload: lambda do |template_type, input, connection = nil|
       template = case template_type
@@ -3299,8 +3278,7 @@
     build_neighbors_payload: lambda do |input, connection|
       call('payload_for_find_neighbors', input)  # Keep existing logic
     end,
-
-    # = REMAINING PAYLOAD BUILDERS (for complex cases) =
+    # -- REMAINING PAYLOAD BUILDERS (for complex cases) --
     payload_for_ai_classify: lambda do |connection, input|
       # Extract categories and options
       categories = Array(input['categories'] || [])
@@ -3384,7 +3362,6 @@
         ]
       }
     end,
-
     generate_embeddings_batch_exec: lambda do |connection, input|
       # Validate model
       call('validate_publisher_model!', connection, input['model'])
@@ -3649,10 +3626,7 @@
         'returnFullDatapoint'  => !!input['returnFullDatapoint']
       }.compact
     end,
-
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Response extraction and normalization
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -- RESPONSE EXTRACTION AND NORMALIZATION --
     extract_json: lambda do |resp|
       json_txt = resp&.dig('candidates', 0, 'content', 'parts', 0, 'text')
       return {} if json_txt.blank?
@@ -3813,11 +3787,7 @@
         { 'error' => 'Safety ratings check failed', 'safety_ratings' => {} }
       end
     end,
-
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Google Drive Helper Methods
-    # ─────────────────────────────────────────────────────────────────────────────
-
+    # -- GOOGLE DRIVE HELPER METHODS --
     extract_drive_file_id: lambda do |url_or_id|
       return url_or_id if url_or_id.blank?
 
@@ -3905,10 +3875,7 @@
         "Google Drive API error (#{code}): #{message || body}"
       end
     end,
- 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Samples and UX helpers
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -- SAMPLES AND UX HELPERS --
     sample_record_output: lambda do |input|
       case input
       when 'send_message'
@@ -4036,10 +4003,7 @@
         end
       end || {}
     end,
-
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Index Management Methods
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -- INDEX MANAGEMENT METHODS --
     validate_index_access: lambda do |connection, index_id|
       # Extract project, region, and index name from the index_id
       index_parts = index_id.split('/')
@@ -4245,13 +4209,10 @@
 
       results
     end
-
   },
 
   object_definitions: {
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Common field definitions
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -- COMMON FIELD DEFINITIONS --
     # Common text input field for AI operations
     text_input_field: {
       fields: lambda do |_connection, _config_fields, _object_definitions|
@@ -4316,9 +4277,7 @@
         safety.concat(usage)
       end
     },
-    # ─────────────────────────────────────────────────────────────────────────────
-    # -- Standard object definitions
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -- STANDARD OBJECT DEFINITIONS --
     prediction: {
       fields: lambda do |_connection, _config_fields, _object_definitions|
         [
@@ -5219,7 +5178,6 @@
         ]
       end
     }
-
   },
 
   pick_lists: {
@@ -5318,5 +5276,4 @@
       ]
     end
   }
-
 }
