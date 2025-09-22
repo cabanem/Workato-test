@@ -152,11 +152,5 @@ diff --git a/connector.rb b/connector.rb
 ## Commit message
 
 ```bash
-git commit -m "refactor(drive): centralize fields and change classification; reuse in single/batch fetch" \
-  -m "Why: repeated Drive field strings and inlined change categorization made edits brittle." \
-  -m "What:" \
-  -m "- Add drive_basic_fields helper and use in fetch_drive_file + batch_fetch_drive_files." \
-  -m "- Extract change bucketing into classify_drive_change; simplify monitor_drive_changes main loop." \
-  -m "Impact: identical outputs; less duplication; easier to extend." \
-  -m "Testing: fetched Google Doc + PDF via both actions; ran changes monitor before/after add/modify/delete."
+git commit -m "refactor(drive): centralize fields and change classification; reuse in single/batch fetch. | Why: repeated Drive field strings and inlined change categorization made edits brittle. | What: - Add drive_basic_fields helper and use in fetch_drive_file + batch_fetch_drive_files. - Extract change bucketing into classify_drive_change; simplify monitor_drive_changes main loop. | Impact: identical outputs; less duplication; easier to extend. | Testing: fetched Google Doc + PDF via both actions; ran changes monitor before/after add/modify/delete."
 ```

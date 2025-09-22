@@ -691,19 +691,7 @@
       execute: lambda do |connection, input, _eis, _eos|
         # Build payload and normalized host
         payload = call('build_ai_payload', :find_neighbors, input)
-        host = input['index_endpoint_host'].to_s.strip
-        # Host normalization
-        if host.blank?
-          error('Index endpoint host is required')
-        end
-        
-        # Remove protocol if present and trailing slashes
-        host = host.gsub(/^https?:\/\//i, '').gsub(/\/+$/, '')
-        
-        # Validate host format (basic check for valid domain or IP)
-        unless host.match?(/^[\w\-\.]+(:\d+)?$/)
-          error("Invalid index endpoint host format: #{host}")
-        end
+        host = call('normalize_host', input['index_endpoint_host'])
 
         version = connection['version'].presence || 'v1'
         project = connection['project']
@@ -2023,6 +2011,17 @@
   },
 
   methods: {
+    normalize_host: lambda do |host|
+      h = host.to_s.strip
+      error('Index endpoint host is required') if h.blank?
+      h = h.gsub(/^https?:\/\//i, '').gsub(/\/+$/, '')
+      error("Invalid index endpoint host format: #{h}") unless h.match?(/^[\w\-\.]+(:\d+)?$/)
+      h
+    end,
+    to_similarity: lambda do |distance, max = 2.0|
+      s = 1.0 - (distance.to_f / max.to_f)
+      s < 0 ? 0.0 : s
+    end,
     classify_drive_change: lambda do |change, include_removed|
       return { kind: :removed, summary: { 'fileId' => change['fileId'], 'time' => change['time'] } } if change['removed']
       file = change['file']
@@ -3347,11 +3346,8 @@
         neighbors.each do |neighbor|
           datapoint = neighbor['datapoint'] || {}
           distance = neighbor['distance'].to_f
-
-          # Normalize distance to similarity score (0-1)
-          # Assuming distances are typically 0-2 for cosine distance
-          max_distance = 2.0
-          similarity_score = [1.0 - (distance / max_distance), 0.0].max
+          
+          similarity_score = call('to_similarity', distance, 2.0)
 
           all_neighbors << {
             'datapoint_id' => datapoint['datapointId'].to_s,
@@ -3831,8 +3827,8 @@
         index_stats = {
           'index_id' => index_id.to_s,
           'deployed_state' => 'DEPLOYED',
-          'dimensions' => index_response.dig('indexStats', 'vectorsCount')&.to_i || 0,
-          'total_datapoints' => index_response.dig('indexStats', 'shardsCount')&.to_i || 0,
+          'total_datapoints' => index_response.dig('indexStats', 'vectorsCount')&.to_i,
+          'shards_count' => index_response.dig('indexStats', 'shardsCount')&.to_i,
           'display_name' => index_response['displayName'].to_s,
           'created_time' => created_time || '',
           'updated_time' => updated_time || ''
@@ -3902,12 +3898,7 @@
                 error("Datapoint missing required fields. Each datapoint must have 'datapoint_id' and 'feature_vector'")
               end
 
-              # Validate vector dimensions if we have index metadata
-              if index_stats['dimensions'] && index_stats['dimensions'] > 0
-                if dp['feature_vector'].length != index_stats['dimensions']
-                  error("Vector dimension mismatch. Expected #{index_stats['dimensions']} dimensions, got #{dp['feature_vector'].length} for datapoint '#{dp['datapoint_id']}'")
-                end
-              end
+              # Do not attempt to validate vector length here; let the API enforce it.
 
               datapoint = {
                 'datapointId' => dp['datapoint_id'],

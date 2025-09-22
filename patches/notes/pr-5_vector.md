@@ -89,15 +89,7 @@ diff --git a/connector.rb b/connector.rb
 ## Commit message
 
 ```bash
-git commit -m "refactor(vector): sane defaults—host normalizer, similarity helper; drop bogus dim checks" \
-  -m "Why: local dimension 'validation' was wrong source; let Vertex enforce it. Host parsing repeated." \
-  -m "What:" \
-  -m "- Add normalize_host(host) and use in find_neighbors." \
-  -m "- Add to_similarity(distance, max=2.0) and use in response transformer." \
-  -m "- validate_index_access: report vectorsCount/shardsCount under correct keys; remove fake dim validation." \
-  -m "- upsert_index_datapoints: stop rejecting on local dim mismatch." \
-  -m "Impact: fewer false negatives; better stats semantics; clearer errors on bad hosts." \
-  -m "Testing: upsert with valid vectors; neighbors query returns sorted top_matches with similarity."
+git commit -m "refactor(vector): sane defaults—host normalizer, similarity helper; drop bogus dim checks | Why: local dimension 'validation' was wrong source; let Vertex enforce it. Host parsing repeated. | What: - Add normalize_host(host) and use in find_neighbors. - Add to_similarity(distance, max=2.0) and use in response transformer. - validate_index_access: report vectorsCount/shardsCount under correct keys; remove fake dim validation. - upsert_index_datapoints: stop rejecting on local dim mismatch. | Impact: fewer false negatives; better stats semantics; clearer errors on bad hosts. | Testing: upsert with valid vectors; neighbors query returns sorted top_matches with similarity."
 ```
 
 ---
