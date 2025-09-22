@@ -159,15 +159,7 @@ diff --git a/connector.rb b/connector.rb
 ## Commit message
 
 ```bash
-git commit -m "refactor(models): simplify discovery cascade and tighten filtering" \
-  -m "Why: too many discovery branches increased drift and opaque failures." \
-  -m "What:" \
-  -m "- cascade_model_discovery now tries: region → us-central1 → static fallback." \
-  -m "- Remove fetch_publisher_models_minimal (unused with new cascade)." \
-  -m "- to_model_options: single filter pass (bucket, retired ids, GA gating) + dedupe." \
-  -m "- create_model_label: nil/empty guard." \
-  -m "Impact: same visible picklist behavior; fewer code paths; easier logs." \
-  -m "Testing: toggled dynamic_models & include_preview; verified text/image/embedding picklists populate."
+git commit -m "refactor(models): simplify discovery cascade and tighten filtering; Why: too many discovery branches increased drift and opaque failures.; What changed {- cascade_model_discovery now tries: region → us-central1 → static fallback; - Remove fetch_publisher_models_minimal (unused with new cascade); - to_model_options: single filter pass (bucket, retired ids, GA gating) + dedupe; - create_model_label: nil/empty guard }Impact: same visible picklist behavior; fewer code paths; easier logs. Testing: toggled dynamic_models & include_preview; verified text/image/embedding picklists populate."
 ```
 
 ---

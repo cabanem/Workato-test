@@ -2553,47 +2553,29 @@
     end,
     # - Cascade model discovery with multiple fallback strategies
     cascade_model_discovery: lambda do |connection, publisher, region|
-      # Strategy 1: Try primary API endpoint
       begin
-        puts "Model discovery: trying primary API endpoint..."
+        puts "Model discovery: primary API..."
         models = call('fetch_fresh_publisher_models', connection, publisher, region)
         if models.present?
-          puts "Model discovery: primary API succeeded (#{models.length} models)"
           models.each { |m| m['source'] = 'primary_api' }
           return models
         end
       rescue => e
-        puts "Model discovery: primary API failed: #{e.message}"
+        puts "Model discovery: primary failed: #{e.message}"
       end
-
-      # Strategy 2: Try alternative region if not us-central1
       if region != 'us-central1'
         begin
-          puts "Model discovery: trying fallback region (us-central1)..."
+          puts "Model discovery: fallback us-central1..."
           models = call('fetch_fresh_publisher_models', connection, publisher, 'us-central1')
           if models.present?
-            puts "Model discovery: fallback region succeeded (#{models.length} models)"
             models.each { |m| m['source'] = 'fallback_region' }
             return models
           end
         rescue => e
-          puts "Model discovery: fallback region failed: #{e.message}"
+          puts "Model discovery: fallback failed: #{e.message}"
         end
       end
-
-      # Strategy 3: Try different view parameter
-      begin
-        puts "Model discovery: trying minimal view mode..."
-        models = call('fetch_publisher_models_minimal', connection, publisher, region)
-        if models.present?
-          puts "Model discovery: minimal view succeeded (#{models.length} models)"
-          models.each { |m| m['source'] = 'minimal_view' }
-          return models
-        end
-      rescue => e
-        puts "Model discovery: minimal view failed: #{e.message}"
-      end
-
+      # Final: static curated list
       # Strategy 4: Use static curated list as final fallback
       begin
         puts "Model discovery: using static curated list as final fallback"
@@ -2605,21 +2587,6 @@
         puts "Model discovery: static fallback failed: #{e.message}"
         return []
       end
-    end,
-    # - Minimal view model fetching for fallback
-    fetch_publisher_models_minimal: lambda do |connection, publisher, region|
-      host = "https://#{region}-aiplatform.googleapis.com"
-      url = "#{host}/v1beta1/publishers/#{publisher}/models"
-
-      resp = get(url).
-        params(
-          page_size: 100,  # Smaller page size for reliability
-          view: 'PUBLISHER_MODEL_VIEW_UNSPECIFIED'  # Most basic view
-        ).
-        after_error_response(/.*/) { |code, body, _hdrs, message| raise "API Error: #{code}" }
-
-      models = resp['publisherModels'] || []
-      models.select { |m| m['name'].present? }
     end,
     # - Static curated model list as ultimate fallback
     get_static_model_list: lambda do |connection, publisher|
@@ -2868,26 +2835,16 @@
     to_model_options: lambda do |models, bucket:, include_preview: false|
       return [] if models.blank?
       
-      # Pre-compile the regex for retired models to avoid recompiling
       retired_pattern = /(^|-)1\.0-|text-bison|chat-bison/
-    
-      # Filter models efficiently
-      filtered = models.select do |m|
-        model_id = m['name'].to_s.split('/').last
-        next false if model_id.blank?
-        
-        # Skip retired models
-        next false if model_id =~ retired_pattern
-        
-        # Check bucket match
-        next false unless call('vertex_model_bucket', model_id) == bucket
-        
-        # Check GA status if needed
+      eligible = models.select do |m|
+        id = m['name'].to_s.split('/').last
+        next false if id.blank?
+        next false if id =~ retired_pattern
+        next false unless call('vertex_model_bucket', id) == bucket
         if !include_preview
           stage = m['launchStage'].to_s
           next false unless stage == 'GA' || stage.blank?
         end
-        
         true
       end
       
@@ -2913,6 +2870,7 @@
     end,
     # - Context-aware model label creation
     create_model_label: lambda do |model_id, model_metadata = {}|
+      return '' if model_id.to_s.strip.empty?
       # Start with the basic formatting
       label = model_id.gsub('-', ' ').split.map { |word| 
         # Keep version numbers as-is, capitalize other words
