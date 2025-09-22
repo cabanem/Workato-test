@@ -2896,6 +2896,7 @@
     # -- PAYLOAD CONSTRUCTION UTILITIES --
     # - Base payload builder for simple prompts
     build_base_payload: lambda do |instruction, user_content, safety_settings = nil, options = {}|
+      options = options.is_a?(Hash) ? options : {}
       # Build the base structure
       payload = {
         'systemInstruction' => {
@@ -2924,6 +2925,9 @@
       end
       
       payload.compact
+    end,
+    json_only_instruction: lambda do |key = 'response'|
+      "\n\nOutput as a JSON object with key \"#{key}\". Only respond with valid JSON and nothing else."
     end,
     build_conversation_payload: lambda do |input|
       # Handle generation config with response schema
@@ -2973,6 +2977,7 @@
       }.compact.merge(input.except('model', 'message_type', 'messages'))
     end,
     build_message_parts: lambda do |m|
+      return [] if m.nil?
       parts = []
       parts << { 'text' => m['text'] } if m['text'].present?
 
@@ -3022,7 +3027,7 @@
             from_lang = inp['from'].present? ? " from #{inp['from']}" : ""
             "#{base}#{from_lang} into #{inp['to']}. Respond only with the user's translated text in #{inp['to']} and nothing else. The user input is delimited with triple backticks."
           },
-          user_prompt: -> (inp) { "```#{call('replace_backticks_with_hash', inp['text'])}```\nOutput this as a JSON object with key \"response\"." }
+          user_prompt: -> (inp) { "```#{call('replace_backticks_with_hash', inp['text'])}```#{call('json_only_instruction','response')}" }
         }
       when :summarize
         {
@@ -3033,7 +3038,7 @@
         {
           instruction: -> (inp) { "You are an assistant helping to extract various fields of information from the user's text. The schema and text to parse are delimited by triple backticks." },
           user_prompt: -> (inp) {
-            "Schema:\n```#{inp['object_schema']}```\nText to parse: ```#{call('replace_backticks_with_hash', inp['text']&.strip)}```\nOutput the response as a JSON object with keys from the schema. If no information is found for a specific key, the value should be null. Only respond with a JSON object and nothing else."
+            "Schema:\n```#{inp['object_schema']}```\nText to parse: ```#{call('replace_backticks_with_hash', inp['text']&.strip)}```\nOutput the response as a JSON object with keys from the schema. If no information is found for a specific key, the value should be null.#{call('json_only_instruction')}"
           }
         }
       when :email
@@ -3044,7 +3049,7 @@
       when :analyze
         {
           instruction: -> (inp) { "You are an assistant helping to analyze the provided information. Take note to answer only based on the information provided and nothing else. The information to analyze and query are delimited by triple backticks." },
-          user_prompt: -> (inp) { "Information to analyze:```#{call('replace_backticks_with_hash', inp['text'])}```\nQuery:```#{call('replace_backticks_with_hash', inp['question'])}```\nIf you don't understand the question or the answer isn't in the information to analyze, input the value as null for \"response\". Only return a JSON object." }
+          user_prompt: -> (inp) { "Information to analyze:```#{call('replace_backticks_with_hash', inp['text'])}```\nQuery:```#{call('replace_backticks_with_hash', inp['question'])}```\nIf you don't understand the question or the answer isn't in the information to analyze, input the value as null for \"response\".#{call('json_only_instruction')}" }
         }
       when :ai_classify
         { custom_builder: 'build_classify_payload' }
