@@ -88,10 +88,7 @@
                     'OAuth 2.0 client IDs and select your desired account name.' }
           ],
           authorization_url: lambda do |connection|
-            scopes = [
-              'https://www.googleapis.com/auth/cloud-platform', # Vertex AI scope
-              'https://www.googleapis.com/auth/drive.readonly' # Google Drive readonly scope
-            ].join(' ')
+            scopes = call('oauth_scopes').join(' ').join(' ')
             params = {
               client_id: connection['client_id'],
               response_type: 'code',
@@ -1984,11 +1981,35 @@
     project_region_path: lambda do |connection|
       "projects/#{connection['project']}/locations/#{connection['region']}"
     end,
+    maybe_parse_json: lambda do |str|
+      return str unless str.is_a?(String)
+      trimmed = str.strip
+      return str unless trimmed.start_with?('{','[')
+      parse_json(trimmed) rescue str
+    end,
+    strip_fences: lambda { |txt| txt.to_s.gsub(/^```(?:json|JSON)?\s*\n?/, '').gsub(/\n?```\s*$/, '').gsub(/`+$/, '').strip },
+    extract_embedding_values: lambda do |prediction|
+      prediction&.dig('embeddings', 'values') ||
+      prediction&.dig('embeddings')&.first&.dig('values') || []
+    end,
+    usage_meta: lambda do |resp|
+      {
+        'promptTokenCount' => resp.dig('usageMetadata', 'promptTokenCount') || 0,
+        'candidatesTokenCount' => resp.dig('usageMetadata', 'candidatesTokenCount') || 0,
+        'totalTokenCount' => resp.dig('usageMetadata', 'totalTokenCount') || 0
+      }
+    end,
     picklist_for: lambda do |connection, bucket, static|
       call('dynamic_model_picklist', connection, bucket, static)
     end,
     log_debug: lambda { |msg| puts(msg) },
     rate_limit_defaults: lambda { { 'max_retries' => 3, 'base_delay' => 1.0, 'max_delay' => 30.0 } },
+    oauth_scopes: lambda do
+      [
+        'https://www.googleapis.com/auth/cloud-platform',
+        'https://www.googleapis.com/auth/drive.readonly'
+      ]
+    end,
     vertex_rpm_limits: lambda do
       {
         'gemini-pro' => 300,
@@ -2023,7 +2044,7 @@
       { kind: :added, summary: summary }
     end,
     drive_basic_fields: lambda do
-      'id,name,mimeType,size,modifiedTime,md5Checksum,owners'
+      'id,name,mimeType,size,modifiedTime,md5Checksum,owners'.freeze
     end,
     # Build fully-qualified Vertex endpoint for a model
     vertex_url_for: lambda do |connection, model, verb|
@@ -2883,6 +2904,35 @@
       puts "All dynamic fetch attempts failed, using static list"
       static_fallback
     end,
+    static_model_options: lambda do
+      {
+        text: [
+          ['Gemini 1.0 Pro', 'publishers/google/models/gemini-pro'],
+          ['Gemini 1.5 Pro', 'publishers/google/models/gemini-1.5-pro'],
+          ['Gemini 1.5 Flash', 'publishers/google/models/gemini-1.5-flash'],
+          ['Gemini 2.0 Flash Lite', 'publishers/google/models/gemini-2.0-flash-lite-001'],
+          ['Gemini 2.0 Flash', 'publishers/google/models/gemini-2.0-flash-001'],
+          ['Gemini 2.5 Pro', 'publishers/google/models/gemini-2.5-pro'],
+          ['Gemini 2.5 Flash', 'publishers/google/models/gemini-2.5-flash'],
+          ['Gemini 2.5 Flash Lite', 'publishers/google/models/gemini-2.5-flash-lite']
+        ],
+        image: [
+          ['Gemini Pro Vision', 'publishers/google/models/gemini-pro-vision'],
+          ['Gemini 1.5 Pro', 'publishers/google/models/gemini-1.5-pro'],
+          ['Gemini 1.5 Flash', 'publishers/google/models/gemini-1.5-flash'],
+          ['Gemini 2.0 Flash Lite', 'publishers/google/models/gemini-2.0-flash-lite-001'],
+          ['Gemini 2.0 Flash', 'publishers/google/models/gemini-2.0-flash-001'],
+          ['Gemini 2.5 Pro', 'publishers/google/models/gemini-2.5-pro'],
+          ['Gemini 2.5 Flash', 'publishers/google/models/gemini-2.5-flash'],
+          ['Gemini 2.5 Flash Lite', 'publishers/google/models/gemini-2.5-flash-lite']
+        ],
+        embedding: [
+          ['Text embedding gecko-001', 'publishers/google/models/textembedding-gecko@001'],
+          ['Text embedding gecko-003', 'publishers/google/models/textembedding-gecko@003'],
+          ['Text embedding-004', 'publishers/google/models/text-embedding-004']
+        ]
+      }
+    end,
     # -- PAYLOAD CONSTRUCTION UTILITIES --
     # - Base payload builder for simple prompts
     build_base_payload: lambda do |instruction, user_content, safety_settings = nil, options = {}|
@@ -2931,9 +2981,7 @@
         input['tools'] = input['tools'].map do |tool|
           if tool['functionDeclarations'].present?
             tool['functionDeclarations'] = tool['functionDeclarations'].map do |function|
-              if function['parameters'].present?
-                function['parameters'] = parse_json(function['parameters'])
-              end
+              function['parameters'] = call('maybe_parse_json', function['parameters']) if function['parameters'].present?
               function
             end.compact
           end
@@ -2981,24 +3029,13 @@
       if m['functionCall'].present?
         fc = m['functionCall']
         # if args provided as string JSON, parse once
-        if fc['args'].is_a?(String) && fc['args'].strip.start_with?('{','[')
-          begin
-            fc = fc.merge('args' => parse_json(fc['args']))
-          rescue
-            # keep raw if parse fails; server will validate
-          end
-        end
+        fc = fc.merge('args' => call('maybe_parse_json', fc['args'])) if fc['args'].present?
         parts << { 'functionCall' => fc }
       end
 
       if m['functionResponse'].present?
         fr = m['functionResponse']
-        if fr['response'].is_a?(String) && fr['response'].strip.start_with?('{','[')
-          begin
-            fr = fr.merge('response' => parse_json(fr['response']))
-          rescue
-          end
-        end
+        fr = fr.merge('response' => call('maybe_parse_json', fr['response'])) if fr['response'].present?
         parts << { 'functionResponse' => fr }
       end
 
@@ -3205,12 +3242,8 @@
 
         batch_texts.each_with_index do |text_obj, index|
           prediction = predictions[index]
-
           if prediction
-            # Extract embedding from prediction
-            vals = prediction&.dig('embeddings', 'values') ||
-                   prediction&.dig('embeddings')&.first&.dig('values') ||
-                   []
+            vals = call('extract_embedding_values', prediction)
 
             embedding_result = {
               'id' => text_obj['id'],
@@ -3316,9 +3349,7 @@
         response = call('rate_limited_ai_request', connection, model, 'embedding', url, payload)
 
         # Extract embedding from response
-        vector = response&.dig('predictions', 0, 'embeddings', 'values') ||
-                 response&.dig('predictions', 0, 'embeddings')&.first&.dig('values') ||
-                 []
+        vector = call('extract_embedding_values', response&.dig('predictions', 0))
 
         # Estimate token count (rough approximation: ~4 characters per token)
         token_count = (content.length / 4.0).ceil
@@ -3415,10 +3446,7 @@
       return {} if json_txt.blank?
 
       # Cleanup markdown code blocks
-      json = json_txt.gsub(/^```(?:json|JSON)?\s*\n?/, '')  # Remove opening fence
-                    .gsub(/\n?```\s*$/, '')                # Remove closing fence
-                    .gsub(/`+$/, '')                       # Remove any trailing backticks
-                    .strip
+      json = call('strip_fences', json_txt)
 
       begin
         parse_json(json) || {}
@@ -3502,9 +3530,7 @@
           'action_required' => has_answer ? 'use_answer' : 'try_different_question',
           'answer_length' => answer.to_s.length,
           'safety_ratings' => ratings,
-          'prompt_tokens' => resp.dig('usageMetadata', 'promptTokenCount') || 0,
-          'response_tokens' => resp.dig('usageMetadata', 'candidatesTokenCount') || 0,
-          'total_tokens' => resp.dig('usageMetadata', 'totalTokenCount') || 0
+          'usage' => call('usage_meta', resp)
         }
 
       when :email
@@ -3530,6 +3556,8 @@
 
       when :classify
         json = call('extract_json', resp)
+        json = {} unless json.is_a?(Hash)
+        
         selected_category = json&.[]('selected_category') || 'N/A'
         confidence = json&.[]('confidence')&.to_f || 1.0
         alternatives = json&.[]('alternatives') || []
@@ -3600,7 +3628,7 @@
         'application/vnd.google-apps.spreadsheet'  => 'text/csv',
         'application/vnd.google-apps.presentation' => 'text/plain'
       }.freeze
-+      exports[mime_type]
+      exports[mime_type]
     end,
     build_drive_query: lambda do |options = {}|
       query_parts = ['trashed = false']
@@ -3633,20 +3661,21 @@
     handle_drive_error: lambda do |connection, code, body, message|
       service_account_email = connection['service_account_email'] || 
                              connection['client_id']
-      case code
-      when 404
-        "File not found in Google Drive. Please verify the file ID and ensure the file exists."
-      when 403
-        if body&.include?('insufficientFilePermissions') || body&.include?('forbidden')
-          "Access denied. Please share the file with the service account: #{service_account_email}"
-        else
-          "Permission denied. Check your Google Drive API access and file permissions."
-        end
-      when 429
-        "Rate limit exceeded. Please implement request backoff and retry logic."
-      when 401
-        "Authentication failed. Please check your OAuth2 token or service account credentials."
-      when 500, 502, 503
+      handlers = {
+        404 => ->(_b, _m) { "File not found in Google Drive. Please verify the file ID and ensure the file exists." },
+        403 => ->(b, _m) {
+          if b&.include?('insufficientFilePermissions') || b&.include?('forbidden')
+            "Access denied. Please share the file with the service account: #{service_account_email}"
+          else
+            "Permission denied. Check your Google Drive API access and file permissions."
+          end
+        },
+        429 => ->(_b, _m) { "Rate limit exceeded. Please implement request backoff and retry logic." },
+        401 => ->(_b, _m) { "Authentication failed. Please check your OAuth2 token or service account credentials." }
+      }
+      if handlers[code]
+        handlers[code].call(body, message)
+      elsif [500, 502, 503].include?(code)
         "Google Drive API temporary error (#{code}). Please retry after a brief delay."
       else
         "Google Drive API error (#{code}): #{message || body}"
@@ -4927,37 +4956,15 @@
 
   pick_lists: {
     available_text_models: lambda do |connection|
-      static = [
-        ['Gemini 1.0 Pro', 'publishers/google/models/gemini-pro'],
-        ['Gemini 1.5 Pro', 'publishers/google/models/gemini-1.5-pro'],
-        ['Gemini 1.5 Flash', 'publishers/google/models/gemini-1.5-flash'],
-        ['Gemini 2.0 Flash Lite', 'publishers/google/models/gemini-2.0-flash-lite-001'],
-        ['Gemini 2.0 Flash', 'publishers/google/models/gemini-2.0-flash-001'],
-        ['Gemini 2.5 Pro', 'publishers/google/models/gemini-2.5-pro'],
-        ['Gemini 2.5 Flash', 'publishers/google/models/gemini-2.5-flash'],
-        ['Gemini 2.5 Flash Lite', 'publishers/google/models/gemini-2.5-flash-lite']
-      ]
+      static = call('static_model_options')[:text]
       call('picklist_for', connection, :text, static)
     end,
     available_image_models: lambda do |connection|
-      static = [
-        ['Gemini Pro Vision', 'publishers/google/models/gemini-pro-vision'],
-        ['Gemini 1.5 Pro', 'publishers/google/models/gemini-1.5-pro'],
-        ['Gemini 1.5 Flash', 'publishers/google/models/gemini-1.5-flash'],
-        ['Gemini 2.0 Flash Lite', 'publishers/google/models/gemini-2.0-flash-lite-001'],
-        ['Gemini 2.0 Flash', 'publishers/google/models/gemini-2.0-flash-001'],
-        ['Gemini 2.5 Pro', 'publishers/google/models/gemini-2.5-pro'],
-        ['Gemini 2.5 Flash', 'publishers/google/models/gemini-2.5-flash'],
-        ['Gemini 2.5 Flash Lite', 'publishers/google/models/gemini-2.5-flash-lite']
-      ]
+      static = call('static_model_options')[:image]      
       call('picklist_for', connection, :image, static)
     end,
     available_embedding_models: lambda do |connection|
-      static = [
-        ['Text embedding gecko-001', 'publishers/google/models/textembedding-gecko@001'],
-        ['Text embedding gecko-003', 'publishers/google/models/textembedding-gecko@003'],
-        ['Text embedding-004', 'publishers/google/models/text-embedding-004']
-      ]
+      static = call('static_model_options')[:embedding]
       call('picklist_for', connection, :embedding, static)
     end,
     message_types: lambda do
