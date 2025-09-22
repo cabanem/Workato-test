@@ -1,0 +1,16 @@
+diff --git a/connectors/vertex-ai.rb b/connectors/vertex-ai.rb
+@@
+-    truthy?: lambda do |val|
+-      case val
+-      when TrueClass then true
+-      when FalseClass then false
+-      when Integer then val != 0
+-      else
+-        %w[true 1 yes y t].include?(val.to_s.strip.downcase)
+-      end
+-    end,
++    # (Removed) truthy? – unused
+@@
+-    # (Removed) build_gemini_payload – superseded by build_ai_payload templates
+-    # (Removed) payload_for_ai_classify – unified into build_classify_payload
++    # Removed helpers migrated to unified builders

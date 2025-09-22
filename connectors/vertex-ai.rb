@@ -133,7 +133,7 @@
               optional: false, group: 'Service Account',
               hint: 'The service account created to delegate other domain users (e.g. name@project.iam.gserviceaccount.com)' },
             { name: 'client_id', optional: false },
-            { name: 'private_key', ontrol_type: 'password',  multiline: true, optional: false,
+            { name: 'private_key', control_type: 'password',  multiline: true, optional: false,
               hint: 'Copy and paste the private key that came from the downloaded json. <br/>' \
                     "Click <a href='https://developers.google.com/identity/protocols/oauth2/' " \
                     "service-account/target='_blank'>here</a> to learn more about Google Service " \
@@ -223,18 +223,8 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Accepts prepared prompts from RAG_Utils
-        # Validate model
         call('validate_publisher_model!', connection, input['model'])
-
-        # Build payload - check for prepared input from RAG_Utils
-        payload = if input['formatted_prompt'].present?
-          # Use prepared prompt directly (from RAG_Utils)
-          input['formatted_prompt']
-        else
-          # Build payload using existing method (backward compatibility)
-          call('payload_for_send_message', input)
-        end
+        payload = input['formatted_prompt'].presence || call('build_ai_payload', :send_message, input)
 
         # Build the url
         url = "projects/#{connection['project']}/locations/#{connection['region']}" \
@@ -266,35 +256,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload with enhanced builder
-        instruction = if input['from'].present?
-          "You are an assistant helping to translate a user's input from #{input['from']} into #{input['to']}. " \
-          "Respond only with the user's translated text in #{input['to']} and nothing else. " \
-          "The user input is delimited with triple backticks."
-        else
-          "You are an assistant helping to translate a user's input into #{input['to']}. " \
-          "Respond only with the user's translated text in #{input['to']} and nothing else. " \
-          "The user input is delimited with triple backticks."
-        end
-
-        user_prompt = "```#{call('replace_backticks_with_hash', input['text'])}```"
-
-        payload = call('build_gemini_payload', instruction, user_prompt, {
-          safety_settings: input['safetySettings'],
-          json_output: true,
-          json_key: 'response',
-          temperature: 0
-        })
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-              "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :generic, json_response: true })
+        call('run_vertex', connection, input, :translate, verb: :generate, extract: { type: :generic, json_response: true })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -317,18 +279,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('build_ai_payload', :summarize, input)
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-              "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :generic, json_response: false })
+        call('run_vertex', connection, input, :summarize, verb: :generate, extract: { type: :generic })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -352,18 +303,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('build_ai_payload', :parse, input)
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-                        "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :parsed })
+        call('run_vertex', connection, input, :parse, verb: :generate, extract: { type: :parsed })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -392,18 +332,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('build_ai_payload', :email, input)
-        # Build the url
-        url ="projects/#{connection['project']}/locations/#{connection['region']}" \
-                        "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :email })
+        call('run_vertex', connection, input, :email, verb: :generate, extract: { type: :email })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -514,18 +443,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('build_ai_payload', :analyze, input)
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-              "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :generic, json_response: true })
+        call('run_vertex', connection, input, :analyze, verb: :generate, extract: { type: :generic, json_response: true })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -552,18 +470,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('build_ai_payload', :analyze_image, input)
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-              "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :generic, json_response: false })
+        call('run_vertex', connection, input, :analyze, verb: :generate, extract: { type: :generic, json_response: true })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -784,19 +691,7 @@
       execute: lambda do |connection, input, _eis, _eos|
         # Build payload and normalized host
         payload = call('build_ai_payload', :find_neighbors, input)
-        host = input['index_endpoint_host'].to_s.strip
-        # Host normalization
-        if host.blank?
-          error('Index endpoint host is required')
-        end
-        
-        # Remove protocol if present and trailing slashes
-        host = host.gsub(/^https?:\/\//i, '').gsub(/\/+$/, '')
-        
-        # Validate host format (basic check for valid domain or IP)
-        unless host.match?(/^[\w\-\.]+(:\d+)?$/)
-          error("Invalid index endpoint host format: #{host}")
-        end
+        host = call('normalize_host', input['index_endpoint_host'])
 
         version = connection['version'].presence || 'v1'
         project = connection['project']
@@ -1046,8 +941,7 @@
             'project' => connection['project'],
             'region' => connection['region'],
             'api_version' => connection['version'] || 'v1',
-            'auth_type' => connection['auth_type'],
-            'host' => connection['developer_api_host']
+            'auth_type' => connection['auth_type']
           },
           'tests_performed' => [],
           'errors' => [],
@@ -1061,11 +955,10 @@
             start_time = Time.now
             
             # Test basic connectivity
-            datasets_response = get("projects/#{connection['project']}/locations/#{connection['region']}/datasets").
-              params(pageSize: 1).
-              after_error_response(/.*/) do |code, body, _header, message|
-                raise "Vertex AI API error (#{code}): #{message}"
-              end
+            datasets_response = call('api_request', connection, :get,
+              "projects/#{connection['project']}/locations/#{connection['region']}/datasets",
+              { params: { pageSize: 1 }, context: { action: 'List datasets' } }
+            )
             
             vertex_test = {
               'service' => 'Vertex AI',
@@ -1082,8 +975,10 @@
             # Test model access if requested
             if input['test_models']
               begin
-                models_response = get("projects/#{connection['project']}/locations/#{connection['region']}/models").
-                  params(pageSize: 1)
+                models_response = call('api_request', connection, :get,
+                  "projects/#{connection['project']}/locations/#{connection['region']}/models",
+                  { params: { pageSize: 1 }, context: { action: 'List models' } }
+                )
                 vertex_test['permissions_validated'] << 'aiplatform.models.list'
                 vertex_test['models_accessible'] = true
               rescue => e
@@ -1093,7 +988,10 @@
               
               # Test specific model access
               begin
-                model_test = get("https://#{connection['region']}-aiplatform.googleapis.com/v1/publishers/google/models/gemini-1.5-pro")
+                model_test = call('api_request', connection, :get,
+                  "https://#{connection['region']}-aiplatform.googleapis.com/v1/publishers/google/models/gemini-1.5-pro",
+                  { context: { action: 'Get Gemini model' } }
+                )
                 vertex_test['gemini_access'] = true
                 vertex_test['permissions_validated'] << 'aiplatform.models.predict'
               rescue => e
@@ -1249,7 +1147,10 @@
               },
               'notes' => 'These are default quotas. Actual quotas may vary by project.'
             }
-            results['quota_info'] = quotas
+            results['quota_info'] = {
+              'api_calls_per_minute' => { 'gemini_pro' => 300, 'gemini_flash' => 600, 'embeddings' => 600 },
+              'notes' => 'Defaults only. Your project quotas may differ.'
+            }
           rescue => e
             results['warnings'] << "Could not retrieve quota information: #{e.message}"
           end
@@ -1445,7 +1346,7 @@
         metadata_response = call('api_request', connection, :get,
           call('drive_api_url', :file, file_id),
           {
-            params: { fields: 'id,name,mimeType,size,modifiedTime,md5Checksum,owners' },
+            params: { fields: call('drive_basic_fields') },
             error_handler: lambda do |code, body, message|
               error(call('handle_drive_error', connection, code, body, message))
             end
@@ -1726,17 +1627,15 @@
         } if file_ids.empty?
 
         # Step 2: Process files
-        file_ids.each_slice(5) do |batch| # process 5 files concurrently
-        #file_ids.each do |file_id_input| # simple sequential processing
+        file_ids.each do |file_id_input|
           begin
-            # Extract clean file ID
             file_id = call('extract_drive_file_id', file_id_input)
 
             # Get file metadata
-            metadata_response = call('api_request', connection, :get,
-              call('drive_api_url', :file, file_id),
-              {
-                params: { fields: 'id,name,mimeType,size,modifiedTime,md5Checksum,owners' },
+        metadata_response = call('api_request', connection, :get,
+          call('drive_api_url', :file, file_id),
+          {
+            params: { fields: call('drive_basic_fields') },
                 error_handler: lambda do |code, body, message|
                   error(call('handle_drive_error', connection, code, body, message))
                 end
@@ -2033,68 +1932,21 @@
           end
         end
 
-        # Step 5: Categorize changes
-        files_added = []
-        files_modified = []
-        files_removed = []
-        
-        # Track seen files to avoid duplicates
-        seen_files = {}
-        
+        files_added, files_modified, files_removed = [], [], []
+        seen = {}
         all_changes.each do |change|
           file_id = change['fileId']
-          
-          if change['removed']
-            # File was removed
-            files_removed << {
-              'fileId' => file_id,
-              'time' => change['time']
-            }
-          elsif change['file']
-            file = change['file']
-            
-            # Skip trashed files unless explicitly requested
-            next if file['trashed'] && !include_removed
-            
-            file_summary = {
-              'id' => file['id'],
-              'name' => file['name'],
-              'mimeType' => file['mimeType'],
-              'modifiedTime' => file['modifiedTime'],
-              'checksum' => file['md5Checksum']
-            }
-            
-            # Determine if file is new or modified
-            # This is simplified - in production, you'd track file creation time
-            if seen_files[file_id]
-              # Already seen in this batch, treat as modified
-              files_modified << file_summary
+          klass = call('classify_drive_change', change, include_removed)
+          next if klass[:kind] == :skip
+          case klass[:kind]
+          when :removed
+            files_removed << klass[:summary]
+          else
+            if seen[file_id]
+              files_modified << klass[:summary]
             else
-              # First time seeing this file
-              # Check if it's a new file based on the change type
-              if change['changeType'] == 'file'
-                # Could be either new or modified
-                # For simplicity, we'll treat first occurrence as added
-                # In production, compare modifiedTime with change time
-                time_diff = if file['modifiedTime'] && change['time']
-                  modified = Time.parse(file['modifiedTime'])
-                  changed = Time.parse(change['time'])
-                  (changed - modified).abs
-                else
-                  0
-                end
-                
-                # If modified very recently relative to change, likely new
-                if time_diff < 60 # Within 60 seconds
-                  files_added << file_summary
-                else
-                  files_modified << file_summary
-                end
-              else
-                files_modified << file_summary
-              end
-              
-              seen_files[file_id] = true
+              files_added << klass[:summary]
+              seen[file_id] = true
             end
           end
         end
@@ -2165,6 +2017,58 @@
   },
 
   methods: {
+    picklist_for: lambda do |connection, bucket, static|
+      call('dynamic_model_picklist', connection, bucket, static)
+    end,
+    log_debug: lambda { |msg| puts(msg) },
+    rate_limit_defaults: lambda { { 'max_retries' => 3, 'base_delay' => 1.0, 'max_delay' => 30.0 } },
+    normalize_host: lambda do |host|
+      h = host.to_s.strip
+      error('Index endpoint host is required') if h.blank?
+      h = h.gsub(/^https?:\/\//i, '').gsub(/\/+$/, '')
+      error("Invalid index endpoint host format: #{h}") unless h.match?(/^[\w\-\.]+(:\d+)?$/)
+      h
+    end,
+    to_similarity: lambda do |distance, max = 2.0|
+      s = 1.0 - (distance.to_f / max.to_f)
+      s < 0 ? 0.0 : s
+    end,
+    classify_drive_change: lambda do |change, include_removed|
+      return { kind: :removed, summary: { 'fileId' => change['fileId'], 'time' => change['time'] } } if change['removed']
+      file = change['file']
+      return { kind: :skip } if file.nil?
+      return { kind: :skip } if file['trashed'] && !include_removed
+      summary = {
+        'id' => file['id'],
+        'name' => file['name'],
+        'mimeType' => file['mimeType'],
+        'modifiedTime' => file['modifiedTime'],
+        'checksum' => file['md5Checksum']
+      }
+      # Heuristic: first seen ~added, else modified
+      { kind: :added, summary: summary }
+    end,
+    drive_basic_fields: lambda do
+      'id,name,mimeType,size,modifiedTime,md5Checksum,owners'
+    end,
+    # Build fully-qualified Vertex endpoint for a model
+    vertex_url_for: lambda do |connection, model, verb|
+      base = "projects/#{connection['project']}/locations/#{connection['region']}"
+      v = verb.to_s
+      case v
+      when 'generate' then "#{base}/#{model}:generateContent"
+      when 'predict'  then "#{base}/#{model}:predict"
+      else error("Unsupported Vertex verb: #{verb}")
+      end
+    end,
+    # Unified “validate → build → call → extract”
+    run_vertex: lambda do |connection, input, template, verb:, extract: {}|
+      call('validate_publisher_model!', connection, input['model'])
+      payload = call('build_ai_payload', template, input, connection)
+      url = call('vertex_url_for', connection, input['model'], verb)
+      resp = call('rate_limited_ai_request', connection, input['model'], verb, url, payload)
+      extract.present? ? call('extract_response', resp, extract) : resp
+    end,
     # Universal API request handler with standard error handling
     api_request: lambda do |connection, method, url, options = {}|
       # Build the request based on method
@@ -2195,7 +2099,7 @@
         if options[:error_handler]
           options[:error_handler].call(code, body, message)
         else
-          call('handle_vertex_error', connection, code, body, message)
+          call('handle_vertex_error', connection, code, body, message, options[:context] || {})
         end
       end
     end,
@@ -2303,30 +2207,6 @@
 
       response
     end,
-    # Enhanced Gemini payload builder with JSON output support
-    build_gemini_payload: lambda do |instruction, prompt, options = {}|
-      # Use existing base builder
-      base = call('build_base_payload', instruction, prompt, options[:safety_settings])
-
-      # Add JSON output instruction if requested
-      if options[:json_output]
-        json_key = options[:json_key] || 'response'
-        json_instruction = "\n\nOutput as a JSON object with key \"#{json_key}\". " \
-                          "Only respond with valid JSON and nothing else."
-
-        # Append to the user prompt
-        current_text = base['contents'][0]['parts'][0]['text']
-        base['contents'][0]['parts'][0]['text'] = current_text + json_instruction
-      end
-
-      # Set temperature if provided
-      if options[:temperature]
-        base['generationConfig'] ||= {}
-        base['generationConfig']['temperature'] = options[:temperature]
-      end
-
-      base
-    end,
     # -- CORE ERROR AND HTTP UTILITIES --
     handle_vertex_error: lambda do |connection, code, body, message, context = {}|
       # Parse the body for structured error information
@@ -2386,15 +2266,7 @@
     replace_backticks_with_hash: lambda do |text|
       text&.gsub('```', '####')
     end,
-    truthy?: lambda do |val|
-      case val
-      when TrueClass then true
-      when FalseClass then false
-      when Integer then val != 0
-      else
-        %w[true 1 yes y t].include?(val.to_s.strip.downcase)
-      end
-    end,
+    # (Removed) truthy? -- unused
     # -- RATE LIMITING UTILITIES --
     # Vertex AI rate limiting enforcement using atomic sliding window in cache
     enforce_vertex_rate_limits: lambda do |connection, model, action_type = 'inference'|
@@ -2403,9 +2275,9 @@
 
       # Determine model family and limits
       model_family = case model.to_s.downcase
-      when /gemini.*pro/
+      when /gemini.*(2\.5\-)?pro/
         'gemini-pro'
-      when /gemini.*flash/
+      when /gemini.*(2\.5\-)?flash/
         'gemini-flash'
       when /embedding/
         'embedding'
@@ -2447,7 +2319,7 @@
           total_sleep = sleep_seconds + jitter
           sleep_ms = (total_sleep * 1000).to_i
 
-          puts "Rate limit reached for #{model_family} (#{timestamps.length}/#{limit}). Sleeping #{total_sleep.round(2)}s"
+          call('log_debug', "Rate limit reached for #{model_family} (#{timestamps.length}/#{limit}). Sleeping #{total_sleep.round(2)}s")
           sleep(total_sleep)
 
           return {
@@ -2474,13 +2346,14 @@
 
       rescue => e
         # If cache fails, allow the request but log warning
-        puts "Rate limit cache operation failed: #{e.message}"
+        call('log_debug', "Rate limit cache operation failed: #{e.message}")
         return { requests_last_minute: 0, limit: limit, throttled: false, sleep_ms: 0 }
       end
     end,
     handle_429_with_backoff: lambda do |connection, action_type, model, &block|
-      max_retries = 3
-      base_delay = 1.0
+      cfg = call('rate_limit_defaults')
+      max_retries = cfg['max_retries']
+      base_delay = cfg['base_delay']
 
       max_retries.times do |attempt|
         begin
@@ -2502,7 +2375,7 @@
               # Use Retry-After if available, otherwise use exponential backoff
               actual_delay = retry_after || delay
 
-              puts "429 rate limit hit for #{model} (attempt #{attempt + 1}/#{max_retries}). Retrying in #{actual_delay}s"
+              call('log_debug', "429 rate limit hit for #{model} (attempt #{attempt + 1}/#{max_retries}). Retrying in #{actual_delay}s")
               sleep(actual_delay)
             else
               # Max retries exceeded
@@ -2519,10 +2392,11 @@
     # Circuit breaker pattern for resilient batch operations
     circuit_breaker_retry: lambda do |connection, operation_name, options = {}, &block|
       # Configuration with defaults
-      max_retries = options[:max_retries] || 3
+      defaults = call('rate_limit_defaults')
+      max_retries = options[:max_retries] || defaults['max_retries']
       retry_on = Array(options[:retry_on] || [429, 500, 502, 503, 504])
-      base_delay = options[:base_delay] || 1.0
-      max_delay = options[:max_delay] || 30.0
+      base_delay = options[:base_delay] || defaults['base_delay']
+      max_delay = options[:max_delay] || defaults['max_delay']
       jitter = options[:jitter] || true
 
       # Circuit breaker state management via cache
@@ -2537,7 +2411,7 @@
           # Auto-recover after 5 minutes
           if Time.now - last_failure_time > 300
             circuit_state['state'] = 'half_open'
-            puts "Circuit breaker for #{operation_name}: transitioning to half-open"
+            call('log_debug', "Circuit breaker for #{operation_name}: transitioning to half-open")
           else
             error("Circuit breaker OPEN for #{operation_name}. Too many recent failures. Retry in #{((last_failure_time + 300 - Time.now) / 60).round(1)} minutes.")
           end
@@ -2551,7 +2425,7 @@
             # Success - reset circuit breaker
             if circuit_state['failures'] > 0
               workato.cache.set(circuit_key, { 'failures' => 0, 'state' => 'closed' }, 3600)
-              puts "Circuit breaker for #{operation_name}: reset to closed state"
+              call('log_debug', "Circuit breaker for #{operation_name}: reset to closed state")
             end
 
             return result
@@ -2578,7 +2452,7 @@
               delay = [base_delay * (2 ** attempt), max_delay].min
               delay += rand * 0.5 if jitter
 
-              puts "#{operation_name} failed (attempt #{attempt + 1}/#{max_retries}): #{e.message}. Retrying in #{delay.round(2)}s"
+              call('log_debug', "#{operation_name} failed (attempt #{attempt + 1}/#{max_retries}): #{e.message}. Retrying in #{delay.round(2)}s")
               sleep(delay)
             else
               # Max retries exceeded or non-retryable error
@@ -2588,7 +2462,7 @@
               # Trip circuit breaker if too many failures
               if circuit_state['failures'] >= 5
                 circuit_state['state'] = 'open'
-                puts "Circuit breaker for #{operation_name}: OPENED due to repeated failures"
+                call('log_debug', "Circuit breaker for #{operation_name}: OPENED due to repeated failures")
               end
 
               workato.cache.set(circuit_key, circuit_state, 3600)
@@ -2598,7 +2472,7 @@
         end
 
       rescue => cache_error
-        puts "Circuit breaker cache error: #{cache_error.message}"
+        call('log_debug', "Circuit breaker cache error: #{cache_error.message}")
         # Fallback to simple retry without circuit breaker
         return block.call
       end
@@ -2615,8 +2489,9 @@
       begin
         cached_data = workato.cache.get(cache_key)
         if cached_data.present?
-          # Check if cache is still fresh (we'll cache for 1 hour)
-          cache_time = Time.parse(cached_data['cached_at'])
+          cache_time = (Time.parse(cached_data['cached_at']) rescue nil)
+          break if cache_time.nil?
+
           if cache_time > 1.hour.ago
             puts "Using cached model list (#{cached_data['models'].length} models, cached #{((Time.now - cache_time) / 60).round} minutes ago)"
             return cached_data['models']
@@ -2653,47 +2528,29 @@
     end,
     # - Cascade model discovery with multiple fallback strategies
     cascade_model_discovery: lambda do |connection, publisher, region|
-      # Strategy 1: Try primary API endpoint
       begin
-        puts "Model discovery: trying primary API endpoint..."
+        puts "Model discovery: primary API..."
         models = call('fetch_fresh_publisher_models', connection, publisher, region)
         if models.present?
-          puts "Model discovery: primary API succeeded (#{models.length} models)"
           models.each { |m| m['source'] = 'primary_api' }
           return models
         end
       rescue => e
-        puts "Model discovery: primary API failed: #{e.message}"
+        puts "Model discovery: primary failed: #{e.message}"
       end
-
-      # Strategy 2: Try alternative region if not us-central1
       if region != 'us-central1'
         begin
-          puts "Model discovery: trying fallback region (us-central1)..."
+          puts "Model discovery: fallback us-central1..."
           models = call('fetch_fresh_publisher_models', connection, publisher, 'us-central1')
           if models.present?
-            puts "Model discovery: fallback region succeeded (#{models.length} models)"
             models.each { |m| m['source'] = 'fallback_region' }
             return models
           end
         rescue => e
-          puts "Model discovery: fallback region failed: #{e.message}"
+          puts "Model discovery: fallback failed: #{e.message}"
         end
       end
-
-      # Strategy 3: Try different view parameter
-      begin
-        puts "Model discovery: trying minimal view mode..."
-        models = call('fetch_publisher_models_minimal', connection, publisher, region)
-        if models.present?
-          puts "Model discovery: minimal view succeeded (#{models.length} models)"
-          models.each { |m| m['source'] = 'minimal_view' }
-          return models
-        end
-      rescue => e
-        puts "Model discovery: minimal view failed: #{e.message}"
-      end
-
+      # Final: static curated list
       # Strategy 4: Use static curated list as final fallback
       begin
         puts "Model discovery: using static curated list as final fallback"
@@ -2705,21 +2562,6 @@
         puts "Model discovery: static fallback failed: #{e.message}"
         return []
       end
-    end,
-    # - Minimal view model fetching for fallback
-    fetch_publisher_models_minimal: lambda do |connection, publisher, region|
-      host = "https://#{region}-aiplatform.googleapis.com"
-      url = "#{host}/v1beta1/publishers/#{publisher}/models"
-
-      resp = get(url).
-        params(
-          page_size: 100,  # Smaller page size for reliability
-          view: 'PUBLISHER_MODEL_VIEW_UNSPECIFIED'  # Most basic view
-        ).
-        after_error_response(/.*/) { |code, body, _hdrs, message| raise "API Error: #{code}" }
-
-      models = resp['models'] || []
-      models.select { |m| m['name'].present? }
     end,
     # - Static curated model list as ultimate fallback
     get_static_model_list: lambda do |connection, publisher|
@@ -2968,34 +2810,26 @@
     to_model_options: lambda do |models, bucket:, include_preview: false|
       return [] if models.blank?
       
-      # Pre-compile the regex for retired models to avoid recompiling
       retired_pattern = /(^|-)1\.0-|text-bison|chat-bison/
-    
-      # Filter models efficiently
-      filtered = models.select do |m|
-        model_id = m['name'].to_s.split('/').last
-        next false if model_id.blank?
-        
-        # Skip retired models
-        next false if model_id =~ retired_pattern
-        
-        # Check bucket match
-        next false unless call('vertex_model_bucket', model_id) == bucket
-        
-        # Check GA status if needed
+      eligible = models.select do |m|
+        id = m['name'].to_s.split('/').last
+        next false if id.blank?
+        next false if id =~ retired_pattern
+        next false unless call('vertex_model_bucket', id) == bucket
         if !include_preview
           stage = m['launchStage'].to_s
           next false unless stage == 'GA' || stage.blank?
         end
-        
         true
       end
       
       # Extract unique model IDs efficiently
-      seen_ids = Set.new
+      seen_ids = {}
       unique_models = filtered.select do |m|
         id = m['name'].to_s.split('/').last
-        seen_ids.add?(id)  # Returns true if added (wasn't present), false if already present
+        next false if id.blank?
+        next false if seen_ids[id]
+        seen_ids[id] = true
       end
       
       # Build options with better sorting
@@ -3009,8 +2843,9 @@
       # Sort with a more sophisticated algorithm
       sort_model_options(options)
     end,
-    # = Context-aware model label creation
+    # - Context-aware model label creation
     create_model_label: lambda do |model_id, model_metadata = {}|
+      return '' if model_id.to_s.strip.empty?
       # Start with the basic formatting
       label = model_id.gsub('-', ' ').split.map { |word| 
         # Keep version numbers as-is, capitalize other words
@@ -3062,6 +2897,7 @@
     # -- PAYLOAD CONSTRUCTION UTILITIES --
     # - Base payload builder for simple prompts
     build_base_payload: lambda do |instruction, user_content, safety_settings = nil, options = {}|
+      options = options.is_a?(Hash) ? options : {}
       # Build the base structure
       payload = {
         'systemInstruction' => {
@@ -3090,6 +2926,9 @@
       end
       
       payload.compact
+    end,
+    json_only_instruction: lambda do |key = 'response'|
+      "\n\nOutput as a JSON object with key \"#{key}\". Only respond with valid JSON and nothing else."
     end,
     build_conversation_payload: lambda do |input|
       # Handle generation config with response schema
@@ -3139,6 +2978,7 @@
       }.compact.merge(input.except('model', 'message_type', 'messages'))
     end,
     build_message_parts: lambda do |m|
+      return [] if m.nil?
       parts = []
       parts << { 'text' => m['text'] } if m['text'].present?
 
@@ -3188,7 +3028,7 @@
             from_lang = inp['from'].present? ? " from #{inp['from']}" : ""
             "#{base}#{from_lang} into #{inp['to']}. Respond only with the user's translated text in #{inp['to']} and nothing else. The user input is delimited with triple backticks."
           },
-          user_prompt: -> (inp) { "```#{call('replace_backticks_with_hash', inp['text'])}```\nOutput this as a JSON object with key \"response\"." }
+          user_prompt: -> (inp) { "```#{call('replace_backticks_with_hash', inp['text'])}```#{call('json_only_instruction','response')}" }
         }
       when :summarize
         {
@@ -3199,7 +3039,7 @@
         {
           instruction: -> (inp) { "You are an assistant helping to extract various fields of information from the user's text. The schema and text to parse are delimited by triple backticks." },
           user_prompt: -> (inp) {
-            "Schema:\n```#{inp['object_schema']}```\nText to parse: ```#{call('replace_backticks_with_hash', inp['text']&.strip)}```\nOutput the response as a JSON object with keys from the schema. If no information is found for a specific key, the value should be null. Only respond with a JSON object and nothing else."
+            "Schema:\n```#{inp['object_schema']}```\nText to parse: ```#{call('replace_backticks_with_hash', inp['text']&.strip)}```\nOutput the response as a JSON object with keys from the schema. If no information is found for a specific key, the value should be null.#{call('json_only_instruction')}"
           }
         }
       when :email
@@ -3210,7 +3050,7 @@
       when :analyze
         {
           instruction: -> (inp) { "You are an assistant helping to analyze the provided information. Take note to answer only based on the information provided and nothing else. The information to analyze and query are delimited by triple backticks." },
-          user_prompt: -> (inp) { "Information to analyze:```#{call('replace_backticks_with_hash', inp['text'])}```\nQuery:```#{call('replace_backticks_with_hash', inp['question'])}```\nIf you don't understand the question or the answer isn't in the information to analyze, input the value as null for \"response\". Only return a JSON object." }
+          user_prompt: -> (inp) { "Information to analyze:```#{call('replace_backticks_with_hash', inp['text'])}```\nQuery:```#{call('replace_backticks_with_hash', inp['question'])}```\nIf you don't understand the question or the answer isn't in the information to analyze, input the value as null for \"response\".#{call('json_only_instruction')}" }
         }
       when :ai_classify
         { custom_builder: 'build_classify_payload' }
@@ -3267,7 +3107,10 @@
 
       # Use custom temperature for classification
       temperature = (options['temperature'] || 0.1).to_f
-      call('build_base_payload', instruction, user_prompt, input['safetySettings'], temperature)
+      payload = call('build_base_payload', instruction, user_prompt, input['safetySettings'])
+      payload['generationConfig'] ||= {}
+      payload['generationConfig']['temperature'] = temperature
+      payload
     end,
     build_image_payload: lambda do |input, connection|
       call('payload_for_analyze_image', input)  # Keep existing complex logic for now
@@ -3279,53 +3122,6 @@
       call('payload_for_find_neighbors', input)  # Keep existing logic
     end,
     # -- REMAINING PAYLOAD BUILDERS (for complex cases) --
-    payload_for_ai_classify: lambda do |connection, input|
-      # Extract categories and options
-      categories = Array(input['categories'] || [])
-      options = input['options'] || {}
-      temperature = (options['temperature'] || 0.1).to_f
-
-      # Build categories text with descriptions
-      categories_text = categories.map do |cat|
-        key = cat['key'].to_s
-        desc = cat['description'].to_s
-        desc.empty? ? key : "#{key}: #{desc}"
-      end.join("\n")
-
-      # Build instruction for AI classification
-      instruction = 'You are an expert text classifier. Classify the provided text into one of the given categories. ' \
-                    'Analyze the text carefully and select the most appropriate category. ' \
-                    'Return confidence scores and alternative classifications if requested. ' \
-                    'The categories and text are delimited by triple backticks.'
-
-      # Build the classification prompt
-      user_prompt = "Categories:\n```#{categories_text}```\n" \
-                    "Text to classify:\n```#{call('replace_backticks_with_hash', input['text']&.strip)}```\n\n"
-
-      # Add output format instructions
-      if options['return_confidence'] && options['return_alternatives']
-        user_prompt += 'Return a JSON object with: ' \
-                       '{"selected_category": "category_key", ' \
-                       '"confidence": 0.95, ' \
-                       '"alternatives": [{"category": "other_key", "confidence": 0.05}]}. ' \
-                       'Confidence scores should be between 0.0 and 1.0. ' \
-                       'Only respond with the JSON object.'
-      elsif options['return_confidence']
-        user_prompt += 'Return a JSON object with: ' \
-                       '{"selected_category": "category_key", "confidence": 0.95}. ' \
-                       'Confidence should be between 0.0 and 1.0. ' \
-                       'Only respond with the JSON object.'
-      else
-        user_prompt += 'Return a JSON object with: {"selected_category": "category_key"}. ' \
-                       'Only respond with the JSON object.'
-      end
-
-      # Build payload with temperature setting
-      payload = call('build_base_payload', instruction, user_prompt, input['safetySettings'])
-      payload['generationConfig'] ||= {}
-      payload['generationConfig']['temperature'] = temperature
-      payload
-    end,
     payload_for_analyze_image: lambda do |input|
       # We can't use the base builder since we have to pass image data in parts
       {
@@ -3543,7 +3339,7 @@
           'dimensions' => vector.length,
           'model_used' => model,
           'token_count' => token_count,
-          'rate_limit_status' => rate_limit_info
+          'rate_limit_status' => (response.is_a?(Hash) ? response['rate_limit_status'] : nil)
         }
 
       rescue => e
@@ -3560,11 +3356,8 @@
         neighbors.each do |neighbor|
           datapoint = neighbor['datapoint'] || {}
           distance = neighbor['distance'].to_f
-
-          # Normalize distance to similarity score (0-1)
-          # Assuming distances are typically 0-2 for cosine distance
-          max_distance = 2.0
-          similarity_score = [1.0 - (distance / max_distance), 0.0].max
+          
+          similarity_score = call('to_similarity', distance, 2.0)
 
           all_neighbors << {
             'datapoint_id' => datapoint['datapointId'].to_s,
@@ -3696,7 +3489,7 @@
       if [:generic, :email, :parsed, :classify].include?(type)
         call('check_finish_reason', resp.dig('candidates', 0, 'finishReason'))
         ratings = call('get_safety_ratings', resp.dig('candidates', 0, 'safetyRatings'))
-        return standard_error_response(type, ratings) if ratings.blank?
+        return call('standard_error_response', type, ratings) if ratings.blank?
       else
         ratings = {}
       end
@@ -4044,8 +3837,8 @@
         index_stats = {
           'index_id' => index_id.to_s,
           'deployed_state' => 'DEPLOYED',
-          'dimensions' => index_response.dig('indexStats', 'vectorsCount')&.to_i || 0,
-          'total_datapoints' => index_response.dig('indexStats', 'shardsCount')&.to_i || 0,
+          'total_datapoints' => index_response.dig('indexStats', 'vectorsCount')&.to_i,
+          'shards_count' => index_response.dig('indexStats', 'shardsCount')&.to_i,
           'display_name' => index_response['displayName'].to_s,
           'created_time' => created_time || '',
           'updated_time' => updated_time || ''
@@ -4115,12 +3908,7 @@
                 error("Datapoint missing required fields. Each datapoint must have 'datapoint_id' and 'feature_vector'")
               end
 
-              # Validate vector dimensions if we have index metadata
-              if index_stats['dimensions'] && index_stats['dimensions'] > 0
-                if dp['feature_vector'].length != index_stats['dimensions']
-                  error("Vector dimension mismatch. Expected #{index_stats['dimensions']} dimensions, got #{dp['feature_vector'].length} for datapoint '#{dp['datapoint_id']}'")
-                end
-              end
+              # Do not attempt to validate vector length here; let the API enforce it.
 
               datapoint = {
                 'datapointId' => dp['datapoint_id'],
@@ -4876,10 +4664,7 @@
     },
     translate_text_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [
-          { name: 'answer', label: 'Translation' }
-        ].concat(object_definitions['safety_rating_schema']).
-          concat(object_definitions['usage_schema'])
+        [{ name: 'answer', label: 'Translation' }].concat(object_definitions['safety_and_usage'])
       end
     },
     summarize_text_input: {
@@ -4895,8 +4680,7 @@
     },
     summarize_text_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [ { name: 'answer', label: 'Summary' } ].concat(object_definitions['safety_rating_schema'])
-                                                .concat(object_definitions['usage_schema'])
+        [{ name: 'answer', label: 'Summary' }].concat(object_definitions['safety_and_usage'])
       end
     },
     parse_text_input: {
@@ -4945,8 +4729,7 @@
         [
           { name: 'subject', label: 'Email subject' },
           { name: 'body', label: 'Email body' }
-        ].concat(object_definitions['safety_rating_schema']).
-          concat(object_definitions['usage_schema'])
+        ].concat(object_definitions['safety_and_usage'])
       end
     },
     analyze_text_input: {
@@ -4955,7 +4738,7 @@
           [
             { name: 'text', label: 'Source text', optional: false, control_type: 'text-area',
               group: 'Task input', hint: 'Provide the text to be analyzed.' },
-            { name: 'question', label: 'Instruction', ptional: false, group: 'Instruction',
+            { name: 'question', label: 'Instruction', optional: false, group: 'Instruction',
               hint: 'Enter analysis instructions, such as an analysis technique or question to be answered.' }
           ]
         ).concat(object_definitions['config_schema'].only('safetySettings'))
@@ -4963,10 +4746,7 @@
     },
     analyze_text_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [
-          { name: 'answer', label: 'Analysis' }
-        ].concat(object_definitions['safety_rating_schema']).
-          concat(object_definitions['usage_schema'])
+        [{ name: 'answer', label: 'Analysis' }].concat(object_definitions['safety_and_usage'])
       end
     },
     analyze_image_input: {
@@ -4994,11 +4774,8 @@
     },
     analyze_image_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [
-          { name: 'answer',
-            label: 'Analysis' }
-        ].concat(object_definitions['safety_rating_schema']).
-          concat(object_definitions['usage_schema'])
+        [{ name: 'answer', label: 'Analysis' }].concat(object_definitions['safety_and_usage'])
+
       end
     },
     find_neighbors_input: {
@@ -5192,7 +4969,7 @@
         ['Gemini 2.5 Flash', 'publishers/google/models/gemini-2.5-flash'],
         ['Gemini 2.5 Flash Lite', 'publishers/google/models/gemini-2.5-flash-lite']
       ]
-      call('dynamic_model_picklist', connection, :text, static)
+      call('picklist_for', connection, :text, static)
     end,
     available_image_models: lambda do |connection|
       static = [
@@ -5205,7 +4982,7 @@
         ['Gemini 2.5 Flash', 'publishers/google/models/gemini-2.5-flash'],
         ['Gemini 2.5 Flash Lite', 'publishers/google/models/gemini-2.5-flash-lite']
       ]
-      call('dynamic_model_picklist', connection, :image, static)
+      call('picklist_for', connection, :image, static)
     end,
     available_embedding_models: lambda do |connection|
       static = [
@@ -5213,7 +4990,7 @@
         ['Text embedding gecko-003', 'publishers/google/models/textembedding-gecko@003'],
         ['Text embedding-004', 'publishers/google/models/text-embedding-004']
       ]
-      call('dynamic_model_picklist', connection, :embedding, static)
+      call('picklist_for', connection, :embedding, static)
     end,
     message_types: lambda do
       %w[single_message chat_transcript].map { |m| [m.humanize, m] }

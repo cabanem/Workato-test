@@ -1,0 +1,43 @@
+diff --git a/connectors/vertex-ai.rb b/connectors/vertex-ai.rb
+@@
+-            'auth_type' => connection['auth_type'],
+-            'host' => connection['developer_api_host']
++            'auth_type' => connection['auth_type']
+           },
+@@
+-            datasets_response = get("projects/#{connection['project']}/locations/#{connection['region']}/datasets").
+-              params(pageSize: 1).
+-              after_error_response(/.*/) do |code, body, _header, message|
+-                raise "Vertex AI API error (#{code}): #{message}"
+-              end
++            datasets_response = call('api_request', connection, :get,
++              "projects/#{connection['project']}/locations/#{connection['region']}/datasets",
++              { params: { pageSize: 1 }, context: { action: 'List datasets' } }
++            )
+@@
+-                models_response = get("projects/#{connection['project']}/locations/#{connection['region']}/models").
+-                  params(pageSize: 1)
++                models_response = call('api_request', connection, :get,
++                  "projects/#{connection['project']}/locations/#{connection['region']}/models",
++                  { params: { pageSize: 1 }, context: { action: 'List models' } }
++                )
+@@
+-                model_test = get("https://#{connection['region']}-aiplatform.googleapis.com/v1/publishers/google/models/gemini-1.5-pro")
++                model_test = call('api_request', connection, :get,
++                  "https://#{connection['region']}-aiplatform.googleapis.com/v1/publishers/google/models/gemini-1.5-pro",
++                  { context: { action: 'Get Gemini model' } }
++                )
+@@
+-            quotas = {
+-              'api_calls_per_minute' => {
+-                'gemini_pro' => 300,
+-                'gemini_flash' => 600,
+-                'embeddings' => 600
+-              },
+-              'notes' => 'These are default quotas. Actual quotas may vary by project.'
+-            }
+-            results['quota_info'] = quotas
++            results['quota_info'] = {
++              'api_calls_per_minute' => { 'gemini_pro' => 300, 'gemini_flash' => 600, 'embeddings' => 600 },
++              'notes' => 'Defaults only. Your project quotas may differ.'
++            }

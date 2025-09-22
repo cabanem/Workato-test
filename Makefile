@@ -1,6 +1,6 @@
 # Makefile for Workato RAG Email Response System
 CONNECTOR ?= sample_connector
-VERSION ?= v2.0_proposed
+VERSION ?= vertex-ai
 CONTRACT ?= cleaned_text
 ACTION ?= 
 DATA ?= {}

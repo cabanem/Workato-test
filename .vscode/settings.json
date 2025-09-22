@@ -12,7 +12,7 @@
   },
   "terminal.integrated.env.linux": {
     "CONNECTOR_PATH": "${workspaceFolder}/connectors",
-    "DEFAULT_CONNECTOR": "rag_utils"
+    "DEFAULT_CONNECTOR": "vertex-ai"
   },
   "task.autoDetect": "on"
 }
