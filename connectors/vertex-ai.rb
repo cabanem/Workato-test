@@ -4033,11 +4033,9 @@
     # Extended Drive file fields with content
     drive_file_extended: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        # Start with base fields
-        base_fields = object_definitions['drive_file_fields']
-
-        # Add extended fields
-        extended = base_fields.concat([
+        # Start with base fields (do not mutate shared arrays)
+        base_fields = object_definitions['drive_file_fields'].dup
+        base_fields + [
           { name: 'owners', label: 'File owners', type: 'array', of: 'object',
             properties: [
               { name: 'displayName', label: 'Display name', type: 'string' },
@@ -4052,9 +4050,7 @@
             hint: 'MIME type used for export' },
           { name: 'fetch_method', label: 'Fetch method', type: 'string',
             hint: 'Method used to retrieve content' }
-        ])
-
-        extended
+        ]
       end
     },
     # Common safety and usage fields
