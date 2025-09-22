@@ -256,35 +256,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload with enhanced builder
-        instruction = if input['from'].present?
-          "You are an assistant helping to translate a user's input from #{input['from']} into #{input['to']}. " \
-          "Respond only with the user's translated text in #{input['to']} and nothing else. " \
-          "The user input is delimited with triple backticks."
-        else
-          "You are an assistant helping to translate a user's input into #{input['to']}. " \
-          "Respond only with the user's translated text in #{input['to']} and nothing else. " \
-          "The user input is delimited with triple backticks."
-        end
-
-        user_prompt = "```#{call('replace_backticks_with_hash', input['text'])}```"
-
-        payload = call('build_gemini_payload', instruction, user_prompt, {
-          safety_settings: input['safetySettings'],
-          json_output: true,
-          json_key: 'response',
-          temperature: 0
-        })
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-              "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :generic, json_response: true })
+        call('run_vertex', connection, input, :translate, verb: :generate, extract: { type: :generic, json_response: true })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -307,18 +279,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('build_ai_payload', :summarize, input)
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-              "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :generic, json_response: false })
+        call('run_vertex', connection, input, :summarize, verb: :generate, extract: { type: :generic })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -342,18 +303,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('build_ai_payload', :parse, input)
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-                        "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :parsed })
+        call('run_vertex', connection, input, :parse, verb: :generate, extract: { type: :parsed })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -382,18 +332,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('build_ai_payload', :email, input)
-        # Build the url
-        url ="projects/#{connection['project']}/locations/#{connection['region']}" \
-                        "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :email })
+        call('run_vertex', connection, input, :email, verb: :generate, extract: { type: :email })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -504,18 +443,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('build_ai_payload', :analyze, input)
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-              "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :generic, json_response: true })
+        call('run_vertex', connection, input, :analyze, verb: :generate, extract: { type: :generic, json_response: true })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -542,18 +470,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Validate model
-        call('validate_publisher_model!', connection, input['model'])
-        # Build payload
-        payload = call('build_ai_payload', :analyze_image, input)
-        # Build the url
-        url = "projects/#{connection['project']}/locations/#{connection['region']}" \
-              "/#{input['model']}:generateContent"
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, input['model'], 'inference', url, payload)
-        # Extract and return the response
-        call('extract_response', response, { type: :generic, json_response: false })
+        call('run_vertex', connection, input, :analyze, verb: :generate, extract: { type: :generic, json_response: true })
       end,
 
       output_fields: lambda do |object_definitions|
@@ -2153,6 +2070,24 @@
   },
 
   methods: {
+    # Build fully-qualified Vertex endpoint for a model
+    vertex_url_for: lambda do |connection, model, verb|
+      base = "projects/#{connection['project']}/locations/#{connection['region']}"
+      v = verb.to_s
+      case v
+      when 'generate' then "#{base}/#{model}:generateContent"
+      when 'predict'  then "#{base}/#{model}:predict"
+      else error("Unsupported Vertex verb: #{verb}")
+      end
+    end,
+    # Unified “validate → build → call → extract”
+    run_vertex: lambda do |connection, input, template, verb:, extract: {}|
+      call('validate_publisher_model!', connection, input['model'])
+      payload = call('build_ai_payload', template, input, connection)
+      url = call('vertex_url_for', connection, input['model'], verb)
+      resp = call('rate_limited_ai_request', connection, input['model'], verb, url, payload)
+      extract.present? ? call('extract_response', resp, extract) : resp
+    end,
     # Universal API request handler with standard error handling
     api_request: lambda do |connection, method, url, options = {}|
       # Build the request based on method
@@ -2290,30 +2225,6 @@
       end
 
       response
-    end,
-    # Enhanced Gemini payload builder with JSON output support
-    build_gemini_payload: lambda do |instruction, prompt, options = {}|
-      # Use existing base builder
-      base = call('build_base_payload', instruction, prompt, options[:safety_settings])
-
-      # Add JSON output instruction if requested
-      if options[:json_output]
-        json_key = options[:json_key] || 'response'
-        json_instruction = "\n\nOutput as a JSON object with key \"#{json_key}\". " \
-                          "Only respond with valid JSON and nothing else."
-
-        # Append to the user prompt
-        current_text = base['contents'][0]['parts'][0]['text']
-        base['contents'][0]['parts'][0]['text'] = current_text + json_instruction
-      end
-
-      # Set temperature if provided
-      if options[:temperature]
-        base['generationConfig'] ||= {}
-        base['generationConfig']['temperature'] = options[:temperature]
-      end
-
-      base
     end,
     # -- CORE ERROR AND HTTP UTILITIES --
     handle_vertex_error: lambda do |connection, code, body, message, context = {}|
@@ -3000,7 +2911,7 @@
       # Sort with a more sophisticated algorithm
       sort_model_options(options)
     end,
-    # = Context-aware model label creation
+    # - Context-aware model label creation
     create_model_label: lambda do |model_id, model_metadata = {}|
       # Start with the basic formatting
       label = model_id.gsub('-', ' ').split.map { |word| 
@@ -3258,7 +3169,10 @@
 
       # Use custom temperature for classification
       temperature = (options['temperature'] || 0.1).to_f
-      call('build_base_payload', instruction, user_prompt, input['safetySettings'], temperature)
+      payload = call('build_base_payload', instruction, user_prompt, input['safetySettings'])
+      payload['generationConfig'] ||= {}
+      payload['generationConfig']['temperature'] = temperature
+      payload
     end,
     build_image_payload: lambda do |input, connection|
       call('payload_for_analyze_image', input)  # Keep existing complex logic for now
@@ -3270,53 +3184,6 @@
       call('payload_for_find_neighbors', input)  # Keep existing logic
     end,
     # -- REMAINING PAYLOAD BUILDERS (for complex cases) --
-    payload_for_ai_classify: lambda do |connection, input|
-      # Extract categories and options
-      categories = Array(input['categories'] || [])
-      options = input['options'] || {}
-      temperature = (options['temperature'] || 0.1).to_f
-
-      # Build categories text with descriptions
-      categories_text = categories.map do |cat|
-        key = cat['key'].to_s
-        desc = cat['description'].to_s
-        desc.empty? ? key : "#{key}: #{desc}"
-      end.join("\n")
-
-      # Build instruction for AI classification
-      instruction = 'You are an expert text classifier. Classify the provided text into one of the given categories. ' \
-                    'Analyze the text carefully and select the most appropriate category. ' \
-                    'Return confidence scores and alternative classifications if requested. ' \
-                    'The categories and text are delimited by triple backticks.'
-
-      # Build the classification prompt
-      user_prompt = "Categories:\n```#{categories_text}```\n" \
-                    "Text to classify:\n```#{call('replace_backticks_with_hash', input['text']&.strip)}```\n\n"
-
-      # Add output format instructions
-      if options['return_confidence'] && options['return_alternatives']
-        user_prompt += 'Return a JSON object with: ' \
-                       '{"selected_category": "category_key", ' \
-                       '"confidence": 0.95, ' \
-                       '"alternatives": [{"category": "other_key", "confidence": 0.05}]}. ' \
-                       'Confidence scores should be between 0.0 and 1.0. ' \
-                       'Only respond with the JSON object.'
-      elsif options['return_confidence']
-        user_prompt += 'Return a JSON object with: ' \
-                       '{"selected_category": "category_key", "confidence": 0.95}. ' \
-                       'Confidence should be between 0.0 and 1.0. ' \
-                       'Only respond with the JSON object.'
-      else
-        user_prompt += 'Return a JSON object with: {"selected_category": "category_key"}. ' \
-                       'Only respond with the JSON object.'
-      end
-
-      # Build payload with temperature setting
-      payload = call('build_base_payload', instruction, user_prompt, input['safetySettings'])
-      payload['generationConfig'] ||= {}
-      payload['generationConfig']['temperature'] = temperature
-      payload
-    end,
     payload_for_analyze_image: lambda do |input|
       # We can't use the base builder since we have to pass image data in parts
       {

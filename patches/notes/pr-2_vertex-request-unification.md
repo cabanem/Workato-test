@@ -155,15 +155,6 @@ diff --git a/connector.rb b/connector.rb
 ## Commit message
 
 ```bash
-git commit -m "refactor(vertex): add runner + url helper; unify 5 actions on one codepath" \
-  -m "Why: 5 actions duplicated 'validate → build → url → call → extract' logic; unify for clarity and fewer failure modes." \
-  -m "What:" \
-  -m "- Add vertex_url_for(connection, model, verb=:generate|:predict)." \
-  -m "- Add run_vertex(connection, input, template, verb:, extract:) orchestration." \
-  -m "- Migrate translate/summarize/parse/draft_email/analyze_text to run_vertex." \
-  -m "- build_classify_payload: set temperature via generationConfig; no extra arg." \
-  -m "- Remove dead build_gemini_payload/payload_for_ai_classify (superseded by templates)." \
-  -m "Impact: behavior preserved; surface area smaller; easier to reason about failures." \
-  -m "Testing: compared outputs pre/post for all 5 actions; identical except for corrected typos."
+git commit -m "refactor(vertex): add runner + url helper; unify 5 actions on one codepath; Why: 5 actions duplicated 'validate → build → url → call → extract' logic; unify for clarity and fewer failure modes; What changed: - Add vertex_url_for(connection, model, verb=:generate|:predict). - Add run_vertex(connection, input, template, verb:, extract:) orchestration. - Migrate translate/summarize/parse/draft_email/analyze_text to run_vertex. - build_classify_payload: set temperature via generationConfig; no extra arg. - Remove dead build_gemini_payload/payload_for_ai_classify (superseded by templates).Impact: behavior preserved; surface area smaller; easier to reason about failures. Testing: compared outputs pre/post for all 5 actions; identical except for corrected typos."
 ```
 ---
