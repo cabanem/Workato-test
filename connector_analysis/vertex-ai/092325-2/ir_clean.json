@@ -1,0 +1,1683 @@
+{
+  "connector": {
+    "title": "Google Vertex AI",
+    "auth_modes": [
+      "oauth2",
+      "custom"
+    ]
+  },
+  "actions": [
+    {
+      "name": "send_messages",
+      "input_object_defs": [
+        "send_messages_input"
+      ],
+      "output_object_defs": [
+        "send_messages_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "send_message",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_publisher_model! → log_debug",
+          "run_vertex → validate_publisher_model! → HTTP:GET",
+          "run_vertex → build_ai_payload → get_ai_template → escape_triple_backticks",
+          "run_vertex → build_ai_payload → get_ai_template → json_only_instruction",
+          "run_vertex → build_ai_payload → process_ai_template → build_base_payload",
+          "run_vertex → vertex_url_for → project_region_path",
+          "run_vertex → rate_limited_ai_request → enforce_vertex_rate_limits",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → rate_limit_defaults",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → is_rate_limit_error → extract_http_status",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → calculate_retry_delay → extract_retry_after",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → log_debug",
+          "run_vertex → rate_limited_ai_request → api_request → HTTP:GET",
+          "run_vertex → extract_response → check_finish_reason",
+          "run_vertex → extract_response → get_safety_ratings",
+          "run_vertex → extract_response → standard_error_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "chat_role",
+        "function_call_mode",
+        "message_types",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "translate_text",
+      "input_object_defs": [
+        "translate_text_input"
+      ],
+      "output_object_defs": [
+        "translate_text_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "translate",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_publisher_model! → log_debug",
+          "run_vertex → validate_publisher_model! → HTTP:GET",
+          "run_vertex → build_ai_payload → get_ai_template → escape_triple_backticks",
+          "run_vertex → build_ai_payload → get_ai_template → json_only_instruction",
+          "run_vertex → build_ai_payload → process_ai_template → build_base_payload",
+          "run_vertex → vertex_url_for → project_region_path",
+          "run_vertex → rate_limited_ai_request → enforce_vertex_rate_limits",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → rate_limit_defaults",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → is_rate_limit_error → extract_http_status",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → calculate_retry_delay → extract_retry_after",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → log_debug",
+          "run_vertex → rate_limited_ai_request → api_request → HTTP:GET",
+          "run_vertex → extract_response → check_finish_reason",
+          "run_vertex → extract_response → get_safety_ratings",
+          "run_vertex → extract_response → standard_error_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "function_call_mode",
+        "languages_picklist",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "summarize_text",
+      "input_object_defs": [
+        "summarize_text_input"
+      ],
+      "output_object_defs": [
+        "summarize_text_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "summarize",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_publisher_model! → log_debug",
+          "run_vertex → validate_publisher_model! → HTTP:GET",
+          "run_vertex → build_ai_payload → get_ai_template → escape_triple_backticks",
+          "run_vertex → build_ai_payload → get_ai_template → json_only_instruction",
+          "run_vertex → build_ai_payload → process_ai_template → build_base_payload",
+          "run_vertex → vertex_url_for → project_region_path",
+          "run_vertex → rate_limited_ai_request → enforce_vertex_rate_limits",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → rate_limit_defaults",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → is_rate_limit_error → extract_http_status",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → calculate_retry_delay → extract_retry_after",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → log_debug",
+          "run_vertex → rate_limited_ai_request → api_request → HTTP:GET",
+          "run_vertex → extract_response → check_finish_reason",
+          "run_vertex → extract_response → get_safety_ratings",
+          "run_vertex → extract_response → standard_error_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "function_call_mode",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "parse_text",
+      "input_object_defs": [
+        "parse_text_input"
+      ],
+      "output_object_defs": [
+        "parse_text_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "parse",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_publisher_model! → log_debug",
+          "run_vertex → validate_publisher_model! → HTTP:GET",
+          "run_vertex → build_ai_payload → get_ai_template → escape_triple_backticks",
+          "run_vertex → build_ai_payload → get_ai_template → json_only_instruction",
+          "run_vertex → build_ai_payload → process_ai_template → build_base_payload",
+          "run_vertex → vertex_url_for → project_region_path",
+          "run_vertex → rate_limited_ai_request → enforce_vertex_rate_limits",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → rate_limit_defaults",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → is_rate_limit_error → extract_http_status",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → calculate_retry_delay → extract_retry_after",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → log_debug",
+          "run_vertex → rate_limited_ai_request → api_request → HTTP:GET",
+          "run_vertex → extract_response → check_finish_reason",
+          "run_vertex → extract_response → get_safety_ratings",
+          "run_vertex → extract_response → standard_error_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "function_call_mode",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "draft_email",
+      "input_object_defs": [
+        "draft_email_input"
+      ],
+      "output_object_defs": [
+        "draft_email_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "email",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_publisher_model! → log_debug",
+          "run_vertex → validate_publisher_model! → HTTP:GET",
+          "run_vertex → build_ai_payload → get_ai_template → escape_triple_backticks",
+          "run_vertex → build_ai_payload → get_ai_template → json_only_instruction",
+          "run_vertex → build_ai_payload → process_ai_template → build_base_payload",
+          "run_vertex → vertex_url_for → project_region_path",
+          "run_vertex → rate_limited_ai_request → enforce_vertex_rate_limits",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → rate_limit_defaults",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → is_rate_limit_error → extract_http_status",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → calculate_retry_delay → extract_retry_after",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → log_debug",
+          "run_vertex → rate_limited_ai_request → api_request → HTTP:GET",
+          "run_vertex → extract_response → check_finish_reason",
+          "run_vertex → extract_response → get_safety_ratings",
+          "run_vertex → extract_response → standard_error_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "function_call_mode",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "ai_classify",
+      "input_object_defs": [
+        "config_schema"
+      ],
+      "output_object_defs": [
+        "safety_rating_schema"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "ai_classify",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_publisher_model! → log_debug",
+          "run_vertex → validate_publisher_model! → HTTP:GET",
+          "run_vertex → build_ai_payload → get_ai_template → escape_triple_backticks",
+          "run_vertex → build_ai_payload → get_ai_template → json_only_instruction",
+          "run_vertex → build_ai_payload → process_ai_template → build_base_payload",
+          "run_vertex → vertex_url_for → project_region_path",
+          "run_vertex → rate_limited_ai_request → enforce_vertex_rate_limits",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → rate_limit_defaults",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → is_rate_limit_error → extract_http_status",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → calculate_retry_delay → extract_retry_after",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → log_debug",
+          "run_vertex → rate_limited_ai_request → api_request → HTTP:GET",
+          "run_vertex → extract_response → check_finish_reason",
+          "run_vertex → extract_response → get_safety_ratings",
+          "run_vertex → extract_response → standard_error_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "function_call_mode",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "analyze_text",
+      "input_object_defs": [
+        "analyze_text_input"
+      ],
+      "output_object_defs": [
+        "analyze_text_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "analyze",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_publisher_model! → log_debug",
+          "run_vertex → validate_publisher_model! → HTTP:GET",
+          "run_vertex → build_ai_payload → get_ai_template → escape_triple_backticks",
+          "run_vertex → build_ai_payload → get_ai_template → json_only_instruction",
+          "run_vertex → build_ai_payload → process_ai_template → build_base_payload",
+          "run_vertex → vertex_url_for → project_region_path",
+          "run_vertex → rate_limited_ai_request → enforce_vertex_rate_limits",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → rate_limit_defaults",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → is_rate_limit_error → extract_http_status",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → calculate_retry_delay → extract_retry_after",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → log_debug",
+          "run_vertex → rate_limited_ai_request → api_request → HTTP:GET",
+          "run_vertex → extract_response → check_finish_reason",
+          "run_vertex → extract_response → get_safety_ratings",
+          "run_vertex → extract_response → standard_error_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "function_call_mode",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "analyze_image",
+      "input_object_defs": [
+        "analyze_image_input"
+      ],
+      "output_object_defs": [
+        "analyze_image_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "analyze",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_publisher_model! → log_debug",
+          "run_vertex → validate_publisher_model! → HTTP:GET",
+          "run_vertex → build_ai_payload → get_ai_template → escape_triple_backticks",
+          "run_vertex → build_ai_payload → get_ai_template → json_only_instruction",
+          "run_vertex → build_ai_payload → process_ai_template → build_base_payload",
+          "run_vertex → vertex_url_for → project_region_path",
+          "run_vertex → rate_limited_ai_request → enforce_vertex_rate_limits",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → rate_limit_defaults",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → is_rate_limit_error → extract_http_status",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → calculate_retry_delay → extract_retry_after",
+          "run_vertex → rate_limited_ai_request → handle_429_with_backoff → log_debug",
+          "run_vertex → rate_limited_ai_request → api_request → HTTP:GET",
+          "run_vertex → extract_response → check_finish_reason",
+          "run_vertex → extract_response → get_safety_ratings",
+          "run_vertex → extract_response → standard_error_response"
+        ]
+      },
+      "picklists_used": [
+        "available_image_models",
+        "function_call_mode",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ],
+      "note": "Action 'analyze_image' uses template :analyze. Did you mean :analyze_image?",
+      "notes": [
+        "Action 'analyze_image' uses template :analyze. Did you mean :analyze_image?"
+      ]
+    },
+    {
+      "name": "generate_embeddings",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "method": "generate_embeddings_batch_exec",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "generate_embeddings_batch_exec → validate_publisher_model! → log_debug",
+          "generate_embeddings_batch_exec → validate_publisher_model! → HTTP:GET",
+          "generate_embeddings_batch_exec → vertex_url_for → project_region_path",
+          "generate_embeddings_batch_exec → process_embedding_batch → circuit_breaker_retry → rate_limit_defaults",
+          "generate_embeddings_batch_exec → process_embedding_batch → circuit_breaker_retry → get_circuit_state → HTTP:GET",
+          "generate_embeddings_batch_exec → process_embedding_batch → circuit_breaker_retry → check_circuit_status → log_debug",
+          "generate_embeddings_batch_exec → process_embedding_batch → circuit_breaker_retry → handle_circuit_success → update_circuit_state",
+          "generate_embeddings_batch_exec → process_embedding_batch → circuit_breaker_retry → handle_circuit_success → log_debug",
+          "generate_embeddings_batch_exec → process_embedding_batch → circuit_breaker_retry → should_retry_error → extract_http_status",
+          "generate_embeddings_batch_exec → process_embedding_batch → circuit_breaker_retry → calculate_backoff_delay",
+          "generate_embeddings_batch_exec → process_embedding_batch → circuit_breaker_retry → log_debug",
+          "generate_embeddings_batch_exec → process_embedding_batch → circuit_breaker_retry → handle_circuit_failure → should_open_circuit",
+          "generate_embeddings_batch_exec → process_embedding_batch → circuit_breaker_retry → handle_circuit_failure → log_debug",
+          "generate_embeddings_batch_exec → process_embedding_batch → build_embedding_instance",
+          "generate_embeddings_batch_exec → process_embedding_batch → rate_limited_ai_request → enforce_vertex_rate_limits",
+          "generate_embeddings_batch_exec → process_embedding_batch → rate_limited_ai_request → handle_429_with_backoff → rate_limit_defaults",
+          "generate_embeddings_batch_exec → process_embedding_batch → rate_limited_ai_request → handle_429_with_backoff → is_rate_limit_error → extract_http_status",
+          "generate_embeddings_batch_exec → process_embedding_batch → rate_limited_ai_request → handle_429_with_backoff → calculate_retry_delay → extract_retry_after",
+          "generate_embeddings_batch_exec → process_embedding_batch → rate_limited_ai_request → handle_429_with_backoff → log_debug",
+          "generate_embeddings_batch_exec → process_embedding_batch → rate_limited_ai_request → api_request → HTTP:GET",
+          "generate_embeddings_batch_exec → process_embedding_prediction → extract_embedding_values",
+          "generate_embeddings_batch_exec → estimate_token_count",
+          "generate_embeddings_batch_exec → should_stream_flush",
+          "generate_embeddings_batch_exec → log_debug"
+        ]
+      },
+      "picklists_used": [
+        "available_embedding_models",
+        "embedding_task_list"
+      ]
+    },
+    {
+      "name": "generate_embedding_single",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "method": "generate_embedding_single_exec",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "generate_embedding_single_exec → validate_publisher_model! → log_debug",
+          "generate_embedding_single_exec → validate_publisher_model! → HTTP:GET"
+        ]
+      },
+      "picklists_used": [
+        "available_embedding_models",
+        "embedding_task_list"
+      ]
+    },
+    {
+      "name": "find_neighbors",
+      "input_object_defs": [
+        "find_neighbors_input"
+      ],
+      "output_object_defs": [
+        "find_neighbors_output"
+      ],
+      "execute": {
+        "method": "api_request",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "build_ai_payload → get_ai_template → escape_triple_backticks",
+          "build_ai_payload → get_ai_template → json_only_instruction",
+          "build_ai_payload → process_ai_template → build_base_payload",
+          "normalize_host",
+          "api_request → HTTP:GET",
+          "handle_vertex_error",
+          "transform_find_neighbors_response → to_similarity → neighbors_max_distance",
+          "transform_find_neighbors_response → neighbors_max_distance"
+        ]
+      },
+      "picklists_used": [
+        "numeric_comparison_op"
+      ]
+    },
+    {
+      "name": "upsert_index_datapoints",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "method": "batch_upsert_datapoints",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "batch_upsert_datapoints → validate_index_access",
+          "batch_upsert_datapoints → process_datapoint_batch → build_upsert_payload → format_datapoint → validate_datapoint",
+          "batch_upsert_datapoints → process_datapoint_batch → build_upsert_payload → format_datapoint → format_restricts",
+          "batch_upsert_datapoints → process_datapoint_batch → api_request → HTTP:GET",
+          "batch_upsert_datapoints → process_datapoint_batch → handle_upsert_error → handle_vertex_error"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "test_connection",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "method": "init_test_results",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "init_test_results",
+          "run_service_test"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "get_prediction",
+      "input_object_defs": [
+        "get_prediction_input"
+      ],
+      "output_object_defs": [
+        "prediction"
+      ],
+      "execute": {
+        "method": "HTTP:POST",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "HTTP:POST"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "fetch_drive_file",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+        "drive_file_extended"
+      ],
+      "execute": {
+        "method": "extract_drive_file_id",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "extract_drive_file_id",
+          "fetch_drive_file_full → api_request → HTTP:GET",
+          "fetch_drive_file_full → drive_api_url",
+          "fetch_drive_file_full → drive_basic_fields",
+          "fetch_drive_file_full → handle_drive_error",
+          "fetch_drive_file_full → fetch_file_content"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "list_drive_files",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+        "drive_file_fields"
+      ],
+      "execute": {
+        "method": "extract_drive_file_id",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "extract_drive_file_id"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "batch_fetch_drive_files",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+        "drive_file_extended"
+      ],
+      "execute": {
+        "method": "extract_drive_file_id",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "extract_drive_file_id",
+          "fetch_drive_file_full → api_request → HTTP:GET",
+          "fetch_drive_file_full → drive_api_url",
+          "fetch_drive_file_full → drive_basic_fields",
+          "fetch_drive_file_full → handle_drive_error",
+          "fetch_drive_file_full → fetch_file_content"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "monitor_drive_changes",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "method": "extract_drive_file_id",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "extract_drive_file_id"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "name": "log_debug",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "rate_limit_defaults",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "oauth_scopes",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "vertex_rpm_limits",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "neighbors_max_distance",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "to_similarity",
+      "calls": [
+        "neighbors_max_distance"
+      ]
+    },
+    {
+      "name": "maybe_parse_json",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "strip_fences",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "escape_triple_backticks",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "project_region_path",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "vertex_host",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "vertex_base_url",
+      "calls": [
+        "vertex_host"
+      ]
+    },
+    {
+      "name": "vertex_api_url",
+      "calls": [
+        "vertex_base_url"
+      ]
+    },
+    {
+      "name": "drive_api_url",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "normalize_host",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "handle_vertex_error",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "api_request",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "vertex_request",
+      "calls": [
+        "vertex_api_url",
+        "api_request"
+      ]
+    },
+    {
+      "name": "drive_request",
+      "calls": [
+        "drive_api_url",
+        "handle_drive_error",
+        "api_request"
+      ]
+    },
+    {
+      "name": "handle_drive_error",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "enforce_vertex_rate_limits",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "extract_http_status",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "is_rate_limit_error",
+      "calls": [
+        "extract_http_status"
+      ]
+    },
+    {
+      "name": "extract_retry_after",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "calculate_retry_delay",
+      "calls": [
+        "extract_retry_after"
+      ]
+    },
+    {
+      "name": "handle_429_with_backoff",
+      "calls": [
+        "rate_limit_defaults",
+        "is_rate_limit_error",
+        "calculate_retry_delay",
+        "log_debug"
+      ]
+    },
+    {
+      "name": "get_circuit_state",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "update_circuit_state",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "should_open_circuit",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "check_circuit_status",
+      "calls": [
+        "log_debug"
+      ]
+    },
+    {
+      "name": "should_retry_error",
+      "calls": [
+        "extract_http_status"
+      ]
+    },
+    {
+      "name": "calculate_backoff_delay",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "handle_circuit_success",
+      "calls": [
+        "update_circuit_state",
+        "log_debug"
+      ]
+    },
+    {
+      "name": "handle_circuit_failure",
+      "calls": [
+        "should_open_circuit",
+        "log_debug"
+      ]
+    },
+    {
+      "name": "circuit_breaker_retry",
+      "calls": [
+        "rate_limit_defaults",
+        "get_circuit_state",
+        "check_circuit_status",
+        "handle_circuit_success",
+        "should_retry_error",
+        "calculate_backoff_delay",
+        "log_debug",
+        "handle_circuit_failure"
+      ]
+    },
+    {
+      "name": "rate_limited_ai_request",
+      "calls": [
+        "enforce_vertex_rate_limits",
+        "handle_429_with_backoff",
+        "api_request"
+      ]
+    },
+    {
+      "name": "vertex_model_bucket",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "sort_model_options",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "to_model_options",
+      "calls": [
+        "vertex_model_bucket"
+      ]
+    },
+    {
+      "name": "create_model_label",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "cascade_model_discovery",
+      "calls": [
+        "log_debug",
+        "fetch_fresh_publisher_models"
+      ]
+    },
+    {
+      "name": "get_static_model_list",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "fetch_fresh_publisher_models",
+      "calls": [
+        "log_debug",
+        "api_request"
+      ]
+    },
+    {
+      "name": "fetch_publisher_models",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "validate_publisher_model!",
+      "calls": [
+        "log_debug"
+      ]
+    },
+    {
+      "name": "error_handler",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "dynamic_model_picklist",
+      "calls": [
+        "log_debug"
+      ]
+    },
+    {
+      "name": "picklist_for",
+      "calls": [
+        "dynamic_model_picklist"
+      ]
+    },
+    {
+      "name": "static_model_options",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "build_base_payload",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "json_only_instruction",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "build_conversation_payload",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "build_message_parts",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "get_ai_template",
+      "calls": [
+        "escape_triple_backticks",
+        "json_only_instruction"
+      ]
+    },
+    {
+      "name": "process_ai_template",
+      "calls": [
+        "build_base_payload"
+      ]
+    },
+    {
+      "name": "build_ai_payload",
+      "calls": [
+        "get_ai_template",
+        "process_ai_template"
+      ]
+    },
+    {
+      "name": "build_classify_payload",
+      "calls": [
+        "escape_triple_backticks"
+      ]
+    },
+    {
+      "name": "payload_for_analyze_image",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "build_image_payload",
+      "calls": [
+        "payload_for_analyze_image"
+      ]
+    },
+    {
+      "name": "build_embedding_payload",
+      "calls": [
+        "payload_for_text_embedding"
+      ]
+    },
+    {
+      "name": "build_neighbors_payload",
+      "calls": [
+        "payload_for_find_neighbors"
+      ]
+    },
+    {
+      "name": "payload_for_find_neighbors",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "payload_for_text_embedding",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "vertex_url_for",
+      "calls": [
+        "project_region_path"
+      ]
+    },
+    {
+      "name": "run_vertex",
+      "calls": [
+        "validate_publisher_model!",
+        "build_ai_payload",
+        "vertex_url_for",
+        "rate_limited_ai_request",
+        "extract_response"
+      ]
+    },
+    {
+      "name": "extract_embedding_values",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "usage_meta",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "extract_json",
+      "calls": [
+        "strip_fences",
+        "log_debug"
+      ]
+    },
+    {
+      "name": "get_safety_ratings",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "check_finish_reason",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "standard_error_response",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "extract_response",
+      "calls": [
+        "check_finish_reason",
+        "get_safety_ratings",
+        "standard_error_response"
+      ]
+    },
+    {
+      "name": "drive_basic_fields",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "extract_drive_file_id",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "get_export_mime_type",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "build_drive_query",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "classify_drive_change",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "fetch_file_content",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "fetch_drive_file_full",
+      "calls": [
+        "api_request",
+        "drive_api_url",
+        "drive_basic_fields",
+        "handle_drive_error",
+        "fetch_file_content"
+      ]
+    },
+    {
+      "name": "probe_vertex_ai",
+      "calls": [
+        "api_request",
+        "project_region_path"
+      ]
+    },
+    {
+      "name": "probe_drive",
+      "calls": [
+        "api_request",
+        "drive_api_url",
+        "handle_drive_error"
+      ]
+    },
+    {
+      "name": "probe_index",
+      "calls": [
+        "validate_index_access"
+      ]
+    },
+    {
+      "name": "transform_find_neighbors_response",
+      "calls": [
+        "to_similarity",
+        "neighbors_max_distance"
+      ]
+    },
+    {
+      "name": "validate_index_access",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "validate_datapoint",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "format_datapoint",
+      "calls": [
+        "validate_datapoint",
+        "format_restricts"
+      ]
+    },
+    {
+      "name": "format_restricts",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "build_upsert_payload",
+      "calls": [
+        "format_datapoint"
+      ]
+    },
+    {
+      "name": "handle_upsert_error",
+      "calls": [
+        "handle_vertex_error"
+      ]
+    },
+    {
+      "name": "process_datapoint_batch",
+      "calls": [
+        "build_upsert_payload",
+        "api_request",
+        "handle_upsert_error"
+      ]
+    },
+    {
+      "name": "batch_upsert_datapoints",
+      "calls": [
+        "validate_index_access",
+        "process_datapoint_batch"
+      ]
+    },
+    {
+      "name": "build_embedding_instance",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "process_embedding_prediction",
+      "calls": [
+        "extract_embedding_values"
+      ]
+    },
+    {
+      "name": "estimate_token_count",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "process_embedding_batch",
+      "calls": [
+        "circuit_breaker_retry",
+        "build_embedding_instance",
+        "rate_limited_ai_request"
+      ]
+    },
+    {
+      "name": "should_stream_flush",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "generate_embeddings_batch_exec",
+      "calls": [
+        "validate_publisher_model!",
+        "vertex_url_for",
+        "process_embedding_batch",
+        "process_embedding_prediction",
+        "estimate_token_count",
+        "should_stream_flush",
+        "log_debug"
+      ]
+    },
+    {
+      "name": "generate_embedding_single_exec",
+      "calls": [
+        "validate_publisher_model!"
+      ]
+    },
+    {
+      "name": "sample_record_output",
+      "calls": [
+        "safety_ratings_output_sample",
+        "usage_output_sample"
+      ]
+    },
+    {
+      "name": "safety_ratings_output_sample",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "usage_output_sample",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "format_parse_sample",
+      "calls": [
+        "format_parse_sample"
+      ]
+    }
+  ],
+  "object_definitions": [
+    {
+      "name": "text_input_field",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "drive_file_fields",
+      "used_by_actions": [
+        "list_drive_files"
+      ],
+      "used_by_objects": [
+        "drive_file_extended"
+      ]
+    },
+    {
+      "name": "drive_file_extended",
+      "used_by_actions": [
+        "batch_fetch_drive_files",
+        "fetch_drive_file"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "safety_and_usage",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "analyze_image_output",
+        "analyze_text_output",
+        "draft_email_output",
+        "summarize_text_output",
+        "translate_text_output"
+      ]
+    },
+    {
+      "name": "prediction",
+      "used_by_actions": [
+        "get_prediction"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "get_prediction_input",
+      "used_by_actions": [
+        "get_prediction"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "config_schema",
+      "used_by_actions": [
+        "ai_classify"
+      ],
+      "used_by_objects": [
+        "analyze_image_input",
+        "analyze_text_input",
+        "draft_email_input",
+        "parse_text_input",
+        "send_messages_input",
+        "summarize_text_input",
+        "translate_text_input"
+      ]
+    },
+    {
+      "name": "send_messages_input",
+      "used_by_actions": [
+        "send_messages"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "send_messages_output",
+      "used_by_actions": [
+        "send_messages"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "translate_text_input",
+      "used_by_actions": [
+        "translate_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "translate_text_output",
+      "used_by_actions": [
+        "translate_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "summarize_text_input",
+      "used_by_actions": [
+        "summarize_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "summarize_text_output",
+      "used_by_actions": [
+        "summarize_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "parse_text_input",
+      "used_by_actions": [
+        "parse_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "parse_text_output",
+      "used_by_actions": [
+        "parse_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "draft_email_input",
+      "used_by_actions": [
+        "draft_email"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "draft_email_output",
+      "used_by_actions": [
+        "draft_email"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "analyze_text_input",
+      "used_by_actions": [
+        "analyze_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "analyze_text_output",
+      "used_by_actions": [
+        "analyze_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "analyze_image_input",
+      "used_by_actions": [
+        "analyze_image"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "analyze_image_output",
+      "used_by_actions": [
+        "analyze_image"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "find_neighbors_input",
+      "used_by_actions": [
+        "find_neighbors"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "find_neighbors_output",
+      "used_by_actions": [
+        "find_neighbors"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "safety_rating_schema",
+      "used_by_actions": [
+        "ai_classify"
+      ],
+      "used_by_objects": [
+        "parse_text_output",
+        "safety_and_usage"
+      ]
+    },
+    {
+      "name": "usage_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "parse_text_output",
+        "safety_and_usage"
+      ]
+    },
+    {
+      "name": "text_model_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "analyze_text_input",
+        "draft_email_input",
+        "parse_text_input",
+        "send_messages_input",
+        "summarize_text_input",
+        "translate_text_input"
+      ]
+    }
+  ],
+  "pick_lists": [
+    {
+      "name": "available_text_models",
+      "used_by_objects": [
+        "text_model_schema"
+      ],
+      "used_by_actions": [
+        "ai_classify",
+        "analyze_text",
+        "draft_email",
+        "parse_text",
+        "send_messages",
+        "summarize_text",
+        "translate_text"
+      ]
+    },
+    {
+      "name": "available_image_models",
+      "used_by_objects": [
+        "analyze_image_input"
+      ],
+      "used_by_actions": [
+        "analyze_image"
+      ]
+    },
+    {
+      "name": "available_embedding_models",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+        "generate_embedding_single",
+        "generate_embeddings"
+      ]
+    },
+    {
+      "name": "message_types",
+      "used_by_objects": [
+        "send_messages_input"
+      ],
+      "used_by_actions": [
+        "send_messages"
+      ]
+    },
+    {
+      "name": "numeric_comparison_op",
+      "used_by_objects": [
+        "find_neighbors_input"
+      ],
+      "used_by_actions": [
+        "find_neighbors"
+      ]
+    },
+    {
+      "name": "safety_categories",
+      "used_by_objects": [
+        "config_schema"
+      ],
+      "used_by_actions": [
+        "ai_classify",
+        "analyze_image",
+        "analyze_text",
+        "draft_email",
+        "parse_text",
+        "send_messages",
+        "summarize_text",
+        "translate_text"
+      ]
+    },
+    {
+      "name": "safety_threshold",
+      "used_by_objects": [
+        "config_schema"
+      ],
+      "used_by_actions": [
+        "ai_classify",
+        "analyze_image",
+        "analyze_text",
+        "draft_email",
+        "parse_text",
+        "send_messages",
+        "summarize_text",
+        "translate_text"
+      ]
+    },
+    {
+      "name": "safety_method",
+      "used_by_objects": [
+        "config_schema"
+      ],
+      "used_by_actions": [
+        "ai_classify",
+        "analyze_image",
+        "analyze_text",
+        "draft_email",
+        "parse_text",
+        "send_messages",
+        "summarize_text",
+        "translate_text"
+      ]
+    },
+    {
+      "name": "response_type",
+      "used_by_objects": [
+        "config_schema"
+      ],
+      "used_by_actions": [
+        "ai_classify",
+        "analyze_image",
+        "analyze_text",
+        "draft_email",
+        "parse_text",
+        "send_messages",
+        "summarize_text",
+        "translate_text"
+      ]
+    },
+    {
+      "name": "chat_role",
+      "used_by_objects": [
+        "send_messages_input"
+      ],
+      "used_by_actions": [
+        "send_messages"
+      ]
+    },
+    {
+      "name": "function_call_mode",
+      "used_by_objects": [
+        "config_schema"
+      ],
+      "used_by_actions": [
+        "ai_classify",
+        "analyze_image",
+        "analyze_text",
+        "draft_email",
+        "parse_text",
+        "send_messages",
+        "summarize_text",
+        "translate_text"
+      ]
+    },
+    {
+      "name": "languages_picklist",
+      "used_by_objects": [
+        "translate_text_input"
+      ],
+      "used_by_actions": [
+        "translate_text"
+      ]
+    },
+    {
+      "name": "embedding_task_list",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+        "generate_embedding_single",
+        "generate_embeddings"
+      ]
+    }
+  ]
+}

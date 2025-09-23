@@ -1811,9 +1811,7 @@
   },
 
   methods: {
-
     # ======= LEAF DEPENDENCIES =======
-    # These methods are used by multiple actions and triggers above.
     log_debug: lambda { |msg| puts(msg) },
     rate_limit_defaults: lambda { { 'max_retries' => 3, 'base_delay' => 1.0, 'max_delay' => 30.0 } },
     oauth_scopes: lambda do
@@ -1844,7 +1842,6 @@
     escape_triple_backticks: lambda { |text| text&.gsub('```', '####') },
 
     # ======= URL AND PATH BUILDERS =======
-
     # # String builders; everything that hits HTTP should depend on these.
     project_region_path: lambda do |connection|
       "projects/#{connection['project']}/locations/#{connection['region']}"

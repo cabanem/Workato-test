@@ -1,0 +1,1826 @@
+{
+  "nodes": [
+    "execute:send_messages",
+    "run_vertex",
+    "execute:translate_text",
+    "execute:summarize_text",
+    "execute:parse_text",
+    "execute:draft_email",
+    "execute:ai_classify",
+    "execute:analyze_text",
+    "execute:analyze_image",
+    "execute:generate_embeddings",
+    "generate_embeddings_batch_exec",
+    "execute:generate_embedding_single",
+    "generate_embedding_single_exec",
+    "execute:find_neighbors",
+    "build_ai_payload",
+    "normalize_host",
+    "api_request",
+    "handle_vertex_error",
+    "transform_find_neighbors_response",
+    "execute:upsert_index_datapoints",
+    "batch_upsert_datapoints",
+    "execute:test_connection",
+    "init_test_results",
+    "run_service_test",
+    "execute:get_prediction",
+    "HTTP:POST",
+    "execute:fetch_drive_file",
+    "extract_drive_file_id",
+    "fetch_drive_file_full",
+    "execute:list_drive_files",
+    "execute:batch_fetch_drive_files",
+    "execute:monitor_drive_changes",
+    "log_debug",
+    "rate_limit_defaults",
+    "oauth_scopes",
+    "vertex_rpm_limits",
+    "neighbors_max_distance",
+    "to_similarity",
+    "maybe_parse_json",
+    "strip_fences",
+    "escape_triple_backticks",
+    "project_region_path",
+    "vertex_host",
+    "vertex_base_url",
+    "vertex_api_url",
+    "drive_api_url",
+    "HTTP:GET",
+    "vertex_request",
+    "drive_request",
+    "handle_drive_error",
+    "HTTP:DELETE",
+    "enforce_vertex_rate_limits",
+    "extract_http_status",
+    "is_rate_limit_error",
+    "extract_retry_after",
+    "calculate_retry_delay",
+    "handle_429_with_backoff",
+    "get_circuit_state",
+    "update_circuit_state",
+    "should_open_circuit",
+    "check_circuit_status",
+    "should_retry_error",
+    "calculate_backoff_delay",
+    "handle_circuit_success",
+    "handle_circuit_failure",
+    "circuit_breaker_retry",
+    "rate_limited_ai_request",
+    "vertex_model_bucket",
+    "sort_model_options",
+    "to_model_options",
+    "create_model_label",
+    "cascade_model_discovery",
+    "fetch_fresh_publisher_models",
+    "get_static_model_list",
+    "fetch_publisher_models",
+    "validate_publisher_model!",
+    "error_handler",
+    "dynamic_model_picklist",
+    "picklist_for",
+    "static_model_options",
+    "build_base_payload",
+    "json_only_instruction",
+    "build_conversation_payload",
+    "build_message_parts",
+    "get_ai_template",
+    "process_ai_template",
+    "build_classify_payload",
+    "payload_for_analyze_image",
+    "build_image_payload",
+    "build_embedding_payload",
+    "payload_for_text_embedding",
+    "build_neighbors_payload",
+    "payload_for_find_neighbors",
+    "vertex_url_for",
+    "extract_response",
+    "extract_embedding_values",
+    "usage_meta",
+    "extract_json",
+    "get_safety_ratings",
+    "check_finish_reason",
+    "standard_error_response",
+    "drive_basic_fields",
+    "get_export_mime_type",
+    "build_drive_query",
+    "classify_drive_change",
+    "fetch_file_content",
+    "probe_vertex_ai",
+    "probe_drive",
+    "probe_index",
+    "validate_index_access",
+    "validate_datapoint",
+    "format_datapoint",
+    "format_restricts",
+    "build_upsert_payload",
+    "handle_upsert_error",
+    "process_datapoint_batch",
+    "build_embedding_instance",
+    "process_embedding_prediction",
+    "estimate_token_count",
+    "process_embedding_batch",
+    "should_stream_flush",
+    "sample_record_output",
+    "safety_ratings_output_sample",
+    "usage_output_sample",
+    "format_parse_sample",
+    "top:test"
+  ],
+  "edges": [
+    {
+      "from": "execute:send_messages",
+      "to": "run_vertex"
+    },
+    {
+      "from": "execute:translate_text",
+      "to": "run_vertex"
+    },
+    {
+      "from": "execute:summarize_text",
+      "to": "run_vertex"
+    },
+    {
+      "from": "execute:parse_text",
+      "to": "run_vertex"
+    },
+    {
+      "from": "execute:draft_email",
+      "to": "run_vertex"
+    },
+    {
+      "from": "execute:ai_classify",
+      "to": "run_vertex"
+    },
+    {
+      "from": "execute:analyze_text",
+      "to": "run_vertex"
+    },
+    {
+      "from": "execute:analyze_image",
+      "to": "run_vertex"
+    },
+    {
+      "from": "execute:generate_embeddings",
+      "to": "generate_embeddings_batch_exec"
+    },
+    {
+      "from": "execute:generate_embedding_single",
+      "to": "generate_embedding_single_exec"
+    },
+    {
+      "from": "execute:find_neighbors",
+      "to": "build_ai_payload"
+    },
+    {
+      "from": "execute:find_neighbors",
+      "to": "normalize_host"
+    },
+    {
+      "from": "execute:find_neighbors",
+      "to": "api_request"
+    },
+    {
+      "from": "execute:find_neighbors",
+      "to": "handle_vertex_error"
+    },
+    {
+      "from": "execute:find_neighbors",
+      "to": "transform_find_neighbors_response"
+    },
+    {
+      "from": "execute:upsert_index_datapoints",
+      "to": "batch_upsert_datapoints"
+    },
+    {
+      "from": "execute:test_connection",
+      "to": "init_test_results"
+    },
+    {
+      "from": "execute:test_connection",
+      "to": "run_service_test"
+    },
+    {
+      "from": "execute:get_prediction",
+      "to": "HTTP:POST"
+    },
+    {
+      "from": "execute:fetch_drive_file",
+      "to": "extract_drive_file_id"
+    },
+    {
+      "from": "execute:fetch_drive_file",
+      "to": "fetch_drive_file_full"
+    },
+    {
+      "from": "execute:list_drive_files",
+      "to": "extract_drive_file_id"
+    },
+    {
+      "from": "execute:batch_fetch_drive_files",
+      "to": "extract_drive_file_id"
+    },
+    {
+      "from": "execute:batch_fetch_drive_files",
+      "to": "fetch_drive_file_full"
+    },
+    {
+      "from": "execute:monitor_drive_changes",
+      "to": "extract_drive_file_id"
+    },
+    {
+      "from": "to_similarity",
+      "to": "neighbors_max_distance"
+    },
+    {
+      "from": "vertex_base_url",
+      "to": "vertex_host"
+    },
+    {
+      "from": "vertex_api_url",
+      "to": "vertex_base_url"
+    },
+    {
+      "from": "api_request",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "vertex_request",
+      "to": "vertex_api_url"
+    },
+    {
+      "from": "vertex_request",
+      "to": "api_request"
+    },
+    {
+      "from": "drive_request",
+      "to": "drive_api_url"
+    },
+    {
+      "from": "drive_request",
+      "to": "handle_drive_error"
+    },
+    {
+      "from": "drive_request",
+      "to": "api_request"
+    },
+    {
+      "from": "drive_request",
+      "to": "HTTP:DELETE"
+    },
+    {
+      "from": "is_rate_limit_error",
+      "to": "extract_http_status"
+    },
+    {
+      "from": "calculate_retry_delay",
+      "to": "extract_retry_after"
+    },
+    {
+      "from": "handle_429_with_backoff",
+      "to": "rate_limit_defaults"
+    },
+    {
+      "from": "handle_429_with_backoff",
+      "to": "is_rate_limit_error"
+    },
+    {
+      "from": "handle_429_with_backoff",
+      "to": "calculate_retry_delay"
+    },
+    {
+      "from": "handle_429_with_backoff",
+      "to": "log_debug"
+    },
+    {
+      "from": "get_circuit_state",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "check_circuit_status",
+      "to": "log_debug"
+    },
+    {
+      "from": "should_retry_error",
+      "to": "extract_http_status"
+    },
+    {
+      "from": "handle_circuit_success",
+      "to": "update_circuit_state"
+    },
+    {
+      "from": "handle_circuit_success",
+      "to": "log_debug"
+    },
+    {
+      "from": "handle_circuit_failure",
+      "to": "should_open_circuit"
+    },
+    {
+      "from": "handle_circuit_failure",
+      "to": "log_debug"
+    },
+    {
+      "from": "circuit_breaker_retry",
+      "to": "rate_limit_defaults"
+    },
+    {
+      "from": "circuit_breaker_retry",
+      "to": "get_circuit_state"
+    },
+    {
+      "from": "circuit_breaker_retry",
+      "to": "check_circuit_status"
+    },
+    {
+      "from": "circuit_breaker_retry",
+      "to": "handle_circuit_success"
+    },
+    {
+      "from": "circuit_breaker_retry",
+      "to": "should_retry_error"
+    },
+    {
+      "from": "circuit_breaker_retry",
+      "to": "calculate_backoff_delay"
+    },
+    {
+      "from": "circuit_breaker_retry",
+      "to": "log_debug"
+    },
+    {
+      "from": "circuit_breaker_retry",
+      "to": "handle_circuit_failure"
+    },
+    {
+      "from": "rate_limited_ai_request",
+      "to": "enforce_vertex_rate_limits"
+    },
+    {
+      "from": "rate_limited_ai_request",
+      "to": "handle_429_with_backoff"
+    },
+    {
+      "from": "rate_limited_ai_request",
+      "to": "api_request"
+    },
+    {
+      "from": "to_model_options",
+      "to": "vertex_model_bucket"
+    },
+    {
+      "from": "cascade_model_discovery",
+      "to": "log_debug"
+    },
+    {
+      "from": "cascade_model_discovery",
+      "to": "fetch_fresh_publisher_models"
+    },
+    {
+      "from": "fetch_fresh_publisher_models",
+      "to": "log_debug"
+    },
+    {
+      "from": "fetch_fresh_publisher_models",
+      "to": "api_request"
+    },
+    {
+      "from": "fetch_publisher_models",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "validate_publisher_model!",
+      "to": "log_debug"
+    },
+    {
+      "from": "validate_publisher_model!",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "dynamic_model_picklist",
+      "to": "log_debug"
+    },
+    {
+      "from": "picklist_for",
+      "to": "dynamic_model_picklist"
+    },
+    {
+      "from": "get_ai_template",
+      "to": "escape_triple_backticks"
+    },
+    {
+      "from": "get_ai_template",
+      "to": "json_only_instruction"
+    },
+    {
+      "from": "process_ai_template",
+      "to": "build_base_payload"
+    },
+    {
+      "from": "build_ai_payload",
+      "to": "get_ai_template"
+    },
+    {
+      "from": "build_ai_payload",
+      "to": "process_ai_template"
+    },
+    {
+      "from": "build_classify_payload",
+      "to": "escape_triple_backticks"
+    },
+    {
+      "from": "build_image_payload",
+      "to": "payload_for_analyze_image"
+    },
+    {
+      "from": "build_embedding_payload",
+      "to": "payload_for_text_embedding"
+    },
+    {
+      "from": "build_neighbors_payload",
+      "to": "payload_for_find_neighbors"
+    },
+    {
+      "from": "vertex_url_for",
+      "to": "project_region_path"
+    },
+    {
+      "from": "run_vertex",
+      "to": "validate_publisher_model!"
+    },
+    {
+      "from": "run_vertex",
+      "to": "build_ai_payload"
+    },
+    {
+      "from": "run_vertex",
+      "to": "vertex_url_for"
+    },
+    {
+      "from": "run_vertex",
+      "to": "rate_limited_ai_request"
+    },
+    {
+      "from": "run_vertex",
+      "to": "extract_response"
+    },
+    {
+      "from": "extract_json",
+      "to": "strip_fences"
+    },
+    {
+      "from": "extract_json",
+      "to": "log_debug"
+    },
+    {
+      "from": "extract_response",
+      "to": "check_finish_reason"
+    },
+    {
+      "from": "extract_response",
+      "to": "get_safety_ratings"
+    },
+    {
+      "from": "extract_response",
+      "to": "standard_error_response"
+    },
+    {
+      "from": "fetch_drive_file_full",
+      "to": "api_request"
+    },
+    {
+      "from": "fetch_drive_file_full",
+      "to": "drive_api_url"
+    },
+    {
+      "from": "fetch_drive_file_full",
+      "to": "drive_basic_fields"
+    },
+    {
+      "from": "fetch_drive_file_full",
+      "to": "handle_drive_error"
+    },
+    {
+      "from": "fetch_drive_file_full",
+      "to": "fetch_file_content"
+    },
+    {
+      "from": "probe_vertex_ai",
+      "to": "api_request"
+    },
+    {
+      "from": "probe_vertex_ai",
+      "to": "project_region_path"
+    },
+    {
+      "from": "probe_drive",
+      "to": "api_request"
+    },
+    {
+      "from": "probe_drive",
+      "to": "drive_api_url"
+    },
+    {
+      "from": "probe_drive",
+      "to": "handle_drive_error"
+    },
+    {
+      "from": "probe_index",
+      "to": "validate_index_access"
+    },
+    {
+      "from": "transform_find_neighbors_response",
+      "to": "to_similarity"
+    },
+    {
+      "from": "transform_find_neighbors_response",
+      "to": "neighbors_max_distance"
+    },
+    {
+      "from": "format_datapoint",
+      "to": "validate_datapoint"
+    },
+    {
+      "from": "format_datapoint",
+      "to": "format_restricts"
+    },
+    {
+      "from": "build_upsert_payload",
+      "to": "format_datapoint"
+    },
+    {
+      "from": "handle_upsert_error",
+      "to": "handle_vertex_error"
+    },
+    {
+      "from": "process_datapoint_batch",
+      "to": "build_upsert_payload"
+    },
+    {
+      "from": "process_datapoint_batch",
+      "to": "api_request"
+    },
+    {
+      "from": "process_datapoint_batch",
+      "to": "handle_upsert_error"
+    },
+    {
+      "from": "batch_upsert_datapoints",
+      "to": "validate_index_access"
+    },
+    {
+      "from": "batch_upsert_datapoints",
+      "to": "process_datapoint_batch"
+    },
+    {
+      "from": "process_embedding_prediction",
+      "to": "extract_embedding_values"
+    },
+    {
+      "from": "process_embedding_batch",
+      "to": "circuit_breaker_retry"
+    },
+    {
+      "from": "process_embedding_batch",
+      "to": "build_embedding_instance"
+    },
+    {
+      "from": "process_embedding_batch",
+      "to": "rate_limited_ai_request"
+    },
+    {
+      "from": "generate_embeddings_batch_exec",
+      "to": "validate_publisher_model!"
+    },
+    {
+      "from": "generate_embeddings_batch_exec",
+      "to": "vertex_url_for"
+    },
+    {
+      "from": "generate_embeddings_batch_exec",
+      "to": "process_embedding_batch"
+    },
+    {
+      "from": "generate_embeddings_batch_exec",
+      "to": "process_embedding_prediction"
+    },
+    {
+      "from": "generate_embeddings_batch_exec",
+      "to": "estimate_token_count"
+    },
+    {
+      "from": "generate_embeddings_batch_exec",
+      "to": "should_stream_flush"
+    },
+    {
+      "from": "generate_embeddings_batch_exec",
+      "to": "log_debug"
+    },
+    {
+      "from": "generate_embedding_single_exec",
+      "to": "validate_publisher_model!"
+    },
+    {
+      "from": "sample_record_output",
+      "to": "safety_ratings_output_sample"
+    },
+    {
+      "from": "sample_record_output",
+      "to": "usage_output_sample"
+    },
+    {
+      "from": "format_parse_sample",
+      "to": "format_parse_sample"
+    },
+    {
+      "from": "top:test",
+      "to": "api_request"
+    },
+    {
+      "from": "top:test",
+      "to": "project_region_path"
+    },
+    {
+      "from": "top:test",
+      "to": "probe_drive"
+    }
+  ],
+  "paths": {
+    "send_messages": [
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "validate_publisher_model!",
+        "log_debug"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "validate_publisher_model!",
+        "HTTP:GET"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "escape_triple_backticks"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "json_only_instruction"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "build_ai_payload",
+        "process_ai_template",
+        "build_base_payload"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "vertex_url_for",
+        "project_region_path"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "enforce_vertex_rate_limits"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "rate_limit_defaults"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "is_rate_limit_error",
+        "extract_http_status"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "calculate_retry_delay",
+        "extract_retry_after"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "log_debug"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "extract_response",
+        "check_finish_reason"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "extract_response",
+        "get_safety_ratings"
+      ],
+      [
+        "execute:send_messages",
+        "run_vertex",
+        "extract_response",
+        "standard_error_response"
+      ]
+    ],
+    "translate_text": [
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "validate_publisher_model!",
+        "log_debug"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "validate_publisher_model!",
+        "HTTP:GET"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "escape_triple_backticks"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "json_only_instruction"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "build_ai_payload",
+        "process_ai_template",
+        "build_base_payload"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "vertex_url_for",
+        "project_region_path"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "enforce_vertex_rate_limits"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "rate_limit_defaults"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "is_rate_limit_error",
+        "extract_http_status"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "calculate_retry_delay",
+        "extract_retry_after"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "log_debug"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "extract_response",
+        "check_finish_reason"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "extract_response",
+        "get_safety_ratings"
+      ],
+      [
+        "execute:translate_text",
+        "run_vertex",
+        "extract_response",
+        "standard_error_response"
+      ]
+    ],
+    "summarize_text": [
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "validate_publisher_model!",
+        "log_debug"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "validate_publisher_model!",
+        "HTTP:GET"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "escape_triple_backticks"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "json_only_instruction"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "build_ai_payload",
+        "process_ai_template",
+        "build_base_payload"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "vertex_url_for",
+        "project_region_path"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "enforce_vertex_rate_limits"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "rate_limit_defaults"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "is_rate_limit_error",
+        "extract_http_status"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "calculate_retry_delay",
+        "extract_retry_after"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "log_debug"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "extract_response",
+        "check_finish_reason"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "extract_response",
+        "get_safety_ratings"
+      ],
+      [
+        "execute:summarize_text",
+        "run_vertex",
+        "extract_response",
+        "standard_error_response"
+      ]
+    ],
+    "parse_text": [
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "validate_publisher_model!",
+        "log_debug"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "validate_publisher_model!",
+        "HTTP:GET"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "escape_triple_backticks"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "json_only_instruction"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "build_ai_payload",
+        "process_ai_template",
+        "build_base_payload"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "vertex_url_for",
+        "project_region_path"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "enforce_vertex_rate_limits"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "rate_limit_defaults"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "is_rate_limit_error",
+        "extract_http_status"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "calculate_retry_delay",
+        "extract_retry_after"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "log_debug"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "extract_response",
+        "check_finish_reason"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "extract_response",
+        "get_safety_ratings"
+      ],
+      [
+        "execute:parse_text",
+        "run_vertex",
+        "extract_response",
+        "standard_error_response"
+      ]
+    ],
+    "draft_email": [
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "validate_publisher_model!",
+        "log_debug"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "validate_publisher_model!",
+        "HTTP:GET"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "escape_triple_backticks"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "json_only_instruction"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "build_ai_payload",
+        "process_ai_template",
+        "build_base_payload"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "vertex_url_for",
+        "project_region_path"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "enforce_vertex_rate_limits"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "rate_limit_defaults"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "is_rate_limit_error",
+        "extract_http_status"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "calculate_retry_delay",
+        "extract_retry_after"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "log_debug"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "extract_response",
+        "check_finish_reason"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "extract_response",
+        "get_safety_ratings"
+      ],
+      [
+        "execute:draft_email",
+        "run_vertex",
+        "extract_response",
+        "standard_error_response"
+      ]
+    ],
+    "ai_classify": [
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "validate_publisher_model!",
+        "log_debug"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "validate_publisher_model!",
+        "HTTP:GET"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "escape_triple_backticks"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "json_only_instruction"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "build_ai_payload",
+        "process_ai_template",
+        "build_base_payload"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "vertex_url_for",
+        "project_region_path"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "enforce_vertex_rate_limits"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "rate_limit_defaults"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "is_rate_limit_error",
+        "extract_http_status"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "calculate_retry_delay",
+        "extract_retry_after"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "log_debug"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "extract_response",
+        "check_finish_reason"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "extract_response",
+        "get_safety_ratings"
+      ],
+      [
+        "execute:ai_classify",
+        "run_vertex",
+        "extract_response",
+        "standard_error_response"
+      ]
+    ],
+    "analyze_text": [
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "validate_publisher_model!",
+        "log_debug"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "validate_publisher_model!",
+        "HTTP:GET"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "escape_triple_backticks"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "json_only_instruction"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "build_ai_payload",
+        "process_ai_template",
+        "build_base_payload"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "vertex_url_for",
+        "project_region_path"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "enforce_vertex_rate_limits"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "rate_limit_defaults"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "is_rate_limit_error",
+        "extract_http_status"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "calculate_retry_delay",
+        "extract_retry_after"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "log_debug"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "extract_response",
+        "check_finish_reason"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "extract_response",
+        "get_safety_ratings"
+      ],
+      [
+        "execute:analyze_text",
+        "run_vertex",
+        "extract_response",
+        "standard_error_response"
+      ]
+    ],
+    "analyze_image": [
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "validate_publisher_model!",
+        "log_debug"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "validate_publisher_model!",
+        "HTTP:GET"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "escape_triple_backticks"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "build_ai_payload",
+        "get_ai_template",
+        "json_only_instruction"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "build_ai_payload",
+        "process_ai_template",
+        "build_base_payload"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "vertex_url_for",
+        "project_region_path"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "enforce_vertex_rate_limits"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "rate_limit_defaults"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "is_rate_limit_error",
+        "extract_http_status"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "calculate_retry_delay",
+        "extract_retry_after"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "log_debug"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "rate_limited_ai_request",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "extract_response",
+        "check_finish_reason"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "extract_response",
+        "get_safety_ratings"
+      ],
+      [
+        "execute:analyze_image",
+        "run_vertex",
+        "extract_response",
+        "standard_error_response"
+      ]
+    ],
+    "generate_embeddings": [
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "validate_publisher_model!",
+        "log_debug"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "validate_publisher_model!",
+        "HTTP:GET"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "vertex_url_for",
+        "project_region_path"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "circuit_breaker_retry",
+        "rate_limit_defaults"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "circuit_breaker_retry",
+        "get_circuit_state",
+        "HTTP:GET"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "circuit_breaker_retry",
+        "check_circuit_status",
+        "log_debug"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "circuit_breaker_retry",
+        "handle_circuit_success",
+        "update_circuit_state"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "circuit_breaker_retry",
+        "handle_circuit_success",
+        "log_debug"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "circuit_breaker_retry",
+        "should_retry_error",
+        "extract_http_status"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "circuit_breaker_retry",
+        "calculate_backoff_delay"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "circuit_breaker_retry",
+        "log_debug"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "circuit_breaker_retry",
+        "handle_circuit_failure",
+        "should_open_circuit"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "circuit_breaker_retry",
+        "handle_circuit_failure",
+        "log_debug"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "build_embedding_instance"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "rate_limited_ai_request",
+        "enforce_vertex_rate_limits"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "rate_limit_defaults"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "is_rate_limit_error",
+        "extract_http_status"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "calculate_retry_delay",
+        "extract_retry_after"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "rate_limited_ai_request",
+        "handle_429_with_backoff",
+        "log_debug"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_batch",
+        "rate_limited_ai_request",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "process_embedding_prediction",
+        "extract_embedding_values"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "estimate_token_count"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "should_stream_flush"
+      ],
+      [
+        "execute:generate_embeddings",
+        "generate_embeddings_batch_exec",
+        "log_debug"
+      ]
+    ],
+    "generate_embedding_single": [
+      [
+        "execute:generate_embedding_single",
+        "generate_embedding_single_exec",
+        "validate_publisher_model!",
+        "log_debug"
+      ],
+      [
+        "execute:generate_embedding_single",
+        "generate_embedding_single_exec",
+        "validate_publisher_model!",
+        "HTTP:GET"
+      ]
+    ],
+    "find_neighbors": [
+      [
+        "execute:find_neighbors",
+        "build_ai_payload",
+        "get_ai_template",
+        "escape_triple_backticks"
+      ],
+      [
+        "execute:find_neighbors",
+        "build_ai_payload",
+        "get_ai_template",
+        "json_only_instruction"
+      ],
+      [
+        "execute:find_neighbors",
+        "build_ai_payload",
+        "process_ai_template",
+        "build_base_payload"
+      ],
+      [
+        "execute:find_neighbors",
+        "normalize_host"
+      ],
+      [
+        "execute:find_neighbors",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:find_neighbors",
+        "handle_vertex_error"
+      ],
+      [
+        "execute:find_neighbors",
+        "transform_find_neighbors_response",
+        "to_similarity",
+        "neighbors_max_distance"
+      ],
+      [
+        "execute:find_neighbors",
+        "transform_find_neighbors_response",
+        "neighbors_max_distance"
+      ]
+    ],
+    "upsert_index_datapoints": [
+      [
+        "execute:upsert_index_datapoints",
+        "batch_upsert_datapoints",
+        "validate_index_access"
+      ],
+      [
+        "execute:upsert_index_datapoints",
+        "batch_upsert_datapoints",
+        "process_datapoint_batch",
+        "build_upsert_payload",
+        "format_datapoint",
+        "validate_datapoint"
+      ],
+      [
+        "execute:upsert_index_datapoints",
+        "batch_upsert_datapoints",
+        "process_datapoint_batch",
+        "build_upsert_payload",
+        "format_datapoint",
+        "format_restricts"
+      ],
+      [
+        "execute:upsert_index_datapoints",
+        "batch_upsert_datapoints",
+        "process_datapoint_batch",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:upsert_index_datapoints",
+        "batch_upsert_datapoints",
+        "process_datapoint_batch",
+        "handle_upsert_error",
+        "handle_vertex_error"
+      ]
+    ],
+    "test_connection": [
+      [
+        "execute:test_connection",
+        "init_test_results"
+      ],
+      [
+        "execute:test_connection",
+        "run_service_test"
+      ]
+    ],
+    "get_prediction": [
+      [
+        "execute:get_prediction",
+        "HTTP:POST"
+      ]
+    ],
+    "fetch_drive_file": [
+      [
+        "execute:fetch_drive_file",
+        "extract_drive_file_id"
+      ],
+      [
+        "execute:fetch_drive_file",
+        "fetch_drive_file_full",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:fetch_drive_file",
+        "fetch_drive_file_full",
+        "drive_api_url"
+      ],
+      [
+        "execute:fetch_drive_file",
+        "fetch_drive_file_full",
+        "drive_basic_fields"
+      ],
+      [
+        "execute:fetch_drive_file",
+        "fetch_drive_file_full",
+        "handle_drive_error"
+      ],
+      [
+        "execute:fetch_drive_file",
+        "fetch_drive_file_full",
+        "fetch_file_content"
+      ]
+    ],
+    "list_drive_files": [
+      [
+        "execute:list_drive_files",
+        "extract_drive_file_id"
+      ]
+    ],
+    "batch_fetch_drive_files": [
+      [
+        "execute:batch_fetch_drive_files",
+        "extract_drive_file_id"
+      ],
+      [
+        "execute:batch_fetch_drive_files",
+        "fetch_drive_file_full",
+        "api_request",
+        "HTTP:GET"
+      ],
+      [
+        "execute:batch_fetch_drive_files",
+        "fetch_drive_file_full",
+        "drive_api_url"
+      ],
+      [
+        "execute:batch_fetch_drive_files",
+        "fetch_drive_file_full",
+        "drive_basic_fields"
+      ],
+      [
+        "execute:batch_fetch_drive_files",
+        "fetch_drive_file_full",
+        "handle_drive_error"
+      ],
+      [
+        "execute:batch_fetch_drive_files",
+        "fetch_drive_file_full",
+        "fetch_file_content"
+      ]
+    ],
+    "monitor_drive_changes": [
+      [
+        "execute:monitor_drive_changes",
+        "extract_drive_file_id"
+      ]
+    ]
+  }
+}
