@@ -176,22 +176,9 @@
     call('api_request', connection, :get,
       "#{call('project_region_path', connection)}/datasets",
       { params: { pageSize: 1 } })
-    # Validate connection/access to Google Drive
     begin
-      response = call('api_request', connection, :get,
-        call('drive_api_url', :files),
-        {
-          params: { pageSize: 1, q: "trashed = false" },
-          error_handler: lambda do |code, body, message|
-            if code == 403
-              error("Drive API not enabled or missing permissions")
-            else
-              call('handle_vertex_error', connection, code, body, message)
-            end
-          end
-        }
-      )
-      { vertex_ai: "connected", drive_access: "connected", files_visible: response['files'].length }
+      drive_probe = call('probe_drive', connection, verbose: false)
+      { vertex_ai: "connected", drive_access: drive_probe['status'], files_visible: drive_probe['files_found'] }
     rescue => e
       { vertex_ai: "connected", drive_access: "error - #{e.message}" }
     end
@@ -219,16 +206,7 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        if input['formatted_prompt'].present?
-          call('rate_limited_ai_request',
-               connection,
-               input['model'],
-               'inference',
-               call('vertex_url_for', connection, input['model'], :generate),
-               input['formatted_prompt'])
-        else
-          call('run_vertex', connection, input, :send_message, verb: :generate)
-        end
+        call('run_vertex', connection, input, :send_message, verb: :generate)
       end,
 
       output_fields: lambda do |object_definitions|
@@ -911,8 +889,9 @@
         ]
       end,
       
-      execute: lambda do |connection, input|
-        results = {
+      # Helper: Initialize test results
+      init_test_results: lambda do |connection|
+        {
           'timestamp' => Time.now.iso8601,
           'environment' => {
             'project' => connection['project'],
@@ -925,237 +904,125 @@
           'warnings' => [],
           'all_tests_passed' => true
         }
-        
-        # Test Vertex AI Connection
-        if input['test_vertex_ai'] != false
-          begin
-            start_time = Time.now
-            
-            # Test basic connectivity
-            datasets_response = call('api_request', connection, :get,
-              "projects/#{connection['project']}/locations/#{connection['region']}/datasets",
-              { params: { pageSize: 1 }, context: { action: 'List datasets' } }
-            )
-            
-            vertex_test = {
-              'service' => 'Vertex AI',
-              'status' => 'connected',
-              'response_time_ms' => ((Time.now - start_time) * 1000).round,
-              'permissions_validated' => []
-            }
-            
-            # Check specific permissions based on response
-            if datasets_response
-              vertex_test['permissions_validated'] << 'aiplatform.datasets.list'
-            end
-            
-            # Test model access if requested
-            if input['test_models']
-              begin
-                models_response = call('api_request', connection, :get,
-                  "projects/#{connection['project']}/locations/#{connection['region']}/models",
-                  { params: { pageSize: 1 }, context: { action: 'List models' } }
-                )
-                vertex_test['permissions_validated'] << 'aiplatform.models.list'
-                vertex_test['models_accessible'] = true
-              rescue => e
-                vertex_test['models_accessible'] = false
-                results['warnings'] << "Cannot list models: #{e.message}"
-              end
-              
-              # Test specific model access
-              begin
-                model_test = call('api_request', connection, :get,
-                  "https://#{connection['region']}-aiplatform.googleapis.com/v1/publishers/google/models/gemini-1.5-pro",
-                  { context: { action: 'Get Gemini model' } }
-                )
-                vertex_test['gemini_access'] = true
-                vertex_test['permissions_validated'] << 'aiplatform.models.predict'
-              rescue => e
-                vertex_test['gemini_access'] = false
-                results['warnings'] << "Cannot access Gemini models: #{e.message}"
-              end
-            end
-            
-            results['tests_performed'] << vertex_test
-            
-          rescue => e
-            results['tests_performed'] << {
-              'service' => 'Vertex AI',
-              'status' => 'failed',
-              'error' => e.message
-            }
-            results['errors'] << "Vertex AI: #{e.message}"
-            results['all_tests_passed'] = false
-          end
+      end,
+
+      # Helper: Run service test
+      run_service_test: lambda do |connection, service_name, test_method, results, *args|
+        return if results.nil?
+
+        begin
+          test_result = call(test_method, connection, *args)
+          results['tests_performed'] << test_result
+
+          # Add warnings from test result
+          results['warnings'] << test_result['warning'] if test_result['warning']
+          (test_result['warnings'] || []).each { |w| results['warnings'] << w }
+        rescue => e
+          results['tests_performed'] << { 'service' => service_name, 'status' => 'failed', 'error' => e.message }
+          results['errors'] << "#{service_name}: #{e.message}"
+          results['all_tests_passed'] = false
         end
-        
-        # Test Google Drive Connection
-        if input['test_drive'] != false
-          begin
-            start_time = Time.now
-            
-            drive_response = call('api_request', connection, :get,
-              call('drive_api_url', :files),
-              {
-                params: { pageSize: 1, q: "trashed = false", fields: 'files(id,name,mimeType)' },
-                error_handler: lambda do |code, body, message|
-                  error(call('handle_drive_error', connection, code, body, message))
-                end,
-                context: { action: 'List Drive files' }
-              }
-            )
-            
-            drive_test = {
-              'service' => 'Google Drive',
-              'status' => 'connected',
-              'response_time_ms' => ((Time.now - start_time) * 1000).round,
-              'files_found' => drive_response['files'].length,
-              'permissions_validated' => ['drive.files.list']
-            }
-            
-            # If verbose, include sample file info
-            if input['verbose'] && drive_response['files'].any?
-              drive_test['sample_file'] = drive_response['files'].first
-            end
-            
-            # Test file read permission
-            if drive_response['files'].any?
-              file_id = drive_response['files'].first['id']
-              begin
-                get(call('drive_api_url', :file, file_id)).
-                  params(fields: 'id,size')
-                drive_test['permissions_validated'] << 'drive.files.get'
-                drive_test['can_read_files'] = true
-              rescue => e
-                drive_test['can_read_files'] = false
-                results['warnings'] << "Cannot read file content: #{e.message}"
-              end
-            end
-            
-            results['tests_performed'] << drive_test
-            
-          rescue => e
-            results['tests_performed'] << {
-              'service' => 'Google Drive',
-              'status' => 'failed',
-              'error' => e.message
-            }
-            results['errors'] << "Google Drive: #{e.message}"
-            results['all_tests_passed'] = false
-          end
+      end,
+
+      # Helper: Validate index format
+      validate_index_format: lambda do |index_id|
+        unless index_id.match?(/^projects\/[^\/]+\/locations\/[^\/]+\/indexes\/[^\/]+$/)
+          error("Invalid index ID format. Expected: projects/PROJECT/locations/REGION/indexes/INDEX_ID")
         end
-        
-        # Test Vector Search Index
-        if input['test_index'] && input['index_id'].present?
-          begin
-            start_time = Time.now
-            index_id = input['index_id']
-            
-            # Validate index format
-            unless index_id.match?(/^projects\/[^\/]+\/locations\/[^\/]+\/indexes\/[^\/]+$/)
-              raise "Invalid index ID format. Expected: projects/PROJECT/locations/REGION/indexes/INDEX_ID"
-            end
-            
-            # Get index details
-            index_response = get(index_id).
-              after_error_response(/.*/) do |code, body, _header, message|
-                if code == 404
-                  raise "Index not found"
-                elsif code == 403
-                  raise "Missing permission: aiplatform.indexes.get"
-                else
-                  raise "Index API error (#{code}): #{message}"
-                end
-              end
-            
-            index_test = {
-              'service' => 'Vector Search Index',
-              'status' => 'connected',
-              'response_time_ms' => ((Time.now - start_time) * 1000).round,
-              'index_details' => {
-                'display_name' => index_response['displayName'],
-                'state' => index_response['state'],
-                'index_update_method' => index_response['indexUpdateMethod']
-              }
-            }
-            
-            # Check deployment status
-            deployed_indexes = index_response['deployedIndexes'] || []
-            if deployed_indexes.empty?
-              index_test['deployed'] = false
-              results['warnings'] << "Index exists but is not deployed"
-            else
-              index_test['deployed'] = true
-              index_test['deployed_count'] = deployed_indexes.length
-            end
-            
-            # Check index stats if available
-            if index_response['indexStats']
-              index_test['stats'] = {
-                'vectors_count' => index_response['indexStats']['vectorsCount'],
-                'shards_count' => index_response['indexStats']['shardsCount']
-              }
-            end
-            
-            results['tests_performed'] << index_test
-            
-          rescue => e
-            results['tests_performed'] << {
-              'service' => 'Vector Search Index',
-              'status' => 'failed',
-              'error' => e.message
-            }
-            results['errors'] << "Vector Search: #{e.message}"
-            results['all_tests_passed'] = false
-          end
+      end,
+
+      # Helper: Add quota info
+      add_quota_info: lambda do |results|
+        begin
+          results['quota_info'] = {
+            'api_calls_per_minute' => call('vertex_rpm_limits'),
+            'notes' => 'These are default quotas. Actual quotas may vary by project.'
+          }
+        rescue => e
+          results['warnings'] << "Could not retrieve quota information: #{e.message}"
         end
-        
-        # API Quotas Check (optional)
-        if input['verbose']
-          begin
-            # Check Vertex AI quotas
-            quotas = { 'api_calls_per_minute' => call('vertex_rpm_limits'),
-                       'notes' => 'These are default quotas. Actual quotas may vary by project.' }
-            results['quota_info'] = quotas
-          rescue => e
-            results['warnings'] << "Could not retrieve quota information: #{e.message}"
-          end
+      end,
+
+      # Helper: Generate recommendations
+      generate_recommendations: lambda do |results|
+        recommendations = []
+
+        if results['errors'].any? { |e| e.include?('Drive API not enabled') }
+          recommendations << 'Enable Google Drive API in Cloud Console'
         end
-        
-        # Summary and recommendations
-        results['summary'] = {
+
+        if results['errors'].any? { |e| e.include?('missing scope') }
+          recommendations << 'Re-authenticate with Drive scope: https://www.googleapis.com/auth/drive.readonly'
+        end
+
+        if results['warnings'].any? { |w| w.include?('not deployed') }
+          recommendations << 'Deploy your Vector Search index to an endpoint'
+        end
+
+        recommendations
+      end,
+
+      # Helper: Calculate summary
+      calculate_summary: lambda do |results|
+        {
           'total_tests' => results['tests_performed'].length,
           'passed' => results['tests_performed'].count { |t| t['status'] == 'connected' },
           'failed' => results['tests_performed'].count { |t| t['status'] == 'failed' }
         }
-        
-        # Add recommendations if there are issues
-        if results['errors'].any? || results['warnings'].any?
-          results['recommendations'] = []
-          
-          if results['errors'].any? { |e| e.include?('Drive API not enabled') }
-            results['recommendations'] << 'Enable Google Drive API in Cloud Console'
-          end
-          
-          if results['errors'].any? { |e| e.include?('missing scope') }
-            results['recommendations'] << 'Re-authenticate with Drive scope: https://www.googleapis.com/auth/drive.readonly'
-          end
-          
-          if results['warnings'].any? { |w| w.include?('not deployed') }
-            results['recommendations'] << 'Deploy your Vector Search index to an endpoint'
-          end
-        end
-        
-        # Set final status
-        results['overall_status'] = if results['all_tests_passed']
+      end,
+
+      # Helper: Determine overall status
+      determine_overall_status: lambda do |results|
+        if results['all_tests_passed']
           'healthy'
         elsif results['errors'].empty?
           'degraded'
         else
-          'unhealthy'
+          'failed'
         end
-        
+      end,
+
+      execute: lambda do |connection, input|
+        results = call('init_test_results', connection)
+
+        # Test Vertex AI
+        if input['test_vertex_ai'] != false
+          call('run_service_test', connection, 'Vertex AI', 'probe_vertex_ai', results,
+               test_models: !!input['test_models'])
+        end
+
+        # Test Google Drive
+        if input['test_drive'] != false
+          call('run_service_test', connection, 'Google Drive', 'probe_drive', results,
+               verbose: !!input['verbose'])
+        end
+
+        # Test Vector Search Index
+        if input['test_index'] && input['index_id'].present?
+          call('validate_index_format', input['index_id'])
+          test_result = call('run_service_test', connection, 'Vector Search Index', 'probe_index',
+                           results, input['index_id'])
+
+          # Add specific warning for undeployed index
+          if test_result && !test_result['deployed']
+            results['warnings'] << "Index exists but is not deployed"
+          end
+        end
+
+        # Add quota info if verbose
+        call('add_quota_info', results) if input['verbose']
+
+        # Build summary
+        results['summary'] = call('calculate_summary', results)
+
+        # Add recommendations
+        if results['errors'].any? || results['warnings'].any?
+          results['recommendations'] = call('generate_recommendations', results)
+        end
+
+        # Set final status
+        results['overall_status'] = call('determine_overall_status', results)
+
         results
       end,
       
@@ -1300,30 +1167,11 @@
       end,
 
       execute: lambda do |connection, input|
-        # Step 1: Extract file ID from URL if needed
         file_id = call('extract_drive_file_id', input['file_id'])
 
-        # Step 2: Get file metadata
-        metadata_response = call('api_request', connection, :get,
-          call('drive_api_url', :file, file_id),
-          {
-            params: { fields: call('drive_basic_fields') },
-            error_handler: lambda do |code, body, message|
-              error(call('handle_drive_error', connection, code, body, message))
-            end
-          }
-        )
+        include_content = input.fetch('include_content', true)
+        call('fetch_drive_file_full', connection, file_id, include_content)
 
-        # Step 3: Get content using unified fetcher
-        content_result = call('fetch_file_content',
-          connection,
-          file_id,
-          metadata_response,
-          input.fetch('include_content', true)
-        )
-
-        # Step 4: Merge metadata and content, then return
-        metadata_response.merge(content_result)
       end
     },
     list_drive_files: {
@@ -1573,7 +1421,6 @@
         file_ids = input['file_ids'] || []
         include_content = input.fetch('include_content', true)
         skip_errors = input.fetch('skip_errors', true)
-        batch_size = [input.fetch('batch_size', 10), 50].min
 
         return {
           'successful_files' => [],
@@ -1592,29 +1439,7 @@
           begin
             file_id = call('extract_drive_file_id', file_id_input)
 
-            # Get file metadata
-        metadata_response = call('api_request', connection, :get,
-          call('drive_api_url', :file, file_id),
-          {
-            params: { fields: call('drive_basic_fields') },
-                error_handler: lambda do |code, body, message|
-                  error(call('handle_drive_error', connection, code, body, message))
-                end
-              }
-            )
-
-            # Get content using unified fetcher
-            content_result = call('fetch_file_content',
-              connection,
-              file_id,
-              metadata_response,
-              include_content
-            )
-
-            # Build successful file result
-            successful_file = metadata_response.merge(content_result)
-
-            successful_files << successful_file
+            successful_files << call('fetch_drive_file_full', connection, file_id, include_content)
 
           rescue => e
             # Step 3: Error handling
@@ -1833,12 +1658,16 @@
             start_params[:spaces] = 'drive'
           end
           
-          start_response = get(call('drive_api_url', :start_token)).
-            params(start_params).
-            after_error_response(/.*/) do |code, body, _header, message|
-              error_msg = call('handle_drive_error', connection, code, body, message)
-              error(error_msg)
-            end
+          start_response = call('api_request', connection, :get,
+            call('drive_api_url', :start_token),
+            {
+              params: start_params,
+              context: { action: 'Get Drive start token' },
+              error_handler: lambda do |code, body, message|
+                error(call('handle_drive_error', connection, code, body, message))
+              end
+            }
+          )
           
           # Return initial token for future use
           return {
@@ -1872,12 +1701,16 @@
           changes_params[:driveId] = folder_id
         end
         
-        changes_response = get(call('drive_api_url', :changes)).
-          params(changes_params).
-          after_error_response(/.*/) do |code, body, _header, message|
-            error_msg = call('handle_drive_error', connection, code, body, message)
-            error(error_msg)
-          end
+        changes_response = call('api_request', connection, :get,
+          call('drive_api_url', :changes),
+          {
+            params: changes_params,
+            context: { action: 'List Drive changes' },
+            error_handler: lambda do |code, body, message|
+              error(call('handle_drive_error', connection, code, body, message))
+            end
+          }
+        )
 
         # Step 4: Process the changes
         all_changes = changes_response['changes'] || []
@@ -1978,30 +1811,9 @@
   },
 
   methods: {
-    project_region_path: lambda do |connection|
-      "projects/#{connection['project']}/locations/#{connection['region']}"
-    end,
-    maybe_parse_json: lambda do |str|
-      return str unless str.is_a?(String)
-      trimmed = str.strip
-      return str unless trimmed.start_with?('{','[')
-      parse_json(trimmed) rescue str
-    end,
-    strip_fences: lambda { |txt| txt.to_s.gsub(/^```(?:json|JSON)?\s*\n?/, '').gsub(/\n?```\s*$/, '').gsub(/`+$/, '').strip },
-    extract_embedding_values: lambda do |prediction|
-      prediction&.dig('embeddings', 'values') ||
-      prediction&.dig('embeddings')&.first&.dig('values') || []
-    end,
-    usage_meta: lambda do |resp|
-      {
-        'promptTokenCount' => resp.dig('usageMetadata', 'promptTokenCount') || 0,
-        'candidatesTokenCount' => resp.dig('usageMetadata', 'candidatesTokenCount') || 0,
-        'totalTokenCount' => resp.dig('usageMetadata', 'totalTokenCount') || 0
-      }
-    end,
-    picklist_for: lambda do |connection, bucket, static|
-      call('dynamic_model_picklist', connection, bucket, static)
-    end,
+
+    # ======= LEAF DEPENDENCIES =======
+    # These methods are used by multiple actions and triggers above.
     log_debug: lambda { |msg| puts(msg) },
     rate_limit_defaults: lambda { { 'max_retries' => 3, 'base_delay' => 1.0, 'max_delay' => 30.0 } },
     oauth_scopes: lambda do
@@ -2017,89 +1829,36 @@
         'embedding' => 600
       }
     end,
-    normalize_host: lambda do |host|
-      h = host.to_s.strip
-      error('Index endpoint host is required') if h.blank?
-      h = h.gsub(/^https?:\/\//i, '').gsub(/\/+$/, '')
-      error("Invalid index endpoint host format: #{h}") unless h.match?(/^[\w\-\.]+(:\d+)?$/)
-      h
-    end,
+    neighbors_max_distance: lambda { 2.0 },
     to_similarity: lambda do |distance, max = 2.0|
-      s = 1.0 - (distance.to_f / max.to_f)
+      s = 1.0 - (distance.to_f / (max || call('neighbors_max_distance')))
       s < 0 ? 0.0 : s
     end,
-    classify_drive_change: lambda do |change, include_removed|
-      return { kind: :removed, summary: { 'fileId' => change['fileId'], 'time' => change['time'] } } if change['removed']
-      file = change['file']
-      return { kind: :skip } if file.nil?
-      return { kind: :skip } if file['trashed'] && !include_removed
-      summary = {
-        'id' => file['id'],
-        'name' => file['name'],
-        'mimeType' => file['mimeType'],
-        'modifiedTime' => file['modifiedTime'],
-        'checksum' => file['md5Checksum']
-      }
-      # Heuristic: first seen ~added, else modified
-      { kind: :added, summary: summary }
+    maybe_parse_json: lambda do |str|
+      return str unless str.is_a?(String)
+      trimmed = str.strip
+      return str unless trimmed.start_with?('{','[')
+      parse_json(trimmed) rescue str
     end,
-    drive_basic_fields: lambda do
-      'id,name,mimeType,size,modifiedTime,md5Checksum,owners'.freeze
+    strip_fences: lambda { |txt| txt.to_s.gsub(/^```(?:json|JSON)?\s*\n?/, '').gsub(/\n?```\s*$/, '').gsub(/`+$/, '').strip },
+    escape_triple_backticks: lambda { |text| text&.gsub('```', '####') },
+
+    # ======= URL AND PATH BUILDERS =======
+
+    # # String builders; everything that hits HTTP should depend on these.
+    project_region_path: lambda do |connection|
+      "projects/#{connection['project']}/locations/#{connection['region']}"
     end,
-    # Build fully-qualified Vertex endpoint for a model
-    vertex_url_for: lambda do |connection, model, verb|
-      base = "projects/#{connection['project']}/locations/#{connection['region']}"
-      v = verb.to_s
-      case v
-      when 'generate' then "#{base}/#{model}:generateContent"
-      when 'predict'  then "#{base}/#{model}:predict"
-      else error("Unsupported Vertex verb: #{verb}")
-      end
-    end,
-    # Unified “validate → build → call → extract”
-    run_vertex: lambda do |connection, input, template, verb:, extract: {}|
-      call('validate_publisher_model!', connection, input['model'])
-      payload = call('build_ai_payload', template, input, connection)
-      url = call('vertex_url_for', connection, input['model'], verb)
-      resp = call('rate_limited_ai_request', connection, input['model'], verb, url, payload)
-      extract.present? ? call('extract_response', resp, extract) : resp
-    end,
-    # Universal API request handler with standard error handling
-    api_request: lambda do |connection, method, url, options = {}|
-      # Build the request based on method
-      request = case method.to_sym
-      when :get
-        if options[:params]
-          get(url).params(options[:params])
-        else
-          get(url)
-        end
-      when :post
-        if options[:payload]
-          post(url, options[:payload])
-        else
-          post(url)
-        end
-      when :put
-        put(url, options[:payload])
-      when :delete
-        delete(url)
-      else
-        error("Unsupported HTTP method: #{method}")
-      end
-      
-      # Apply standard error handling
-      request.after_error_response(/.*/) do |code, body, _header, message|
-        # Check if custom error handler provided
-        if options[:error_handler]
-          options[:error_handler].call(code, body, message)
-        else
-          call('handle_vertex_error', connection, code, body, message, options[:context] || {})
-        end
-      end
-    end,
-    # Drive API URL builder for consistent endpoint construction
-    drive_api_url: lambda do |endpoint, file_id = nil, options = {}|
+    vertex_host: lambda { |connection|
+      "https://#{connection['region']}-aiplatform.googleapis.com"
+    },
+    vertex_base_url: lambda { |connection|
+      "#{call('vertex_host', connection)}/#{connection['version'].presence || 'v1'}"
+    },
+    vertex_api_url: lambda { |connection, path|
+      "#{call('vertex_base_url', connection)}/#{path}"
+    },
+    drive_api_url: lambda do |endpoint, file_id = nil|
       base = 'https://www.googleapis.com/drive/v3'
 
       case endpoint.to_sym
@@ -2122,87 +1881,16 @@
         error("Unknown Drive API endpoint: #{endpoint}")
       end
     end,
-    # Unified file content fetcher - eliminates duplication between actions
-    fetch_file_content: lambda do |connection, file_id, metadata, include_content = true|
-      # Skip content fetching if not requested
-      unless include_content
-        return {
-          'text_content' => '',
-          'needs_processing' => false,
-          'fetch_method' => 'skipped',
-          'export_mime_type' => nil
-        }
-      end
-
-      # Determine export type for Google Workspace files
-      export_mime_type = call('get_export_mime_type', metadata['mimeType'])
-
-      if export_mime_type.present?
-        # Google Workspace file - use export endpoint
-        content_response = call('api_request', connection, :get,
-          call('drive_api_url', :export, file_id),
-          {
-            params: { mimeType: export_mime_type },
-            error_handler: lambda do |code, body, message|
-              error(call('handle_drive_error', connection, code, body, message))
-            end
-          }
-        )
-
-        # Return workspace file result
-        {
-          'text_content' => content_response.force_encoding('UTF-8'),
-          'needs_processing' => false,
-          'fetch_method' => 'export',
-          'export_mime_type' => export_mime_type
-        }
-      else
-        # Regular file - use download endpoint
-        content_response = call('api_request', connection, :get,
-          call('drive_api_url', :download, file_id),
-          {
-            error_handler: lambda do |code, body, message|
-              error(call('handle_drive_error', connection, code, body, message))
-            end
-          }
-        )
-
-        # Check if it's a text-based file
-        is_text_file = metadata['mimeType']&.start_with?('text/') ||
-                       ['application/json', 'application/xml'].include?(metadata['mimeType'])
-
-        # Check if it needs additional processing
-        needs_processing = ['application/pdf', 'image/'].any? { |prefix|
-          metadata['mimeType']&.start_with?(prefix)
-        }
-
-        # Return regular file result
-        {
-          'text_content' => is_text_file ? content_response.force_encoding('UTF-8') : '',
-          'needs_processing' => needs_processing,
-          'fetch_method' => 'download',
-          'export_mime_type' => nil
-        }
-      end
+    normalize_host: lambda do |host|
+      h = host.to_s.strip
+      error('Index endpoint host is required') if h.blank?
+      h = h.gsub(/^https?:\/\//i, '').gsub(/\/+$/, '')
+      error("Invalid index endpoint host format: #{h}") unless h.match?(/^[\w\-\.]+(:\d+)?$/)
+      h
     end,
-    # Unified rate-limited AI request handler
-    rate_limited_ai_request: lambda do |connection, model, action_type, url, payload|
-      # Apply rate limiting before request
-      rate_limit_info = call('enforce_vertex_rate_limits', connection, model, action_type)
 
-      # Make request with 429 retry handling
-      response = call('handle_429_with_backoff', connection, action_type, model) do
-        call('api_request', connection, :post, url, { payload: payload })
-      end
-
-      # Add rate limit info to response if it's a hash
-      if response.is_a?(Hash)
-        response['rate_limit_status'] = rate_limit_info
-      end
-
-      response
-    end,
-    # -- CORE ERROR AND HTTP UTILITIES --
+    # ======= CORE HTTP AND ERROR HANDLING =======
+    # These methods handle all HTTP requests, retries, and error parsing.
     handle_vertex_error: lambda do |connection, code, body, message, context = {}|
       # Parse the body for structured error information
       error_details = begin
@@ -2266,13 +1954,76 @@
         error("#{base_message}#{hint}")
       end
     end,
-    sanitize_triple_backticks: lambda { |text| text&.gsub('```', '####') },
-    replace_backticks_with_hash: lambda do |text|  # backwards-compatible alias
-      call('sanitize_triple_backticks', text)
+    api_request: lambda do |connection, method, url, options = {}|
+      # Build the request based on method
+      request = case method.to_sym
+      when :get
+        if options[:params]
+          get(url).params(options[:params])
+        else
+          get(url)
+        end
+      when :post
+        if options[:payload]
+          post(url, options[:payload])
+        else
+          post(url)
+        end
+      when :put
+        put(url, options[:payload])
+      when :delete
+        delete(url)
+      else
+        error("Unsupported HTTP method: #{method}")
+      end
+      
+      # Apply standard error handling
+      request.after_error_response(/.*/) do |code, body, _header, message|
+        # Check if custom error handler provided
+        if options[:error_handler]
+          options[:error_handler].call(code, body, message)
+        else
+          call('handle_vertex_error', connection, code, body, message, options[:context] || {})
+        end
+      end
     end,
-    # (Removed) truthy? -- unused
-    # -- RATE LIMITING UTILITIES --
-    # Vertex AI rate limiting enforcement using atomic sliding window in cache
+    vertex_request: lambda do |connection, method, path_or_url, **opts|
+      url = path_or_url.start_with?('http') ? path_or_url : call('vertex_api_url', connection, path_or_url)
+      call('api_request', connection, method, url, opts)
+    end,
+    drive_request: lambda do |connection, method, endpoint, **opts|
+      url = call('drive_api_url', endpoint, opts.delete(:file_id), opts)
+      opts[:error_handler] ||= lambda do |code, body, message|
+        error(call('handle_drive_error', connection, code, body, message))
+      end
+      call('api_request', connection, method, url, opts)
+    end,
+    handle_drive_error: lambda do |connection, code, body, message|
+      service_account_email = connection['service_account_email'] || 
+                             connection['client_id']
+      handlers = {
+        404 => ->(_b, _m) { "File not found in Google Drive. Please verify the file ID and ensure the file exists." },
+        403 => ->(b, _m) {
+          if b&.include?('insufficientFilePermissions') || b&.include?('forbidden')
+            "Access denied. Please share the file with the service account: #{service_account_email}"
+          else
+            "Permission denied. Check your Google Drive API access and file permissions."
+          end
+        },
+        429 => ->(_b, _m) { "Rate limit exceeded. Please implement request backoff and retry logic." },
+        401 => ->(_b, _m) { "Authentication failed. Please check your OAuth2 token or service account credentials." }
+      }
+      if handlers[code]
+        handlers[code].call(body, message)
+      elsif [500, 502, 503].include?(code)
+        "Google Drive API temporary error (#{code}). Please retry after a brief delay."
+      else
+        "Google Drive API error (#{code}): #{message || body}"
+      end
+    end,
+
+    # ======= RATE LIMITING AND RESILIANCE =======
+    # These methods implement retries with exponential backoff for resiliency.
     enforce_vertex_rate_limits: lambda do |connection, model, action_type = 'inference'|
       # Skip if rate limiting is disabled
       return { requests_last_minute: 0, limit: 0, throttled: false, sleep_ms: 0 } unless connection['enable_rate_limiting']
@@ -2348,6 +2099,45 @@
         return { requests_last_minute: 0, limit: limit, throttled: false, sleep_ms: 0 }
       end
     end,
+    # Helper: Extract HTTP status from error
+    extract_http_status: lambda do |error|
+      return nil unless error.respond_to?(:response) && error.response.respond_to?(:status)
+      error.response.status.to_i
+    end,
+
+    # Helper: Check if error is rate limit related
+    is_rate_limit_error: lambda do |error|
+      status = call('extract_http_status', error)
+      status == 429 || error.message.include?('Rate limit') || error.message.include?('429')
+    end,
+
+    # Helper: Extract retry-after delay from error
+    extract_retry_after: lambda do |error|
+      # Try header first
+      if error.respond_to?(:response) && error.response.respond_to?(:headers)
+        retry_after = error.response.headers['Retry-After']&.to_i
+        return retry_after if retry_after && retry_after > 0
+      end
+
+      # Try JSON body for Google APIs
+      return nil unless error.respond_to?(:response)
+
+      begin
+        body = error.response&.body
+        info = parse_json(body)
+        info.dig('error', 'details')&.find { |d| d['@type']&.include?('RetryInfo') }&.dig('retryDelay', 'seconds')&.to_i
+      rescue
+        nil
+      end
+    end,
+
+    # Helper: Calculate retry delay
+    calculate_retry_delay: lambda do |error, attempt, base_delay|
+      retry_after = call('extract_retry_after', error)
+      retry_after || (base_delay * (2 ** attempt))
+    end,
+
+    # Main rate limit handler (simplified)
     handle_429_with_backoff: lambda do |connection, action_type, model, &block|
       cfg = call('rate_limit_defaults')
       max_retries = cfg['max_retries']
@@ -2355,188 +2145,247 @@
 
       max_retries.times do |attempt|
         begin
-          # Execute the block (API call)
           return block.call
         rescue => e
-          # Check if this is a 429 error
-          if e.message.include?('429') || e.message.include?('Rate limit')
-            if attempt < max_retries - 1
-              # Calculate exponential backoff delay
-              delay = base_delay * (2 ** attempt)
+          raise e unless call('is_rate_limit_error', e)
 
-              # Try to extract Retry-After header from error if available
-              retry_after = nil
-              if e.respond_to?(:response) && e.response.respond_to?(:headers)
-                retry_after = e.response.headers['Retry-After']&.to_i
-              end
-
-              # Some Google APIs return retry info inside the JSON error body
-              if retry_after.nil? && e.respond_to?(:response)
-                begin
-                  body = e.response&.body
-                  info = parse_json(body)
-                  retry_after = info.dig('error', 'details')&.find { |d| d['@type']&.include?('RetryInfo') }&.dig('retryDelay', 'seconds')&.to_i
-                rescue
-                end
-              end
-
-              # Use Retry-After if available, otherwise use exponential backoff
-              actual_delay = retry_after || delay
-
-              call('log_debug', "429 rate limit hit for #{model} (attempt #{attempt + 1}/#{max_retries}). Retrying in #{actual_delay}s")
-              sleep(actual_delay)
-            else
-              # Max retries exceeded
-              error("Rate limit exceeded for #{model} after #{max_retries} attempts. " \
-                    "Please reduce request frequency or enable automatic rate limiting in connection settings.")
-            end
-          else
-            # Not a rate limit error, re-raise
-            raise e
+          if attempt >= max_retries - 1
+            error("Rate limit exceeded for #{model} after #{max_retries} attempts. " \
+                  "Please reduce request frequency or enable automatic rate limiting in connection settings.")
           end
+
+          delay = call('calculate_retry_delay', e, attempt, base_delay)
+          call('log_debug', "429 rate limit hit for #{model} (attempt #{attempt + 1}/#{max_retries}). Retrying in #{delay}s")
+          sleep(delay)
         end
       end
     end,
-    # Circuit breaker pattern for resilient batch operations
+    # Helper: Get circuit breaker state
+    get_circuit_state: lambda do |circuit_key|
+      workato.cache.get(circuit_key) || { 'failures' => 0, 'last_failure' => nil, 'state' => 'closed' }
+    end,
+
+    # Helper: Update circuit breaker state
+    update_circuit_state: lambda do |circuit_key, state|
+      workato.cache.set(circuit_key, state, 3600)
+    end,
+
+    # Helper: Check if circuit should open
+    should_open_circuit: lambda do |failures|
+      failures >= 5
+    end,
+
+    # Helper: Check circuit breaker status
+    check_circuit_status: lambda do |circuit_state, operation_name|
+      return if circuit_state['state'] != 'open'
+
+      last_failure_time = Time.parse(circuit_state['last_failure']) rescue (Time.now - 3600)
+      recovery_time = 300 # 5 minutes
+
+      if Time.now - last_failure_time > recovery_time
+        circuit_state['state'] = 'half_open'
+        call('log_debug', "Circuit breaker for #{operation_name}: transitioning to half-open")
+      else
+        minutes_remaining = ((last_failure_time + recovery_time - Time.now) / 60).round(1)
+        error("Circuit breaker OPEN for #{operation_name}. Too many recent failures. Retry in #{minutes_remaining} minutes.")
+      end
+    end,
+
+    # Helper: Check if error should be retried
+    should_retry_error: lambda do |error, retry_on|
+      error_code = call('extract_http_status', error)
+
+      retry_on.any? do |code|
+        case code
+        when Integer then error_code == code
+        when String then error.message.include?(code)
+        when Regexp then error.message.match?(code)
+        else false
+        end
+      end
+    end,
+
+    # Helper: Calculate delay with jitter
+    calculate_backoff_delay: lambda do |attempt, base_delay, max_delay, jitter|
+      delay = [base_delay * (2 ** attempt), max_delay].min
+      delay += rand * 0.5 if jitter
+      delay
+    end,
+
+    # Helper: Handle successful circuit breaker operation
+    handle_circuit_success: lambda do |circuit_key, circuit_state, operation_name|
+      return unless circuit_state['failures'] > 0
+
+      call('update_circuit_state', circuit_key, { 'failures' => 0, 'state' => 'closed' })
+      call('log_debug', "Circuit breaker for #{operation_name}: reset to closed state")
+    end,
+
+    # Helper: Handle circuit breaker failure
+    handle_circuit_failure: lambda do |circuit_key, circuit_state, operation_name|
+      circuit_state['failures'] += 1
+      circuit_state['last_failure'] = Time.now.iso8601
+
+      if call('should_open_circuit', circuit_state['failures'])
+        circuit_state['state'] = 'open'
+        call('log_debug', "Circuit breaker for #{operation_name}: OPENED due to repeated failures")
+      end
+
+      call('update_circuit_state', circuit_key, circuit_state)
+    end,
+
+    # Main circuit breaker implementation (simplified)
     circuit_breaker_retry: lambda do |connection, operation_name, options = {}, &block|
-      # Configuration with defaults
       defaults = call('rate_limit_defaults')
       max_retries = options[:max_retries] || defaults['max_retries']
       retry_on = Array(options[:retry_on] || [429, 500, 502, 503, 504])
       base_delay = options[:base_delay] || defaults['base_delay']
       max_delay = options[:max_delay] || defaults['max_delay']
-      jitter = options[:jitter] || true
+      jitter = options[:jitter] != false
 
-      # Circuit breaker state management via cache
       circuit_key = "circuit_breaker_#{connection['project']}_#{operation_name}"
 
       begin
-        circuit_state = workato.cache.get(circuit_key) || { 'failures' => 0, 'last_failure' => nil, 'state' => 'closed' }
+        circuit_state = call('get_circuit_state', circuit_key)
+        call('check_circuit_status', circuit_state, operation_name)
 
-        # Check if circuit is open (too many recent failures)
-        if circuit_state['state'] == 'open'
-          last_failure_time = Time.parse(circuit_state['last_failure']) rescue (Time.now - 3600)
-          # Auto-recover after 5 minutes
-          if Time.now - last_failure_time > 300
-            circuit_state['state'] = 'half_open'
-            call('log_debug', "Circuit breaker for #{operation_name}: transitioning to half-open")
-          else
-            error("Circuit breaker OPEN for #{operation_name}. Too many recent failures. Retry in #{((last_failure_time + 300 - Time.now) / 60).round(1)} minutes.")
-          end
-        end
-
-        # Attempt the operation with retries
         max_retries.times do |attempt|
           begin
             result = block.call
-
-            # Success - reset circuit breaker
-            if circuit_state['failures'] > 0
-              workato.cache.set(circuit_key, { 'failures' => 0, 'state' => 'closed' }, 3600)
-              call('log_debug', "Circuit breaker for #{operation_name}: reset to closed state")
-            end
-
+            call('handle_circuit_success', circuit_key, circuit_state, operation_name)
             return result
-
           rescue => e
-            error_code = e.respond_to?(:response) ? e.response&.status : nil
+            is_retryable = call('should_retry_error', e, retry_on)
 
-            # Check if this error should trigger a retry
-            should_retry = retry_on.any? do |code|
-              case code
-              when Integer
-                error_code == code
-              when String
-                e.message.include?(code)
-              when Regexp
-                e.message.match?(code)
-              else
-                false
-              end
-            end
-
-            if should_retry && attempt < max_retries - 1
-              # Calculate delay with exponential backoff and optional jitter
-              delay = [base_delay * (2 ** attempt), max_delay].min
-              delay += rand * 0.5 if jitter
-
+            if is_retryable && attempt < max_retries - 1
+              delay = call('calculate_backoff_delay', attempt, base_delay, max_delay, jitter)
               call('log_debug', "#{operation_name} failed (attempt #{attempt + 1}/#{max_retries}): #{e.message}. Retrying in #{delay.round(2)}s")
               sleep(delay)
             else
-              # Max retries exceeded or non-retryable error
-              circuit_state['failures'] += 1
-              circuit_state['last_failure'] = Time.now.iso8601
-
-              # Trip circuit breaker if too many failures
-              if circuit_state['failures'] >= 5
-                circuit_state['state'] = 'open'
-                call('log_debug', "Circuit breaker for #{operation_name}: OPENED due to repeated failures")
-              end
-
-              workato.cache.set(circuit_key, circuit_state, 3600)
+              call('handle_circuit_failure', circuit_key, circuit_state, operation_name)
               raise e
             end
           end
         end
-
       rescue => cache_error
         call('log_debug', "Circuit breaker cache error: #{cache_error.message}")
-        # Fallback to simple retry without circuit breaker
         return block.call
       end
     end,
-    # -- VERTEX MODEL DISCOVERY UTILITIES --
-    # - Main model fetching with caching
-    fetch_publisher_models: lambda do |connection, publisher = 'google'|
-      # Build the cache key (incl all relevant param to ensure regions/publishers are cached separately)
-      region = connection['region'].presence || 'us-central1'
-      include_preview = connection['include_preview_models'] || false
-      cache_key = "models_#{region}_#{publisher}_preview_#{include_preview}"
+    rate_limited_ai_request: lambda do |connection, model, action_type, url, payload|
+      # Apply rate limiting before request
+      rate_limit_info = call('enforce_vertex_rate_limits', connection, model, action_type)
 
-      # Try for a cache hit (using Workato's built-in caching)
-      begin
-        cached_data = workato.cache.get(cache_key)
-        if cached_data.present?
-          cache_time = (Time.parse(cached_data['cached_at']) rescue nil)
-          if cache_time.nil?
-            # Missing timestamp - proceed to refresh cache (intentional fall through to fetch fresh)
-          end
-
-          if cache_time > 1.hour.ago
-            call('log_debug', "Using cached model list (#{cached_data['models'].length} models, cached #{((Time.now - cache_time) / 60).round} minutes ago)")
-            return cached_data['models']
-          else
-            call('log_debug', "Model cache expired, refreshing...")
-          end
-        end
-      rescue => e
-        # If cache access fails, continue without it
-        call('log_debug', "Cache access failed: #{e.message}, fetching fresh data")
+      # Make request with 429 retry handling
+      response = call('handle_429_with_backoff', connection, action_type, model) do
+        call('api_request', connection, :post, url, { payload: payload })
       end
 
-      # Fallback cascade for dynamic model discovery
-      models = call('cascade_model_discovery', connection, publisher, region)
-
-      # Cache the results if we got any
-      if models.present?
-        begin
-          cache_data = {
-            'models' => models,
-            'cached_at' => Time.now.iso8601,
-            'count' => models.length,
-            'source' => models.first&.dig('source') || 'api'
-          }
-          # Cache for 1 hour (3600 seconds)
-          workato.cache.set(cache_key, cache_data, 3600)
-          call('log_debug', "Cached #{models.length} models for future use (source: #{cache_data['source']})")
-        rescue => e
-          call('log_debug', "Failed to cache models: #{e.message}")
-        end
+      # Add rate limit info to response if it's a hash
+      if response.is_a?(Hash)
+        response['rate_limit_status'] = rate_limit_info
       end
 
-      models
+      response
     end,
-    # - Cascade model discovery with multiple fallback strategies
+
+    # ======= VERTEX MODEL DISCOVERY AND VALIDATION =======
+    # These methods help validate access to Vertex AI services and resources.
+    # All 'what models are available' logic lives in this section.
+    vertex_model_bucket: lambda do |model_id|
+      id = model_id.to_s.downcase
+
+      # Use a hash for 0(1) lookup instead of multiple str includes
+      @model_categories ||= {
+        'embedding' => %w[embedding gecko multimodalembedding embeddinggemma],
+        'image' => %w[vision imagegeneration imagen],
+        'audio' => %w[tts audio speech],
+        'code' => %w[code codey],
+        'chat' => %w[chat],
+        'text' => []  # Default category
+      }
+
+      # Find the category for this model
+      @model_categories.each do |category, keywords|
+        return category.to_sym if keywords.any? { |keyword| id.include?(keyword) }
+      end
+    
+      :text # default to text if no match
+    end,  
+    sort_model_options: lambda do |options|
+      options.sort_by do |label, value|
+        # Extract version number if present
+        version_match = label.match(/(\d+)\.(\d+)/)
+        major_version = version_match ? version_match[1].to_i : 0
+        minor_version = version_match ? version_match[2].to_i : 0
+        
+        # Determine model tier
+        tier = case label
+              when /\bPro\b/i then 0
+              when /\bFlash\b/i then 1  
+              when /\bLite\b/i then 2
+              else 3
+              end
+        
+        # Sort by: version (desc), tier, then alphabetical
+        [
+          -major_version,  # Newest version first
+          -minor_version,  # Higher minor version first
+          tier,            # Pro > Flash > Lite
+          label            # Alphabetical as tiebreaker
+        ]
+      end
+    end,
+    to_model_options: lambda do |models, bucket:, include_preview: false|
+      return [] if models.blank?
+      
+      retired_pattern = /(^|-)1\.0-|text-bison|chat-bison/
+      eligible = models.select do |m|
+        id = m['name'].to_s.split('/').last
+        next false if id.blank?
+        next false if id =~ retired_pattern
+        next false unless call('vertex_model_bucket', id) == bucket
+        if !include_preview
+          stage = m['launchStage'].to_s
+          next false unless stage == 'GA' || stage.blank?
+        end
+        true
+      end
+      
+      # Extract unique model IDs efficiently
+      seen_ids = {}
+      unique_models = eligible.select do |m|
+        id = m['name'].to_s.split('/').last
+        next false if id.blank?
+        next false if seen_ids[id]
+        seen_ids[id] = true
+      end
+      
+      # Build options with better sorting
+      options = unique_models.map do |m|
+        id = m['name'].to_s.split('/').last
+        # Create a human-friendly label
+        label = create_model_label(id, m)
+        [label, "publishers/google/models/#{id}"]
+      end
+      
+      # Sort with a more sophisticated algorithm
+      sort_model_options(options)
+    end,
+    create_model_label: lambda do |model_id, model_metadata = {}|
+      return '' if model_id.to_s.strip.empty?
+      # Start with the basic formatting
+      label = model_id.gsub('-', ' ').split.map { |word| 
+        # Keep version numbers as-is, capitalize other words
+        word =~ /^\d/ ? word : word.capitalize 
+      }.join(' ')
+      
+      # Add helpful context if available
+      if model_metadata['launchStage'].present? && model_metadata['launchStage'] != 'GA'
+        label += " (#{model_metadata['launchStage']})"
+      end
+      
+      label
+    end,
     cascade_model_discovery: lambda do |connection, publisher, region|
       begin
         call('log_debug', "Model discovery: primary API...")
@@ -2573,7 +2422,6 @@
         return []
       end
     end,
-    # - Static curated model list as ultimate fallback
     get_static_model_list: lambda do |connection, _publisher|
       include_preview = connection['include_preview_models'] || false
 
@@ -2625,21 +2473,18 @@
           # Time each API call for monitoring
           api_start = Time.now
           
-          resp = get(url).
-            params(
-              page_size: page_size,
-              page_token: page_token,
-              view: 'PUBLISHER_MODEL_VIEW_BASIC'  # Changed from FULL - we only need basic info
-            ).
-            after_error_response(/.*/) do |code, body, _hdrs, message|
-              # Log but don't fail completely
+          resp = call('api_request', connection, :get, url, {
+            params: { page_size: page_size, page_token: page_token, view: 'PUBLISHER_MODEL_VIEW_BASIC' },
+            context: { action: 'List publisher models' },
+            error_handler: lambda do |code, body, message|
               if connection['verbose_errors']
                 call('log_debug', "Model listing failed (HTTP #{code}): #{body}")
               else
                 call('log_debug', "Model listing failed (HTTP #{code}) - using static fallback")
               end
-              raise "API Error"
+              raise 'API Error'
             end
+          })
           
           api_time = Time.now - api_start
           total_api_time += api_time
@@ -2671,6 +2516,55 @@
         []
       end
     end,
+    fetch_publisher_models: lambda do |connection, publisher = 'google'|
+      # Build the cache key (incl all relevant param to ensure regions/publishers are cached separately)
+      region = connection['region'].presence || 'us-central1'
+      include_preview = connection['include_preview_models'] || false
+      cache_key = "models_#{region}_#{publisher}_preview_#{include_preview}"
+
+      # Try for a cache hit (using Workato's built-in caching)
+      begin
+        cached_data = workato.cache.get(cache_key)
+        if cached_data.present?
+          cache_time = (Time.parse(cached_data['cached_at']) rescue nil)
+          if cache_time.nil?
+            # Missing timestamp - proceed to refresh cache (intentional fall through to fetch fresh)
+          end
+
+          if cache_time > 1.hour.ago
+            call('log_debug', "Using cached model list (#{cached_data['models'].length} models, cached #{((Time.now - cache_time) / 60).round} minutes ago)")
+            return cached_data['models']
+          else
+            call('log_debug', "Model cache expired, refreshing...")
+          end
+        end
+      rescue => e
+        # If cache access fails, continue without it
+        call('log_debug', "Cache access failed: #{e.message}, fetching fresh data")
+      end
+
+      # Fallback cascade for dynamic model discovery
+      models = call('cascade_model_discovery', connection, publisher, region)
+
+      # Cache the results if we got any
+      if models.present?
+        begin
+          cache_data = {
+            'models' => models,
+            'cached_at' => Time.now.iso8601,
+            'count' => models.length,
+            'source' => models.first&.dig('source') || 'api'
+          }
+          # Cache for 1 hour (3600 seconds)
+          workato.cache.set(cache_key, cache_data, 3600)
+          call('log_debug', "Cached #{models.length} models for future use (source: #{cache_data['source']})")
+        rescue => e
+          call('log_debug', "Failed to cache models: #{e.message}")
+        end
+      end
+
+      models
+    end,
     validate_publisher_model!: lambda do |connection, model_name|
       # Early exit conditions (no need to validate in input absent or validation disabled)
       return if model_name.blank?
@@ -2688,12 +2582,12 @@
           validated_time = Time.parse(cached_validation['validated_at'])
           # Use cached result if validation is less than 1 hour old
           if validated_time > Time.now - 3600
-            puts "Model #{model_name} validation cached (#{((Time.now - validated_time) / 60).round(1)}min ago)"
+            call('log_debug', "Model #{model_name} validation cached (#{((Time.now - validated_time) / 60).round(1)}min ago)")
             return
           end
         end
       rescue => e
-        puts "Model validation cache read failed: #{e.message}"
+        call('log_debug', "Model validation cache read failed: #{e.message}")
         # Continue with validation if cache fails
       end
       
@@ -2713,30 +2607,29 @@
 
       begin
         # Make the validation request with specific error handling
-        resp = get(url).
-          params(view: 'PUBLISHER_MODEL_VIEW_BASIC').  # Changed from FULL to BASIC for speed
-          after_error_response(/404/) do |code, body, _hdrs, message|
-            # Model not found - provide helpful context about what might be wrong
-            error("Model '#{model_name}' not found in region '#{region}'.\n" \
-                  "Possible issues:\n" \
-                  "• Model name typo (check spelling carefully)\n" \
-                  "• Model not available in #{region} (try us-central1)\n" \
-                  "• Model deprecated or renamed\n" \
-                  "• Using preview model without enabling preview models in connection")
-          end.
-          after_error_response(/403/) do |code, body, _hdrs, message|
-            # Permission denied - guide user to fix their setup
-            error("Access denied to model '#{model_name}'.\n" \
-                  "To fix this:\n" \
-                  "1. Verify Vertex AI API is enabled in Google Cloud Console\n" \
-                  "2. Check service account has 'Vertex AI User' role\n" \
-                  "3. Ensure billing is enabled for your project\n" \
-                  "4. Confirm project ID is correct: #{connection['project']}")
-          end.
-          after_error_response(/.*/) do |code, body, _hdrs, message|
-            # Use the centralized error handler for other errors
-            call('handle_vertex_error', connection, code, body, message)
+        resp = call('api_request', connection, :get, url, {
+          params: { view: 'PUBLISHER_MODEL_VIEW_BASIC' },
+          context: { action: 'Validate publisher model' },
+          error_handler: lambda do |code, body, message|
+            if code == 404
+              error("Model '#{model_name}' not found in region '#{region}'.\n" \
+                    "Possible issues:\n" \
+                    "• Model name typo (check spelling carefully)\n" \
+                    "• Model not available in #{region} (try us-central1)\n" \
+                    "• Model deprecated or renamed\n" \
+                    "• Using preview model without enabling preview models in connection")
+            elsif code == 403
+              error("Access denied to model '#{model_name}'.\n" \
+                    "To fix this:\n" \
+                    "1. Verify Vertex AI API is enabled in Google Cloud Console\n" \
+                    "2. Check service account has 'Vertex AI User' role\n" \
+                    "3. Ensure billing is enabled for your project\n" \
+                    "4. Confirm project ID is correct: #{connection['project']}")
+            else
+              call('handle_vertex_error', connection, code, body, message)
+            end
           end
+        })
         
         # Additional validation: Check if model is GA when preview models aren't allowed
         unless connection['include_preview_models']
@@ -2761,117 +2654,17 @@
           }
           workato.cache.set(cache_key, validation_data, 3600) # 1 hour TTL
         rescue => e
-          puts "Model validation cache write failed: #{e.message}"
+          call('log_debug', "Model validation cache write failed: #{e.message}")
         end
 
-        puts "Model #{model_name} validated successfully in #{region}"
-        
+        call('log_debug', "Model #{model_name} validated successfully in #{region}")
+
       rescue => e
         # If anything goes wrong, provide a clear error message
         error("Model validation failed: #{e.message}\n" \
               "This usually means a temporary network issue. Try again in a moment.")
       end
     end,
-    # - Partition models by capability.
-    vertex_model_bucket: lambda do |model_id|
-      id = model_id.to_s.downcase
-
-      # Use a hash for 0(1) lookup instead of multiple str includes
-      @model_categories ||= {
-        'embedding' => %w[embedding gecko multimodalembedding embeddinggemma],
-        'image' => %w[vision imagegeneration imagen],
-        'audio' => %w[tts audio speech],
-        'code' => %w[code codey],
-        'chat' => %w[chat],
-        'text' => []  # Default category
-      }
-
-      # Find the category for this model
-      @model_categories.each do |category, keywords|
-        return category.to_sym if keywords.any? { |keyword| id.include?(keyword) }
-      end
-    
-      :text # default to text if no match
-    end,
-    # - Sort model options by version, tier, then alphabetically      
-    sort_model_options: lambda do |options|
-      options.sort_by do |label, value|
-        # Extract version number if present
-        version_match = label.match(/(\d+)\.(\d+)/)
-        major_version = version_match ? version_match[1].to_i : 0
-        minor_version = version_match ? version_match[2].to_i : 0
-        
-        # Determine model tier
-        tier = case label
-              when /\bPro\b/i then 0
-              when /\bFlash\b/i then 1  
-              when /\bLite\b/i then 2
-              else 3
-              end
-        
-        # Sort by: version (desc), tier, then alphabetical
-        [
-          -major_version,  # Newest version first
-          -minor_version,  # Higher minor version first
-          tier,            # Pro > Flash > Lite
-          label            # Alphabetical as tiebreaker
-        ]
-      end
-    end,
-    # - Filter/sort + convert to picklist options [label, value]
-    to_model_options: lambda do |models, bucket:, include_preview: false|
-      return [] if models.blank?
-      
-      retired_pattern = /(^|-)1\.0-|text-bison|chat-bison/
-      eligible = models.select do |m|
-        id = m['name'].to_s.split('/').last
-        next false if id.blank?
-        next false if id =~ retired_pattern
-        next false unless call('vertex_model_bucket', id) == bucket
-        if !include_preview
-          stage = m['launchStage'].to_s
-          next false unless stage == 'GA' || stage.blank?
-        end
-        true
-      end
-      
-      # Extract unique model IDs efficiently
-      seen_ids = {}
-      unique_models = eligible.select do |m|
-        id = m['name'].to_s.split('/').last
-        next false if id.blank?
-        next false if seen_ids[id]
-        seen_ids[id] = true
-      end
-      
-      # Build options with better sorting
-      options = unique_models.map do |m|
-        id = m['name'].to_s.split('/').last
-        # Create a human-friendly label
-        label = create_model_label(id, m)
-        [label, "publishers/google/models/#{id}"]
-      end
-      
-      # Sort with a more sophisticated algorithm
-      sort_model_options(options)
-    end,
-    # - Context-aware model label creation
-    create_model_label: lambda do |model_id, model_metadata = {}|
-      return '' if model_id.to_s.strip.empty?
-      # Start with the basic formatting
-      label = model_id.gsub('-', ' ').split.map { |word| 
-        # Keep version numbers as-is, capitalize other words
-        word =~ /^\d/ ? word : word.capitalize 
-      }.join(' ')
-      
-      # Add helpful context if available
-      if model_metadata['launchStage'].present? && model_metadata['launchStage'] != 'GA'
-        label += " (#{model_metadata['launchStage']})"
-      end
-      
-      label
-    end,
-    # - Picklist generator with static fallback
     dynamic_model_picklist: lambda do |connection, bucket, static_fallback|
       # 1. Check if dynamic models are enabled (return to static if not)
       unless connection['dynamic_models']
@@ -2906,6 +2699,9 @@
       call('log_debug', "All dynamic fetch attempts failed, using static list")
       static_fallback
     end,
+    picklist_for: lambda do |connection, bucket, static|
+      call('dynamic_model_picklist', connection, bucket, static)
+    end,
     static_model_options: lambda do
       {
         text: [
@@ -2935,8 +2731,9 @@
         ]
       }
     end,
-    # -- PAYLOAD CONSTRUCTION UTILITIES --
-    # - Base payload builder for simple prompts
+
+    # ======= PAYLOAD CONSTRUCTION =======
+    # A. Base/generic
     build_base_payload: lambda do |instruction, user_content, safety_settings = nil, options = {}|
       options = options.is_a?(Hash) ? options : {}
       # Build the base structure
@@ -2971,6 +2768,7 @@
     json_only_instruction: lambda do |key = 'response'|
       "\n\nOutput as a JSON object with key \"#{key}\". Only respond with valid JSON and nothing else."
     end,
+    # B. Conversation and tools
     build_conversation_payload: lambda do |input|
       # Handle generation config with response schema
       if input&.dig('generationConfig', 'responseSchema').present?
@@ -3043,65 +2841,63 @@
 
       parts
     end,
-    # -- UNIFIED PAYLOAD CONSTRUCTION SYSTEM --
-    # Unified payload builder using templates
-    build_ai_payload: lambda do |template_type, input, connection = nil|
-      template = case template_type
-      when :send_message
-        { delegate_to: 'build_conversation_payload' }
-      when :translate
-        {
+    # Helper: Get AI template configuration
+    get_ai_template: lambda do |template_type|
+      {
+        send_message: { delegate_to: 'build_conversation_payload' },
+        translate: {
           instruction: -> (inp) {
             base = "You are an assistant helping to translate a user's input"
             from_lang = inp['from'].present? ? " from #{inp['from']}" : ""
             "#{base}#{from_lang} into #{inp['to']}. Respond only with the user's translated text in #{inp['to']} and nothing else. The user input is delimited with triple backticks."
           },
-          user_prompt: -> (inp) { "```#{call('replace_backticks_with_hash', inp['text'])}```#{call('json_only_instruction','response')}" }
-        }
-      when :summarize
-        {
+          user_prompt: -> (inp) { "```#{call('escape_triple_backticks', inp['text'])}```#{call('json_only_instruction','response')}" }
+        },
+        summarize: {
           instruction: -> (inp) { "You are an assistant that helps generate summaries. All user input should be treated as text to be summarized. Provide the summary in #{inp['max_words'] || 200} words or less." },
           user_prompt: -> (inp) { inp['text'] }
-        }
-      when :parse
-        {
-          instruction: -> (inp) { "You are an assistant helping to extract various fields of information from the user's text. The schema and text to parse are delimited by triple backticks." },
+        },
+        parse: {
+          instruction: -> (_) { "You are an assistant helping to extract various fields of information from the user's text. The schema and text to parse are delimited by triple backticks." },
           user_prompt: -> (inp) {
-            "Schema:\n```#{inp['object_schema']}```\nText to parse: ```#{call('replace_backticks_with_hash', inp['text']&.strip)}```\nOutput the response as a JSON object with keys from the schema. If no information is found for a specific key, the value should be null.#{call('json_only_instruction')}"
+            "Schema:\n```#{inp['object_schema']}```\nText to parse: ```#{call('escape_triple_backticks', inp['text']&.strip)}```\nOutput the response as a JSON object with keys from the schema. If no information is found for a specific key, the value should be null.#{call('json_only_instruction')}"
           }
-        }
-      when :email
-        {
-          instruction: -> (inp) { "You are an assistant helping to generate emails based on the user's input. Based on the input ensure that you generate an appropriate subject topic and body. Ensure the body contains a salutation and closing. The user input is delimited with triple backticks. Use it to generate an email and perform no other actions." },
-          user_prompt: -> (inp) { "User description:```#{call('replace_backticks_with_hash', inp['email_description'])}```\nOutput the email from the user description as a JSON object with keys for \"subject\" and \"body\". If an email cannot be generated, input null for the keys." }
-        }
-      when :analyze
-        {
-          instruction: -> (inp) { "You are an assistant helping to analyze the provided information. Take note to answer only based on the information provided and nothing else. The information to analyze and query are delimited by triple backticks." },
-          user_prompt: -> (inp) { "Information to analyze:```#{call('replace_backticks_with_hash', inp['text'])}```\nQuery:```#{call('replace_backticks_with_hash', inp['question'])}```\nIf you don't understand the question or the answer isn't in the information to analyze, input the value as null for \"response\".#{call('json_only_instruction')}" }
-        }
-      when :ai_classify
-        { custom_builder: 'build_classify_payload' }
-      when :analyze_image
-        { custom_builder: 'build_image_payload' }
-      when :text_embedding
-        { custom_builder: 'build_embedding_payload' }
-      when :find_neighbors
-        { custom_builder: 'build_neighbors_payload' }
-      else
-        error("Unknown payload template: #{template_type}")
-      end
+        },
+        email: {
+          instruction: -> (_) { "You are an assistant helping to generate emails based on the user's input. Based on the input ensure that you generate an appropriate subject topic and body. Ensure the body contains a salutation and closing. The user input is delimited with triple backticks. Use it to generate an email and perform no other actions." },
+          user_prompt: -> (inp) { "User description:```#{call('escape_triple_backticks', inp['email_description'])}```\nOutput the email from the user description as a JSON object with keys for \"subject\" and \"body\". If an email cannot be generated, input null for the keys." }
+        },
+        analyze: {
+          instruction: -> (_) { "You are an assistant helping to analyze the provided information. Take note to answer only based on the information provided and nothing else. The information to analyze and query are delimited by triple backticks." },
+          user_prompt: -> (inp) { "Information to analyze:```#{call('escape_triple_backticks', inp['text'])}```\nQuery:```#{call('escape_triple_backticks', inp['question'])}```\nIf you don't understand the question or the answer isn't in the information to analyze, input the value as null for \"response\".#{call('json_only_instruction')}" }
+        },
+        ai_classify: { custom_builder: 'build_classify_payload' },
+        analyze_image: { custom_builder: 'build_image_payload' },
+        text_embedding: { custom_builder: 'build_embedding_payload' },
+        find_neighbors: { custom_builder: 'build_neighbors_payload' }
+      }[template_type]
+    end,
 
-      # Handle delegation or custom builders
+    # Helper: Process AI template
+    process_ai_template: lambda do |template, input, connection|
       return call(template[:delegate_to], input) if template[:delegate_to]
       return call(template[:custom_builder], input, connection) if template[:custom_builder]
 
-      # Build payload from template
+      # Build from instruction and user_prompt
       instruction = template[:instruction].call(input)
       user_prompt = template[:user_prompt].call(input)
       call('build_base_payload', instruction, user_prompt, input['safetySettings'])
     end,
-    # Custom payload builders for complex cases
+
+    # C. Template selector
+    # Build AI Payload delegates to specific builders based on template type.
+    build_ai_payload: lambda do |template_type, input, connection = nil|
+      template = call('get_ai_template', template_type)
+      error("Unknown payload template: #{template_type}") unless template
+
+      call('process_ai_template', template, input, connection)
+    end,
+    # D. Task-specific builders
     build_classify_payload: lambda do |input, connection|
       # Extract categories and options
       categories = Array(input['categories'] || [])
@@ -3122,7 +2918,7 @@
 
       # Build the classification prompt
       user_prompt = "Categories:\n```#{categories_text}```\n" \
-                    "Text to classify:\n```#{call('replace_backticks_with_hash', input['text']&.strip)}```\n\n"
+                    "Text to classify:\n```#{call('escape_triple_backticks', input['text']&.strip)}```\n\n"
 
       # Add output format based on options
       if options['return_confidence'] && options['return_alternatives']
@@ -3140,16 +2936,6 @@
       payload['generationConfig']['temperature'] = temperature
       payload
     end,
-    build_image_payload: lambda do |input, connection|
-      call('payload_for_analyze_image', input)  # Keep existing complex logic for now
-    end,
-    build_embedding_payload: lambda do |input, connection|
-      call('payload_for_text_embedding', input)  # Keep existing logic
-    end,
-    build_neighbors_payload: lambda do |input, connection|
-      call('payload_for_find_neighbors', input)  # Keep existing logic
-    end,
-    # -- REMAINING PAYLOAD BUILDERS (for complex cases) --
     payload_for_analyze_image: lambda do |input|
       # We can't use the base builder since we have to pass image data in parts
       {
@@ -3175,6 +2961,48 @@
         'safetySettings' => input['safetySettings'].presence
       }.compact
     end,
+    build_image_payload: lambda do |input, connection|
+      call('payload_for_analyze_image', input)  # Keep existing complex logic for now
+    end,
+    build_embedding_payload: lambda do |input, connection|
+      call('payload_for_text_embedding', input)  # Keep existing logic
+    end,
+    build_neighbors_payload: lambda do |input, connection|
+      call('payload_for_find_neighbors', input)  # Keep existing logic
+    end,
+    payload_for_find_neighbors: lambda do |input|
+      # We follow Google’s JSON casing for FindNeighbors REST:
+      # top-level: deployedIndexId, returnFullDatapoint, queries[]
+      # queries[].datapoint.*: datapointId, featureVector, sparseEmbedding, restricts, numericRestricts, crowdingTag
+      #
+      # Numeric restricts accept ONE of valueInt/valueFloat/valueDouble with 'op' enum.
+      queries = (input['queries'] || []).map do |q|
+        dp = q['datapoint'] || {}
+
+        # Pass through as-is; assume UI provided correct shapes/casing.
+        {
+          'datapoint' => {
+            'datapointId'     => dp['datapointId'].presence,
+            'featureVector'   => dp['featureVector'].presence,
+            'sparseEmbedding' => dp['sparseEmbedding'].presence, # { values: [Float], dimensions: [Integer] }
+            'restricts'       => dp['restricts'].presence,       # [{ namespace, allowList[], denyList[] }]
+            'numericRestricts'=> dp['numericRestricts'].presence,# [{ namespace, op, valueInt|valueFloat|valueDouble }]
+            'crowdingTag'     => dp['crowdingTag'].presence      # { crowdingAttribute }
+          }.compact,
+          'neighborCount'                          => q['neighborCount'],
+          'approximateNeighborCount'               => q['approximateNeighborCount'],
+          'perCrowdingAttributeNeighborCount'      => q['perCrowdingAttributeNeighborCount'],
+          'fractionLeafNodesToSearchOverride'      => q['fractionLeafNodesToSearchOverride'],
+          'rrf'                                    => q['rrf'].presence # optional future-proofing; if you need RRF fusion
+        }.compact
+      end
+
+      {
+        'deployedIndexId'      => input['deployedIndexId'],
+        'queries'              => queries,
+        'returnFullDatapoint'  => !!input['returnFullDatapoint']
+      }.compact
+    end,
     payload_for_text_embedding: lambda do |input|
       {
         'instances' => [
@@ -3186,8 +3014,752 @@
         ]
       }
     end,
+
+    # ======= VERTEX REQUEST ORCHESTRATION ======= 
+    # Build fully-qualified Vertex endpoint for a model
+    vertex_url_for: lambda do |connection, model, verb|
+      base = call('project_region_path', connection)
+      v = verb.to_s
+      case v
+      when 'generate' then "#{base}/#{model}:generateContent"
+      when 'predict'  then "#{base}/#{model}:predict"
+      else error("Unsupported Vertex verb: #{verb}")
+      end
+    end,
+    # Unified “validate → build → call → extract”
+    run_vertex: lambda do |connection, input, template, verb:, extract: {}|
+      call('validate_publisher_model!', connection, input['model'])
+      payload = input['formatted_prompt'].presence || call('build_ai_payload', template, input, connection)
+      url = call('vertex_url_for', connection, input['model'], verb)
+      resp = call('rate_limited_ai_request', connection, input['model'], verb, url, payload)
+      extract.present? ? call('extract_response', resp, extract) : resp
+    end,
+
+    # ======= RESPONSE EXTRACTION AND NORMALIZATION =======
+    extract_embedding_values: lambda do |prediction|
+      prediction&.dig('embeddings', 'values') ||
+      prediction&.dig('embeddings')&.first&.dig('values') || []
+    end,
+    usage_meta: lambda do |resp|
+      {
+        'promptTokenCount' => resp.dig('usageMetadata', 'promptTokenCount') || 0,
+        'candidatesTokenCount' => resp.dig('usageMetadata', 'candidatesTokenCount') || 0,
+        'totalTokenCount' => resp.dig('usageMetadata', 'totalTokenCount') || 0
+      }
+    end,
+    extract_json: lambda do |resp|
+      json_txt = resp&.dig('candidates', 0, 'content', 'parts', 0, 'text')
+      return {} if json_txt.blank?
+
+      # Cleanup markdown code blocks
+      json = call('strip_fences', json_txt)
+
+      begin
+        parse_json(json) || {}
+      rescue => e
+        # Log error for debugging, but return empty hash to prevent action failure
+        call('log_debug', "JSON parsing failed: #{e.message}. Raw text: #{json_txt}")
+        {}
+      end
+    end,
+    get_safety_ratings: lambda do |ratings|
+      {
+        'sexually_explicit' =>
+          ratings&.find do |r|
+            r['category'] == 'HARM_CATEGORY_SEXUALLY_EXPLICIT'
+          end&.[]('probability'),
+        'hate_speech' =>
+          ratings&.find { |r| r['category'] == 'HARM_CATEGORY_HATE_SPEECH' }&.[]('probability'),
+        'harassment' =>
+          ratings&.find { |r| r['category'] == 'HARM_CATEGORY_HARASSMENT' }&.[]('probability'),
+        'dangerous_content' =>
+          ratings&.find do |r|
+            r['category'] == 'HARM_CATEGORY_DANGEROUS_CONTENT'
+          end&.[]('probability')
+      }
+    end,
+    check_finish_reason: lambda do |reason|
+      case reason&.downcase
+      when 'finish_reason_unspecified'
+        error 'ERROR - The finish reason is unspecified.'
+      when 'other'
+        error 'ERROR - Token generation stopped due to an unknown reason.'
+      when 'max_tokens'
+        error 'ERROR - Token generation reached the configured maximum output tokens.'
+      when 'safety'
+        error 'ERROR - Token generation stopped because the content potentially contains ' \
+              'safety violations.'
+      when 'recitation'
+        error 'ERROR - Token generation stopped because the content potentially contains ' \
+              'copyright violations.'
+      when 'blocklist'
+        error 'ERROR - Token generation stopped because the content contains forbidden items.'
+      when 'prohibited_content'
+        error 'ERROR - Token generation stopped for potentially containing prohibited content.'
+      when 'spii'
+        error 'ERROR - Token generation stopped because the content potentially contains ' \
+              'Sensitive Personal Identifiable Information (SPII).'
+      when 'malformed_function_call'
+        error 'ERROR - The function call generated by the model is invalid.'
+      end
+    end,
+    standard_error_response: lambda do |type, ratings|
+      case type
+      when :generic
+        { 'answer' => 'N/A', 'safety_ratings' => {} }
+      when :classify
+        { 'selected_category' => 'N/A', 'confidence' => 0.0, 'safety_ratings' => {} }
+      else
+        { 'error' => 'Safety ratings check failed', 'safety_ratings' => {} }
+      end
+    end,
+    extract_response: lambda do |resp, options = {}|
+      # Extract options with defaults
+      type = options[:type] || :generic
+      is_json_response = options[:json_response] || false
+
+      # Common safety and finish reason checks for generative responses
+      if [:generic, :email, :parsed, :classify].include?(type)
+        call('check_finish_reason', resp.dig('candidates', 0, 'finishReason'))
+        ratings = call('get_safety_ratings', resp.dig('candidates', 0, 'safetyRatings'))
+        return call('standard_error_response', type, ratings) if ratings.blank?
+      else
+        ratings = {}
+      end
+
+      # Extract core response based on type
+      case type
+      when :generic
+        answer = if is_json_response
+                  call('extract_json', resp)&.[]('response')
+                else
+                  resp&.dig('candidates', 0, 'content', 'parts', 0, 'text')
+                end
+
+        has_answer = !answer.nil? && !answer.to_s.strip.empty? && answer.to_s.strip != 'N/A'
+
+        {
+          'answer' => answer.to_s,
+          'has_answer' => has_answer,
+          'pass_fail' => has_answer,
+          'action_required' => has_answer ? 'use_answer' : 'try_different_question',
+          'answer_length' => answer.to_s.length,
+          'safety_ratings' => ratings,
+          'usage' => call('usage_meta', resp)
+        }
+
+      when :email
+        json = call('extract_json', resp)
+        {
+          'subject' => json&.[]('subject'),
+          'body' => json&.[]('body'),
+          'safety_ratings' => ratings,
+          'usage' => resp['usageMetadata']
+        }
+
+      when :parsed
+        json = call('extract_json', resp)
+        json&.each_with_object({}) do |(key, value), hash|
+          hash[key] = value
+        end&.merge('safety_ratings' => ratings, 'usage' => resp['usageMetadata'])
+
+      when :embedding
+        vals = call('extract_embedding_values', resp&.dig('predictions', 0)) || []
+        { 'embedding' => vals.map { |v| { 'value' => v } } }
+
+      when :classify
+        json = call('extract_json', resp)
+        json = {} unless json.is_a?(Hash)
+        
+        selected_category = json&.[]('selected_category') || 'N/A'
+        confidence = json&.[]('confidence')&.to_f || 1.0
+        alternatives = json&.[]('alternatives') || []
+
+        # Normalize values
+        selected_category = selected_category.to_s
+        selected_category = 'unknown' if selected_category.empty? || selected_category == 'N/A'
+        confidence = [[confidence, 0.0].max, 1.0].min
+
+        # Decision logic
+        confidence_threshold = 0.7
+        requires_human_review = confidence < confidence_threshold
+
+        {
+          'selected_category' => selected_category,
+          'confidence' => confidence,
+          'alternatives' => alternatives,
+          'requires_human_review' => requires_human_review,
+          'confidence_threshold' => confidence_threshold,
+          'pass_fail' => !requires_human_review,
+          'action_required' => requires_human_review ? 'human_review' : 'use_classification',
+          'safety_ratings' => ratings,
+          'usage' => resp['usageMetadata']
+        }
+
+      else
+        error("Unknown response extraction type: #{type}")
+      end
+    end,
+
+    # ======= GOOGLE DRIVE HELPER METHODS =======
+    drive_basic_fields: lambda do
+      'id,name,mimeType,size,modifiedTime,md5Checksum,owners'.freeze
+    end,
+    extract_drive_file_id: lambda do |url_or_id|
+      return url_or_id if url_or_id.blank?
+
+      # Try different URL patterns
+      # Pattern 1: /d/{file_id}/
+      if match = url_or_id.match(%r{/d/([a-zA-Z0-9_-]+)})
+        return match[1]
+      end
+
+      # Pattern 2: ?id={file_id}
+      if match = url_or_id.match(/[?&]id=([a-zA-Z0-9_-]+)/)
+        return match[1]
+      end
+
+      # Pattern 3: Raw file ID (alphanumeric with dashes/underscores)
+      if url_or_id.match(/^[a-zA-Z0-9_-]+$/)
+        return url_or_id
+      end
+
+      # If no pattern matches, return as-is and let API handle the error
+      url_or_id
+    end,
+    get_export_mime_type: lambda do |mime_type|
+      return nil if mime_type.blank?
+      exports = {
+        'application/vnd.google-apps.document'     => 'text/plain',
+        'application/vnd.google-apps.spreadsheet'  => 'text/csv',
+        'application/vnd.google-apps.presentation' => 'text/plain'
+      }.freeze
+      exports[mime_type]
+    end,
+    build_drive_query: lambda do |options = {}|
+      query_parts = ['trashed = false']
+
+      # Add folder filter
+      if options[:folder_id].present?
+        query_parts << "'#{options[:folder_id]}' in parents"
+      end
+
+      # Add date filters
+      if options[:modified_after].present?
+        query_parts << "modifiedTime > '#{options[:modified_after]}'"
+      end
+
+      if options[:modified_before].present?
+        query_parts << "modifiedTime < '#{options[:modified_before]}'"
+      end
+
+      # Add MIME type filters
+      if options[:mime_type].present?
+        query_parts << "mimeType = '#{options[:mime_type]}'"
+      end
+
+      if options[:exclude_folders]
+        query_parts << "mimeType != 'application/vnd.google-apps.folder'"
+      end
+
+      query_parts.join(' and ')
+    end,
+    classify_drive_change: lambda do |change, include_removed|
+      return { kind: :removed, summary: { 'fileId' => change['fileId'], 'time' => change['time'] } } if change['removed']
+      file = change['file']
+      return { kind: :skip } if file.nil?
+      return { kind: :skip } if file['trashed'] && !include_removed
+      summary = {
+        'id' => file['id'],
+        'name' => file['name'],
+        'mimeType' => file['mimeType'],
+        'modifiedTime' => file['modifiedTime'],
+        'checksum' => file['md5Checksum']
+      }
+      # Heuristic: first seen ~added, else modified
+      { kind: :added, summary: summary }
+    end,
+    fetch_file_content: lambda do |connection, file_id, metadata, include_content = true|
+      # Skip content fetching if not requested
+      unless include_content
+        return {
+          'text_content' => '',
+          'needs_processing' => false,
+          'fetch_method' => 'skipped',
+          'export_mime_type' => nil
+        }
+      end
+
+      # Determine export type for Google Workspace files
+      export_mime_type = call('get_export_mime_type', metadata['mimeType'])
+
+      if export_mime_type.present?
+        # Google Workspace file - use export endpoint
+        content_response = call('api_request', connection, :get,
+          call('drive_api_url', :export, file_id),
+          {
+            params: { mimeType: export_mime_type },
+            error_handler: lambda do |code, body, message|
+              error(call('handle_drive_error', connection, code, body, message))
+            end
+          }
+        )
+
+        # Return workspace file result
+        {
+          'text_content' => content_response.force_encoding('UTF-8'),
+          'needs_processing' => false,
+          'fetch_method' => 'export',
+          'export_mime_type' => export_mime_type
+        }
+      else
+        # Regular file - use download endpoint
+        content_response = call('api_request', connection, :get,
+          call('drive_api_url', :download, file_id),
+          {
+            error_handler: lambda do |code, body, message|
+              error(call('handle_drive_error', connection, code, body, message))
+            end
+          }
+        )
+
+        # Check if it's a text-based file
+        is_text_file = metadata['mimeType']&.start_with?('text/') ||
+                       ['application/json', 'application/xml'].include?(metadata['mimeType'])
+
+        # Check if it needs additional processing
+        needs_processing = ['application/pdf', 'image/'].any? { |prefix|
+          metadata['mimeType']&.start_with?(prefix)
+        }
+
+        # Return regular file result
+        {
+          'text_content' => is_text_file ? content_response.force_encoding('UTF-8') : '',
+          'needs_processing' => needs_processing,
+          'fetch_method' => 'download',
+          'export_mime_type' => nil
+        }
+      end
+    end,
+    fetch_drive_file_full: lambda do |connection, file_id, include_content|
+      metadata_response = call('api_request', connection, :get,
+        call('drive_api_url', :file, file_id),
+        {
+          params: { fields: call('drive_basic_fields') },
+          error_handler: lambda do |code, body, message|
+            error(call('handle_drive_error', connection, code, body, message))
+          end
+        }
+      )
+
+      content_result = call('fetch_file_content',
+        connection, file_id, metadata_response, include_content
+      )
+
+      metadata_response.merge(content_result)
+    end,
+
+    # ======= HEALTH PROBES =======
+    probe_vertex_ai: lambda do |connection, test_models: false|
+      start_time = Time.now
+      datasets_response = call('api_request', connection, :get,
+        "#{call('project_region_path', connection)}/datasets",
+        { params: { pageSize: 1 }, context: { action: 'List datasets' } }
+      )
+      result = {
+        'service' => 'Vertex AI',
+        'status' => 'connected',
+        'response_time_ms' => ((Time.now - start_time) * 1000).round,
+        'permissions_validated' => []
+      }
+      result['permissions_validated'] << 'aiplatform.datasets.list' if datasets_response
+      if test_models
+        begin
+          models_response = call('api_request', connection, :get,
+            "#{call('project_region_path', connection)}/models",
+            { params: { pageSize: 1 }, context: { action: 'List models' } }
+          )
+          result['permissions_validated'] << 'aiplatform.models.list'
+          result['models_accessible'] = models_response.present?
+        rescue => e
+          result['models_accessible'] = false
+          result['warning'] = "Cannot list models: #{e.message}"
+        end
+        begin
+          _ = call('api_request', connection, :get,
+            "https://#{connection['region']}-aiplatform.googleapis.com/v1/publishers/google/models/gemini-1.5-pro",
+            { context: { action: 'Get Gemini model' } }
+          )
+          result['gemini_access'] = true
+          result['permissions_validated'] << 'aiplatform.models.predict'
+        rescue => e
+          result['gemini_access'] = false
+          (result['warnings'] ||= []) << "Cannot access Gemini models: #{e.message}"
+        end
+      end
+      result
+    end,
+    probe_drive: lambda do |connection, verbose: false|
+      start_time = Time.now
+      drive_response = call('api_request', connection, :get,
+        call('drive_api_url', :files),
+        {
+          params: { pageSize: 1, q: "trashed = false", fields: 'files(id,name,mimeType)' },
+          error_handler: lambda do |code, body, message|
+            error(call('handle_drive_error', connection, code, body, message))
+          end,
+          context: { action: 'List Drive files' }
+        }
+      )
+      test = {
+        'service' => 'Google Drive',
+        'status' => 'connected',
+        'response_time_ms' => ((Time.now - start_time) * 1000).round,
+        'files_found' => drive_response['files'].length,
+        'permissions_validated' => ['drive.files.list']
+      }
+      if verbose && drive_response['files'].any?
+        test['sample_file'] = drive_response['files'].first
+      end
+      if drive_response['files'].any?
+        file_id = drive_response['files'].first['id']
+        begin
+          call('api_request', connection, :get, call('drive_api_url', :file, file_id),
+            { params: { fields: 'id,size' }, context: { action: 'Get Drive file' } }
+          )
+          test['permissions_validated'] << 'drive.files.get'
+          test['can_read_files'] = true
+        rescue => e
+          test['can_read_files'] = false
+          (test['warnings'] ||= []) << "Cannot read file content: #{e.message}"
+        end
+      end
+      test
+    end,
+    probe_index: lambda do |connection, index_id|
+      start_time = Time.now
+      index_stats = call('validate_index_access', connection, index_id)
+      {
+        'service' => 'Vector Search Index',
+        'status' => 'connected',
+        'response_time_ms' => ((Time.now - start_time) * 1000).round,
+        'index_details' => {
+          'display_name' => index_stats['display_name'],
+          'state' => index_stats['deployed_state'],
+          'index_update_method' => nil
+        },
+        'deployed' => index_stats['deployed_state'] == 'DEPLOYED',
+        'deployed_count' => nil,
+        'stats' => {
+          'vectors_count' => index_stats['total_datapoints'],
+          'shards_count' => index_stats['shards_count']
+        }
+      }
+    end,
+
+    # ======= VECTOR SEARCH / INDEX MANAGEMENT =======
+    transform_find_neighbors_response: lambda do |response|
+      # Extract all neighbors from potentially multiple queries
+      all_neighbors = []
+      nearest_neighbors = response['nearestNeighbors'] || []
+
+      nearest_neighbors.each do |query_result|
+        neighbors = query_result['neighbors'] || []
+        neighbors.each do |neighbor|
+          datapoint = neighbor['datapoint'] || {}
+          distance = neighbor['distance'].to_f
+          
+          similarity_score = call('to_similarity', distance, call('neighbors_max_distance'))
+
+          all_neighbors << {
+            'datapoint_id' => datapoint['datapointId'].to_s,
+            'distance' => distance,
+            'similarity_score' => similarity_score.round(6),
+            'feature_vector' => datapoint['featureVector'] || [],
+            'crowding_attribute' => datapoint.dig('crowdingTag', 'crowdingAttribute').to_s
+          }
+        end
+      end
+
+      # Sort by similarity score (highest first)
+      all_neighbors.sort_by! { |n| -n['similarity_score'] }
+
+      # Recipe-friendly response
+      best_match = all_neighbors.first || {}
+      has_matches = all_neighbors.any?
+
+      {
+        'matches_count' => all_neighbors.length,
+        'top_matches' => all_neighbors,
+        'best_match_id' => best_match['datapoint_id'].to_s,
+        'best_match_score' => best_match['similarity_score'] || 0.0,
+        'pass_fail' => has_matches,
+        'action_required' => has_matches ? 'retrieve_content' : 'refine_query',
+        'nearestNeighbors' => nearest_neighbors  # Keep original for backward compatibility
+      }
+    end,
+    validate_index_access: lambda do |connection, index_id|
+      # Extract project, region, and index name from the index_id
+      index_parts = index_id.split('/')
+      if index_parts.length < 6 || index_parts[0] != 'projects' || index_parts[2] != 'locations' || index_parts[4] != 'indexes'
+        error("Invalid index_id format. Expected: projects/PROJECT/locations/REGION/indexes/INDEX_ID")
+      end
+
+      begin
+        # Get index details
+        index_response = call('api_request', connection, :get, index_id, {
+          context: { action: 'Get index details' },
+          error_handler: lambda do |code, body, message|
+            if code == 404
+              error("Index not found: #{index_id}")
+            elsif code == 403
+              error("Permission denied. Service account missing aiplatform.indexes.get permission for index: #{index_id}")
+            else
+              call('handle_vertex_error', connection, code, body, message)
+            end
+          end
+        })
+
+        # Check if index is deployed
+        deployed_indexes = index_response['deployedIndexes'] || []
+        if deployed_indexes.empty?
+          error("Index is not deployed. Index must be in DEPLOYED state for upsert operations.")
+        end
+
+        # Get index stats from first deployed index
+        deployed_index = deployed_indexes[0]
+        # Ensure all ID fields are strings and timestamps are ISO 8601
+        created_time = index_response['createTime']
+        updated_time = index_response['updateTime']
+
+        # Ensure timestamps are in ISO 8601 format (Google already provides ISO 8601)
+        created_time = created_time.to_s if created_time
+        updated_time = updated_time.to_s if updated_time
+
+        index_stats = {
+          'index_id' => index_id.to_s,
+          'deployed_state' => 'DEPLOYED',
+          'total_datapoints' => index_response.dig('indexStats', 'vectorsCount')&.to_i,
+          'shards_count' => index_response.dig('indexStats', 'shardsCount')&.to_i,
+          'display_name' => index_response['displayName'].to_s,
+          'created_time' => created_time || '',
+          'updated_time' => updated_time || ''
+        }
+
+        # Try to get more detailed stats if available
+        if deployed_index['indexEndpoint']
+          endpoint_id = deployed_index['indexEndpoint']
+          begin
+            endpoint_response = call('api_request', connection, :get, endpoint_id, {
+              context: { action: 'Get index endpoint' },
+              error_handler: lambda do |_code, _body, _message| nil end
+            })
+
+            if endpoint_response
+              index_stats['endpoint_state'] = endpoint_response['state'] || 'UNKNOWN'
+              index_stats['public_endpoint_enabled'] = endpoint_response['publicEndpointEnabled'] || false
+            end
+          rescue
+            # Ignore endpoint lookup failures - not critical for validation
+          end
+        end
+
+        index_stats
+      rescue => e
+        if e.message.include?('Permission denied') || e.message.include?('aiplatform.indexes')
+          error("Service account missing required permissions. Ensure the service account has 'aiplatform.indexes.get' and 'aiplatform.indexes.update' permissions.")
+        else
+          error("Failed to validate index access: #{e.message}")
+        end
+      end
+    end,
+    # Helper: Validate datapoint structure
+    validate_datapoint: lambda do |dp|
+      unless dp['datapoint_id'] && dp['feature_vector']
+        error("Datapoint missing required fields. Each datapoint must have 'datapoint_id' and 'feature_vector'")
+      end
+    end,
+
+    # Helper: Format single datapoint for API
+    format_datapoint: lambda do |dp|
+      call('validate_datapoint', dp)
+
+      datapoint = {
+        'datapointId' => dp['datapoint_id'],
+        'featureVector' => dp['feature_vector']
+      }
+
+      # Add optional restricts
+      if dp['restricts']&.any?
+        datapoint['restricts'] = call('format_restricts', dp['restricts'])
+      end
+
+      datapoint['crowdingTag'] = dp['crowding_tag'] if dp['crowding_tag']
+      datapoint
+    end,
+
+    # Helper: Format restricts array
+    format_restricts: lambda do |restricts|
+      restricts.map do |restrict|
+        formatted = { 'namespace' => restrict['namespace'] }
+        formatted['allowList'] = restrict['allowList'] if restrict['allowList']&.any?
+        formatted['denyList'] = restrict['denyList'] if restrict['denyList']&.any?
+        formatted
+      end
+    end,
+
+    # Helper: Build upsert payload
+    build_upsert_payload: lambda do |batch, update_mask|
+      formatted_datapoints = batch.map { |dp| call('format_datapoint', dp) }
+      payload = { 'datapoints' => formatted_datapoints }
+      payload['updateMask'] = update_mask if update_mask
+      payload
+    end,
+
+    # Helper: Handle upsert error
+    handle_upsert_error: lambda do |code, body, message|
+      if code == 429
+        raise StandardError, "Rate limited: #{message}"
+      elsif code == 403
+        raise StandardError, "Permission denied. Service account missing aiplatform.indexes.update permission"
+      else
+        call('handle_vertex_error', nil, code, body, message)
+      end
+    end,
+
+    # Helper: Process single batch with retries
+    process_datapoint_batch: lambda do |connection, index_id, batch, batch_index, update_mask|
+      max_retries = 3
+      base_delay = 1.0
+
+      max_retries.times do |attempt|
+        begin
+          payload = call('build_upsert_payload', batch, update_mask)
+
+          call('api_request', connection, :post, "#{index_id}:upsertDatapoints", {
+            payload: payload,
+            context: { action: 'Upsert datapoints' },
+            error_handler: lambda { |code, body, message| call('handle_upsert_error', code, body, message) }
+          })
+
+          return { success: true, count: batch.length }
+
+        rescue => e
+          if e.message.include?('Rate limited') && attempt < max_retries - 1
+            delay = base_delay * (2 ** attempt)
+            sleep(delay)
+          else
+            return {
+              success: false,
+              count: batch.length,
+              errors: batch.map do |dp|
+                {
+                  'datapoint_id' => dp['datapoint_id'],
+                  'batch_index' => batch_index,
+                  'error' => e.message,
+                  'retry_count' => attempt
+                }
+              end
+            }
+          end
+        end
+      end
+    end,
+
+    # Main batch upsert (simplified)
+    batch_upsert_datapoints: lambda do |connection, index_id, datapoints, update_mask = nil|
+      error('At least one datapoint is required for batch upsert') if datapoints.nil? || datapoints.empty?
+
+      index_stats = call('validate_index_access', connection, index_id)
+      batch_size = 100
+
+      results = {
+        'total_processed' => datapoints.length,
+        'successful_upserts' => 0,
+        'failed_upserts' => 0,
+        'error_details' => [],
+        'index_stats' => index_stats
+      }
+
+      # Process batches
+      datapoints.each_slice(batch_size).with_index do |batch, batch_index|
+        batch_result = call('process_datapoint_batch', connection, index_id, batch, batch_index, update_mask)
+
+        if batch_result[:success]
+          results['successful_upserts'] += batch_result[:count]
+        else
+          results['failed_upserts'] += batch_result[:count]
+          results['error_details'].concat(batch_result[:errors]) if batch_result[:errors]
+        end
+      end
+
+      # Update stats if successful
+      if results['successful_upserts'] > 0
+        begin
+          results['index_stats'] = call('validate_index_access', connection, index_id)
+        rescue
+          # Keep original stats on error
+        end
+      end
+
+      results
+    end,
+
+    # Helper: Build embedding instance
+    build_embedding_instance: lambda do |text_obj, task_type|
+      {
+        'task_type' => task_type.presence,
+        'content' => text_obj['content'].to_s
+      }.compact
+    end,
+
+    # Helper: Process embedding prediction
+    process_embedding_prediction: lambda do |text_obj, prediction|
+      if prediction
+        vals = call('extract_embedding_values', prediction)
+        {
+          'id' => text_obj['id'],
+          'vector' => vals,
+          'dimensions' => vals.length,
+          'metadata' => text_obj['metadata'] || {},
+          'success' => true
+        }
+      else
+        {
+          'id' => text_obj['id'],
+          'vector' => [],
+          'dimensions' => 0,
+          'metadata' => (text_obj['metadata'] || {}).merge('error' => 'Missing prediction in batch response'),
+          'success' => false
+        }
+      end
+    end,
+
+    # Helper: Estimate token count
+    estimate_token_count: lambda do |text|
+      (text.to_s.length / 4.0).ceil
+    end,
+
+    # Helper: Process single embedding batch
+    process_embedding_batch: lambda do |connection, model, batch_texts, task_type, url|
+      call('circuit_breaker_retry', connection, "batch_embedding_#{model}", {
+        max_retries: 2,
+        retry_on: [429, 500, 502, 503, 504, 'timeout', 'connection'],
+        base_delay: 1.0
+      }) do
+        instances = batch_texts.map { |text| call('build_embedding_instance', text, task_type) }
+        payload = { 'instances' => instances }
+        call('rate_limited_ai_request', connection, model, 'embedding', url, payload)
+      end
+    end,
+
+    # Helper: Check streaming memory limits
+    should_stream_flush: lambda do |embeddings, max_memory, streaming_mode|
+      streaming_mode && embeddings.length >= max_memory
+    end,
+
+    # ======= EMBEDDING OPTIONS ======
     generate_embeddings_batch_exec: lambda do |connection, input|
-      # Validate model
       call('validate_publisher_model!', connection, input['model'])
 
       # Extract inputs
@@ -3196,91 +3768,54 @@
       model = input['model']
       task_type = input['task_type']
 
-      # Memory management: Support streaming mode for large datasets
+      # Configuration
       streaming_mode = input['streaming_mode'] || texts.length > 1000
       max_memory_embeddings = input['max_memory_embeddings'] || 500
+      batch_size = 25  # Vertex AI's limit
 
       # Initialize statistics
-      batches_processed = 0
-      successful_requests = 0
-      failed_requests = 0
-      total_tokens = 0
+      stats = {
+        batches_processed: 0,
+        successful_requests: 0,
+        failed_requests: 0,
+        total_tokens: 0
+      }
       embeddings = []
-      batch_size = 25  # Vertex AI's limit for embedding batch requests
-      rate_limit_info = { requests_last_minute: 0, limit: 0, throttled: false, sleep_ms: 0 }
 
-      # Build the URL once
       url = call('vertex_url_for', connection, model, :predict)
+      last_rate = nil
 
-      # Process texts in batches of 25
+      # Process batches
       texts.each_slice(batch_size) do |batch_texts|
-        batches_processed += 1
-        last_rate = nil
+        stats[:batches_processed] += 1
 
-        # Use circuit breaker for resilient batch processing
-        response = call('circuit_breaker_retry', connection, "batch_embedding_#{model}", {
-          max_retries: 2,
-          retry_on: [429, 500, 502, 503, 504, 'timeout', 'connection'],
-          base_delay: 1.0
-        }) do
-          # Build batch payload with multiple instances
-          instances = batch_texts.map do |text_obj|
-            {
-              'task_type' => task_type.presence,
-              'content' => text_obj['content'].to_s
-            }.compact
-          end
-
-          payload = { 'instances' => instances }
-
-          # Make rate-limited batch request
-          call('rate_limited_ai_request', connection, model, 'embedding', url, payload)
-        end
-
+        response = call('process_embedding_batch', connection, model, batch_texts, task_type, url)
+        predictions = response['predictions'] || []
         last_rate = response.is_a?(Hash) ? response['rate_limit_status'] : nil
 
-        # Process batch response - each prediction corresponds to each instance
-        predictions = response['predictions'] || []
-
         batch_texts.each_with_index do |text_obj, index|
-          prediction = predictions[index]
-          if prediction
-            vals = call('extract_embedding_values', prediction)
+          result = call('process_embedding_prediction', text_obj, predictions[index])
+          embeddings << result
 
-            embedding_result = {
-              'id' => text_obj['id'],
-              'vector' => vals,
-              'dimensions' => vals.length,
-              'metadata' => text_obj['metadata'] || {}
-            }
-
-            # Memory management: Store or stream based on mode
-            if streaming_mode && embeddings.length >= max_memory_embeddings
-              # In streaming mode, yield results periodically and clear memory
-              # For now, we'll still accumulate but could extend this to write to cache/storage
-              puts "Streaming mode: processed #{embeddings.length} embeddings, continuing..."
-            end
-
-            embeddings << embedding_result
-            successful_requests += 1
-            # Estimate tokens (rough approximation: ~4 characters per token)
-            total_tokens += (text_obj['content'].to_s.length / 4.0).ceil
+          if result['success']
+            stats[:successful_requests] += 1
+            stats[:total_tokens] += call('estimate_token_count', text_obj['content'])
           else
-            # Missing prediction for this text
-            failed_requests += 1
-            embedding_result = {
-              'id' => text_obj['id'],
-              'vector' => [],
-              'dimensions' => 0,
-              'metadata' => (text_obj['metadata'] || {}).merge('error' => 'Missing prediction in batch response')
-            }
+            stats[:failed_requests] += 1
+          end
 
-            embeddings << embedding_result
+          # Check memory limits
+          if call('should_stream_flush', embeddings, max_memory_embeddings, streaming_mode)
+            call('log_debug', "Streaming mode: processed #{embeddings.length} embeddings, continuing...")
           end
         end
       end
 
       # Calculate batch efficiency metrics
+      batches_processed = stats[:batches_processed]
+      successful_requests = stats[:successful_requests]
+      failed_requests = stats[:failed_requests]
+      total_tokens = stats[:total_tokens]
       api_calls_saved = texts.length - batches_processed
 
       # Estimate cost savings (assuming $0.0001 per API call for embeddings)
@@ -3369,321 +3904,8 @@
         error("Failed to generate embedding: #{e.message}")
       end
     end,
-    transform_find_neighbors_response: lambda do |response|
-      # Extract all neighbors from potentially multiple queries
-      all_neighbors = []
-      nearest_neighbors = response['nearestNeighbors'] || []
 
-      nearest_neighbors.each do |query_result|
-        neighbors = query_result['neighbors'] || []
-        neighbors.each do |neighbor|
-          datapoint = neighbor['datapoint'] || {}
-          distance = neighbor['distance'].to_f
-          
-          similarity_score = call('to_similarity', distance, 2.0)
-
-          all_neighbors << {
-            'datapoint_id' => datapoint['datapointId'].to_s,
-            'distance' => distance,
-            'similarity_score' => similarity_score.round(6),
-            'feature_vector' => datapoint['featureVector'] || [],
-            'crowding_attribute' => datapoint.dig('crowdingTag', 'crowdingAttribute').to_s
-          }
-        end
-      end
-
-      # Sort by similarity score (highest first)
-      all_neighbors.sort_by! { |n| -n['similarity_score'] }
-
-      # Recipe-friendly response
-      best_match = all_neighbors.first || {}
-      has_matches = all_neighbors.any?
-
-      {
-        'matches_count' => all_neighbors.length,
-        'top_matches' => all_neighbors,
-        'best_match_id' => best_match['datapoint_id'].to_s,
-        'best_match_score' => best_match['similarity_score'] || 0.0,
-        'pass_fail' => has_matches,
-        'action_required' => has_matches ? 'retrieve_content' : 'refine_query',
-        'nearestNeighbors' => nearest_neighbors  # Keep original for backward compatibility
-      }
-    end,
-    payload_for_find_neighbors: lambda do |input|
-      # We follow Google’s JSON casing for FindNeighbors REST:
-      # top-level: deployedIndexId, returnFullDatapoint, queries[]
-      # queries[].datapoint.*: datapointId, featureVector, sparseEmbedding, restricts, numericRestricts, crowdingTag
-      #
-      # Numeric restricts accept ONE of valueInt/valueFloat/valueDouble with 'op' enum.
-      queries = (input['queries'] || []).map do |q|
-        dp = q['datapoint'] || {}
-
-        # Pass through as-is; assume UI provided correct shapes/casing.
-        {
-          'datapoint' => {
-            'datapointId'     => dp['datapointId'].presence,
-            'featureVector'   => dp['featureVector'].presence,
-            'sparseEmbedding' => dp['sparseEmbedding'].presence, # { values: [Float], dimensions: [Integer] }
-            'restricts'       => dp['restricts'].presence,       # [{ namespace, allowList[], denyList[] }]
-            'numericRestricts'=> dp['numericRestricts'].presence,# [{ namespace, op, valueInt|valueFloat|valueDouble }]
-            'crowdingTag'     => dp['crowdingTag'].presence      # { crowdingAttribute }
-          }.compact,
-          'neighborCount'                          => q['neighborCount'],
-          'approximateNeighborCount'               => q['approximateNeighborCount'],
-          'perCrowdingAttributeNeighborCount'      => q['perCrowdingAttributeNeighborCount'],
-          'fractionLeafNodesToSearchOverride'      => q['fractionLeafNodesToSearchOverride'],
-          'rrf'                                    => q['rrf'].presence # optional future-proofing; if you need RRF fusion
-        }.compact
-      end
-
-      {
-        'deployedIndexId'      => input['deployedIndexId'],
-        'queries'              => queries,
-        'returnFullDatapoint'  => !!input['returnFullDatapoint']
-      }.compact
-    end,
-    # -- RESPONSE EXTRACTION AND NORMALIZATION --
-    extract_json: lambda do |resp|
-      json_txt = resp&.dig('candidates', 0, 'content', 'parts', 0, 'text')
-      return {} if json_txt.blank?
-
-      # Cleanup markdown code blocks
-      json = call('strip_fences', json_txt)
-
-      begin
-        parse_json(json) || {}
-      rescue => e
-        # Log error for debugging, but return empty hash to prevent action failure
-        puts "JSON parsing failed: #{e.message}. Raw text: #{json_txt}"
-        {}
-      end
-    end,
-    get_safety_ratings: lambda do |ratings|
-      {
-        'sexually_explicit' =>
-          ratings&.find do |r|
-            r['category'] == 'HARM_CATEGORY_SEXUALLY_EXPLICIT'
-          end&.[]('probability'),
-        'hate_speech' =>
-          ratings&.find { |r| r['category'] == 'HARM_CATEGORY_HATE_SPEECH' }&.[]('probability'),
-        'harassment' =>
-          ratings&.find { |r| r['category'] == 'HARM_CATEGORY_HARASSMENT' }&.[]('probability'),
-        'dangerous_content' =>
-          ratings&.find do |r|
-            r['category'] == 'HARM_CATEGORY_DANGEROUS_CONTENT'
-          end&.[]('probability')
-      }
-    end,
-    check_finish_reason: lambda do |reason|
-      case reason&.downcase
-      when 'finish_reason_unspecified'
-        error 'ERROR - The finish reason is unspecified.'
-      when 'other'
-        error 'ERROR - Token generation stopped due to an unknown reason.'
-      when 'max_tokens'
-        error 'ERROR - Token generation reached the configured maximum output tokens.'
-      when 'safety'
-        error 'ERROR - Token generation stopped because the content potentially contains ' \
-              'safety violations.'
-      when 'recitation'
-        error 'ERROR - Token generation stopped because the content potentially contains ' \
-              'copyright violations.'
-      when 'blocklist'
-        error 'ERROR - Token generation stopped because the content contains forbidden items.'
-      when 'prohibited_content'
-        error 'ERROR - Token generation stopped for potentially containing prohibited content.'
-      when 'spii'
-        error 'ERROR - Token generation stopped because the content potentially contains ' \
-              'Sensitive Personal Identifiable Information (SPII).'
-      when 'malformed_function_call'
-        error 'ERROR - The function call generated by the model is invalid.'
-      end
-    end,
-    # Unified response extractor that handles all response types
-    extract_response: lambda do |resp, options = {}|
-      # Extract options with defaults
-      type = options[:type] || :generic
-      is_json_response = options[:json_response] || false
-
-      # Common safety and finish reason checks for generative responses
-      if [:generic, :email, :parsed, :classify].include?(type)
-        call('check_finish_reason', resp.dig('candidates', 0, 'finishReason'))
-        ratings = call('get_safety_ratings', resp.dig('candidates', 0, 'safetyRatings'))
-        return call('standard_error_response', type, ratings) if ratings.blank?
-      else
-        ratings = {}
-      end
-
-      # Extract core response based on type
-      case type
-      when :generic
-        answer = if is_json_response
-                  call('extract_json', resp)&.[]('response')
-                else
-                  resp&.dig('candidates', 0, 'content', 'parts', 0, 'text')
-                end
-
-        has_answer = !answer.nil? && !answer.to_s.strip.empty? && answer.to_s.strip != 'N/A'
-
-        {
-          'answer' => answer.to_s,
-          'has_answer' => has_answer,
-          'pass_fail' => has_answer,
-          'action_required' => has_answer ? 'use_answer' : 'try_different_question',
-          'answer_length' => answer.to_s.length,
-          'safety_ratings' => ratings,
-          'usage' => call('usage_meta', resp)
-        }
-
-      when :email
-        json = call('extract_json', resp)
-        {
-          'subject' => json&.[]('subject'),
-          'body' => json&.[]('body'),
-          'safety_ratings' => ratings,
-          'usage' => resp['usageMetadata']
-        }
-
-      when :parsed
-        json = call('extract_json', resp)
-        json&.each_with_object({}) do |(key, value), hash|
-          hash[key] = value
-        end&.merge('safety_ratings' => ratings, 'usage' => resp['usageMetadata'])
-
-      when :embedding
-        vals = resp&.dig('predictions', 0, 'embeddings', 'values') ||
-               resp&.dig('predictions', 0, 'embeddings')&.first&.dig('values') ||
-               []
-        { 'embedding' => vals.map { |v| { 'value' => v } } }
-
-      when :classify
-        json = call('extract_json', resp)
-        json = {} unless json.is_a?(Hash)
-        
-        selected_category = json&.[]('selected_category') || 'N/A'
-        confidence = json&.[]('confidence')&.to_f || 1.0
-        alternatives = json&.[]('alternatives') || []
-
-        # Normalize values
-        selected_category = selected_category.to_s
-        selected_category = 'unknown' if selected_category.empty? || selected_category == 'N/A'
-        confidence = [[confidence, 0.0].max, 1.0].min
-
-        # Decision logic
-        confidence_threshold = 0.7
-        requires_human_review = confidence < confidence_threshold
-
-        {
-          'selected_category' => selected_category,
-          'confidence' => confidence,
-          'alternatives' => alternatives,
-          'requires_human_review' => requires_human_review,
-          'confidence_threshold' => confidence_threshold,
-          'pass_fail' => !requires_human_review,
-          'action_required' => requires_human_review ? 'human_review' : 'use_classification',
-          'safety_ratings' => ratings,
-          'usage' => resp['usageMetadata']
-        }
-
-      else
-        error("Unknown response extraction type: #{type}")
-      end
-    end,
-    # Helper method for standard error responses
-    standard_error_response: lambda do |type, ratings|
-      case type
-      when :generic
-        { 'answer' => 'N/A', 'safety_ratings' => {} }
-      when :classify
-        { 'selected_category' => 'N/A', 'confidence' => 0.0, 'safety_ratings' => {} }
-      else
-        { 'error' => 'Safety ratings check failed', 'safety_ratings' => {} }
-      end
-    end,
-    # -- GOOGLE DRIVE HELPER METHODS --
-    extract_drive_file_id: lambda do |url_or_id|
-      return url_or_id if url_or_id.blank?
-
-      # Try different URL patterns
-      # Pattern 1: /d/{file_id}/
-      if match = url_or_id.match(%r{/d/([a-zA-Z0-9_-]+)})
-        return match[1]
-      end
-
-      # Pattern 2: ?id={file_id}
-      if match = url_or_id.match(/[?&]id=([a-zA-Z0-9_-]+)/)
-        return match[1]
-      end
-
-      # Pattern 3: Raw file ID (alphanumeric with dashes/underscores)
-      if url_or_id.match(/^[a-zA-Z0-9_-]+$/)
-        return url_or_id
-      end
-
-      # If no pattern matches, return as-is and let API handle the error
-      url_or_id
-    end,
-    get_export_mime_type: lambda do |mime_type|
-      return nil if mime_type.blank?
-      exports = {
-        'application/vnd.google-apps.document'     => 'text/plain',
-        'application/vnd.google-apps.spreadsheet'  => 'text/csv',
-        'application/vnd.google-apps.presentation' => 'text/plain'
-      }.freeze
-      exports[mime_type]
-    end,
-    build_drive_query: lambda do |options = {}|
-      query_parts = ['trashed = false']
-
-      # Add folder filter
-      if options[:folder_id].present?
-        query_parts << "'#{options[:folder_id]}' in parents"
-      end
-
-      # Add date filters
-      if options[:modified_after].present?
-        query_parts << "modifiedTime > '#{options[:modified_after]}'"
-      end
-
-      if options[:modified_before].present?
-        query_parts << "modifiedTime < '#{options[:modified_before]}'"
-      end
-
-      # Add MIME type filters
-      if options[:mime_type].present?
-        query_parts << "mimeType = '#{options[:mime_type]}'"
-      end
-
-      if options[:exclude_folders]
-        query_parts << "mimeType != 'application/vnd.google-apps.folder'"
-      end
-
-      query_parts.join(' and ')
-    end,
-    handle_drive_error: lambda do |connection, code, body, message|
-      service_account_email = connection['service_account_email'] || 
-                             connection['client_id']
-      handlers = {
-        404 => ->(_b, _m) { "File not found in Google Drive. Please verify the file ID and ensure the file exists." },
-        403 => ->(b, _m) {
-          if b&.include?('insufficientFilePermissions') || b&.include?('forbidden')
-            "Access denied. Please share the file with the service account: #{service_account_email}"
-          else
-            "Permission denied. Check your Google Drive API access and file permissions."
-          end
-        },
-        429 => ->(_b, _m) { "Rate limit exceeded. Please implement request backoff and retry logic." },
-        401 => ->(_b, _m) { "Authentication failed. Please check your OAuth2 token or service account credentials." }
-      }
-      if handlers[code]
-        handlers[code].call(body, message)
-      elsif [500, 502, 503].include?(code)
-        "Google Drive API temporary error (#{code}). Please retry after a brief delay."
-      else
-        "Google Drive API error (#{code}): #{message || body}"
-      end
-    end,
-    # -- SAMPLES AND UX HELPERS --
+    # ====== SAMPLES AND UX HELPERS =======
     sample_record_output: lambda do |input|
       case input
       when 'send_message'
@@ -3810,207 +4032,6 @@
           hash[element['name'].gsub(/^\d|\W/) { |c| "_ #{c.unpack('H*')}" }] = '<Sample Text>'
         end
       end || {}
-    end,
-    # -- INDEX MANAGEMENT METHODS --
-    validate_index_access: lambda do |connection, index_id|
-      # Extract project, region, and index name from the index_id
-      index_parts = index_id.split('/')
-      if index_parts.length < 6 || index_parts[0] != 'projects' || index_parts[2] != 'locations' || index_parts[4] != 'indexes'
-        error("Invalid index_id format. Expected: projects/PROJECT/locations/REGION/indexes/INDEX_ID")
-      end
-
-
-      begin
-        # Get index details
-        index_response = get("#{index_id}").
-          after_error_response(/.*/) do |code, body, _header, message|
-            if code == 404
-              error("Index not found: #{index_id}")
-            elsif code == 403
-              error("Permission denied. Service account missing aiplatform.indexes.get permission for index: #{index_id}")
-            else
-              call('handle_vertex_error', connection, code, body, message)
-            end
-          end
-
-        # Check if index is deployed
-        deployed_indexes = index_response['deployedIndexes'] || []
-        if deployed_indexes.empty?
-          error("Index is not deployed. Index must be in DEPLOYED state for upsert operations.")
-        end
-
-        # Get index stats from first deployed index
-        deployed_index = deployed_indexes[0]
-        # Ensure all ID fields are strings and timestamps are ISO 8601
-        created_time = index_response['createTime']
-        updated_time = index_response['updateTime']
-
-        # Ensure timestamps are in ISO 8601 format (Google already provides ISO 8601)
-        created_time = created_time.to_s if created_time
-        updated_time = updated_time.to_s if updated_time
-
-        index_stats = {
-          'index_id' => index_id.to_s,
-          'deployed_state' => 'DEPLOYED',
-          'total_datapoints' => index_response.dig('indexStats', 'vectorsCount')&.to_i,
-          'shards_count' => index_response.dig('indexStats', 'shardsCount')&.to_i,
-          'display_name' => index_response['displayName'].to_s,
-          'created_time' => created_time || '',
-          'updated_time' => updated_time || ''
-        }
-
-        # Try to get more detailed stats if available
-        if deployed_index['indexEndpoint']
-          endpoint_id = deployed_index['indexEndpoint']
-          begin
-            endpoint_response = get("#{endpoint_id}").
-              after_error_response(/.*/) do |code, body, _header, message|
-                # Don't fail validation if we can't get endpoint details
-                # This is optional information
-              end
-
-            if endpoint_response
-              index_stats['endpoint_state'] = endpoint_response['state'] || 'UNKNOWN'
-              index_stats['public_endpoint_enabled'] = endpoint_response['publicEndpointEnabled'] || false
-            end
-          rescue
-            # Ignore endpoint lookup failures - not critical for validation
-          end
-        end
-
-        index_stats
-      rescue => e
-        if e.message.include?('Permission denied') || e.message.include?('aiplatform.indexes')
-          error("Service account missing required permissions. Ensure the service account has 'aiplatform.indexes.get' and 'aiplatform.indexes.update' permissions.")
-        else
-          error("Failed to validate index access: #{e.message}")
-        end
-      end
-    end,
-    batch_upsert_datapoints: lambda do |connection, index_id, datapoints, update_mask = nil|
-      # Validate inputs
-      if datapoints.nil? || datapoints.empty?
-        error('At least one datapoint is required for batch upsert')
-      end
-
-      # First validate index access and get metadata
-      index_stats = call('validate_index_access', connection, index_id)
-
-      # Process datapoints in batches of 100 with exponential backoff
-      batch_size = 100
-      max_retries = 3
-      base_delay = 1.0 # Base delay in seconds
-
-      results = {
-        'total_processed' => datapoints.length,
-        'successful_upserts' => 0,
-        'failed_upserts' => 0,
-        'error_details' => [],
-        'index_stats' => index_stats
-      }
-
-      # Process each batch
-      datapoints.each_slice(batch_size).with_index do |batch, batch_index|
-        retry_count = 0
-        batch_success = false
-
-        while retry_count <= max_retries && !batch_success
-          begin
-            # Format datapoints for API
-            formatted_datapoints = batch.map do |dp|
-              # Validate required fields
-              unless dp['datapoint_id'] && dp['feature_vector']
-                error("Datapoint missing required fields. Each datapoint must have 'datapoint_id' and 'feature_vector'")
-              end
-
-              # Do not attempt to validate vector length here; let the API enforce it.
-
-              datapoint = {
-                'datapointId' => dp['datapoint_id'],
-                'featureVector' => dp['feature_vector']
-              }
-
-              # Add optional fields if present
-              if dp['restricts']&.any?
-                datapoint['restricts'] = dp['restricts'].map do |restrict|
-                  formatted_restrict = { 'namespace' => restrict['namespace'] }
-                  formatted_restrict['allowList'] = restrict['allowList'] if restrict['allowList']&.any?
-                  formatted_restrict['denyList'] = restrict['denyList'] if restrict['denyList']&.any?
-                  formatted_restrict
-                end
-              end
-
-              datapoint['crowdingTag'] = dp['crowding_tag'] if dp['crowding_tag']
-              datapoint
-            end
-
-            # Build request payload
-            payload = { 'datapoints' => formatted_datapoints }
-            payload['updateMask'] = update_mask if update_mask
-
-            # Make API call
-            post("#{index_id}:upsertDatapoints", payload).
-              after_error_response(/.*/) do |code, body, _header, message|
-                if code == 429 # Rate limit
-                  raise StandardError.new("Rate limited: #{message}")
-                elsif code == 403
-                  raise StandardError.new("Permission denied. Service account missing aiplatform.indexes.update permission")
-                else
-                  call('handle_vertex_error', connection, code, body, message)
-                end
-              end
-
-            # If we get here, the batch was successful
-            results['successful_upserts'] += batch.length
-            batch_success = true
-
-          rescue => e
-            retry_count += 1
-
-            if e.message.include?('Rate limited') && retry_count <= max_retries
-              # Exponential backoff for rate limits
-              delay = base_delay * (2 ** (retry_count - 1))
-              sleep(delay)
-            elsif retry_count > max_retries
-              # Mark all datapoints in this batch as failed
-              batch.each do |dp|
-                results['error_details'] << {
-                  'datapoint_id' => dp['datapoint_id'],
-                  'batch_index' => batch_index,
-                  'error' => "Failed after #{max_retries} retries: #{e.message}",
-                  'retry_count' => retry_count - 1
-                }
-              end
-              results['failed_upserts'] += batch.length
-              batch_success = true # Exit retry loop
-            else
-              # Non-retryable error, mark batch as failed
-              batch.each do |dp|
-                results['error_details'] << {
-                  'datapoint_id' => dp['datapoint_id'],
-                  'batch_index' => batch_index,
-                  'error' => e.message,
-                  'retry_count' => retry_count - 1
-                }
-              end
-              results['failed_upserts'] += batch.length
-              batch_success = true # Exit retry loop
-            end
-          end
-        end
-      end
-
-      # Update final index stats if we successfully processed some datapoints
-      if results['successful_upserts'] > 0
-        begin
-          updated_stats = call('validate_index_access', connection, index_id)
-          results['index_stats'] = updated_stats
-        rescue
-          # Ignore errors getting updated stats - use original stats
-        end
-      end
-
-      results
     end
   },
 
