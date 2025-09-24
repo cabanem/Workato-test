@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>list_drive_files — Call Graph</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;margin:0;background:#fafafa}
+    header{padding:16px 20px;border-bottom:1px solid #e5e7eb;background:#fff;position:sticky;top:0}
+    main{padding:16px}
+    pre.mermaid{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;overflow:auto}
+    .legend{display:flex;gap:8px;align-items:center;margin:12px 0 20px}
+    .chip{border-radius:10px;padding:2px 8px;border:1px solid #e5e7eb}
+    .chip.action{background:#E3F2FD;border-color:#1E88E5}
+    .chip.method{background:#E8F5E9;border-color:#2E7D32}
+    .chip.http{background:#FFF3E0;border-color:#EF6C00}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, securityLevel: 'loose', theme: 'default' });</script>
+</head>
+<body>
+  <header>
+    <h1 style="margin:0;font-size:18px">Action: list_drive_files</h1>
+  </header>
+  <main>
+    <div class="legend">
+      <span class="chip action">Action entrypoint</span>
+      <span class="chip method">Method</span>
+      <span class="chip http">Direct HTTP</span>
+    </div>
+    <pre class="mermaid">flowchart TD
+  execute_list_drive_files([execute:list_drive_files])
+  extract_drive_file_id[extract_drive_file_id]
+  build_drive_query[build_drive_query]
+  with_resilience[with_resilience]
+  rate_limit_defaults[rate_limit_defaults]
+  enforce_vertex_rate_limits[enforce_vertex_rate_limits]
+  gen_correlation_id[gen_correlation_id]
+  circuit_breaker_retry[circuit_breaker_retry]
+  get_circuit_state[get_circuit_state]
+  HTTP_GET{{HTTP:GET}}
+  check_circuit_status[check_circuit_status]
+  log_debug[log_debug]
+  handle_circuit_success[handle_circuit_success]
+  update_circuit_state[update_circuit_state]
+  should_retry_error[should_retry_error]
+  extract_http_status[extract_http_status]
+  calculate_backoff_delay[calculate_backoff_delay]
+  handle_circuit_failure[handle_circuit_failure]
+  should_open_circuit[should_open_circuit]
+  HTTP_DELETE{{HTTP:DELETE}}
+  api_request[api_request]
+  HTTP_POST{{HTTP:POST}}
+  HTTP_PUT{{HTTP:PUT}}
+  drive_api_url[drive_api_url]
+  handle_drive_error[handle_drive_error]
+  execute_list_drive_files --> extract_drive_file_id
+  execute_list_drive_files --> build_drive_query
+  execute_list_drive_files --> with_resilience
+  execute_list_drive_files --> api_request
+  execute_list_drive_files --> drive_api_url
+  execute_list_drive_files --> handle_drive_error
+  with_resilience --> rate_limit_defaults
+  with_resilience --> enforce_vertex_rate_limits
+  with_resilience --> gen_correlation_id
+  with_resilience --> circuit_breaker_retry
+  with_resilience --> HTTP_DELETE
+  api_request --> HTTP_GET
+  api_request --> HTTP_POST
+  api_request --> HTTP_PUT
+  api_request --> HTTP_DELETE
+  get_circuit_state --> HTTP_GET
+  check_circuit_status --> log_debug
+  should_retry_error --> extract_http_status
+  handle_circuit_success --> update_circuit_state
+  handle_circuit_success --> log_debug
+  handle_circuit_failure --> should_open_circuit
+  handle_circuit_failure --> log_debug
+  circuit_breaker_retry --> rate_limit_defaults
+  circuit_breaker_retry --> get_circuit_state
+  circuit_breaker_retry --> check_circuit_status
+  circuit_breaker_retry --> handle_circuit_success
+  circuit_breaker_retry --> should_retry_error
+  circuit_breaker_retry --> calculate_backoff_delay
+  circuit_breaker_retry --> log_debug
+  circuit_breaker_retry --> handle_circuit_failure
+  classDef action fill:#E3F2FD,stroke:#1E88E5,stroke-width:1px;
+  classDef method fill:#E8F5E9,stroke:#2E7D32,stroke-width:1px;
+  classDef http   fill:#FFF3E0,stroke:#EF6C00,stroke-width:1px;
+  class execute_list_drive_files action;
+  class extract_drive_file_id method;
+  class build_drive_query method;
+  class with_resilience method;
+  class rate_limit_defaults method;
+  class enforce_vertex_rate_limits method;
+  class gen_correlation_id method;
+  class circuit_breaker_retry method;
+  class get_circuit_state method;
+  class check_circuit_status method;
+  class log_debug method;
+  class handle_circuit_success method;
+  class update_circuit_state method;
+  class should_retry_error method;
+  class extract_http_status method;
+  class calculate_backoff_delay method;
+  class handle_circuit_failure method;
+  class should_open_circuit method;
+  class api_request method;
+  class drive_api_url method;
+  class handle_drive_error method;
+  class HTTP_GET http;
+  class HTTP_DELETE http;
+  class HTTP_POST http;
+  class HTTP_PUT http;</pre>
+  </main>
+</body>
+</html>

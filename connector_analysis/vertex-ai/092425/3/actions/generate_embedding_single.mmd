@@ -1,0 +1,15 @@
+flowchart TD
+  execute_generate_embedding_single([execute:generate_embedding_single])
+  generate_embedding_single_exec[generate_embedding_single_exec]
+  validate_publisher_model_[validate_publisher_model!]
+  HTTP_GET{{HTTP:GET}}
+  execute_generate_embedding_single --> generate_embedding_single_exec
+  validate_publisher_model_ --> HTTP_GET
+  generate_embedding_single_exec --> validate_publisher_model_
+  classDef action fill:#E3F2FD,stroke:#1E88E5,stroke-width:1px;
+  classDef method fill:#E8F5E9,stroke:#2E7D32,stroke-width:1px;
+  classDef http   fill:#FFF3E0,stroke:#EF6C00,stroke-width:1px;
+  class execute_generate_embedding_single action;
+  class generate_embedding_single_exec method;
+  class validate_publisher_model_ method;
+  class HTTP_GET http;

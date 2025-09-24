@@ -1,0 +1,21 @@
+# .github/workflows/publish-viz.yml
+name: Publish connector viz
+on: { push: { branches: [ main ] } }
+permissions: { contents: write, pages: write, id-token: write }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with: { ruby-version: '3.2' }
+      - run: ruby connector_analyzer.rb path/to/connector.rb -o out
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: out }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: ${{ steps.deployment.outputs.page_url }} }
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

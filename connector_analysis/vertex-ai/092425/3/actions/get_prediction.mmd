@@ -1,0 +1,9 @@
+flowchart TD
+  execute_get_prediction([execute:get_prediction])
+  HTTP_POST{{HTTP:POST}}
+  execute_get_prediction --> HTTP_POST
+  classDef action fill:#E3F2FD,stroke:#1E88E5,stroke-width:1px;
+  classDef method fill:#E8F5E9,stroke:#2E7D32,stroke-width:1px;
+  classDef http   fill:#FFF3E0,stroke:#EF6C00,stroke-width:1px;
+  class execute_get_prediction action;
+  class HTTP_POST http;

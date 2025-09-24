@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Per-Action Call Graphs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;margin:0;background:#fafafa}
+    header{padding:16px 20px;border-bottom:1px solid #e5e7eb;background:#fff;position:sticky;top:0}
+    main{padding:16px}
+    a{color:#1E88E5;text-decoration:none}
+    a:hover{text-decoration:underline}
+    table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden}
+    th,td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:14px}
+    th{background:#fafafa}
+    tr:hover{background:#f6fafe}
+    code{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:2px 6px}
+  </style>
+</head>
+<body>
+  <header><h1 style="margin:0;font-size:18px">Per-Action Call Graphs</h1></header>
+  <main>
+    <p>Open a focused call graph for each action. Mermaid sources are in <code>out/actions/*.mmd</code>.</p>
+    <table>
+      <thead><tr><th>Action</th><th>Mini graph</th><th>Nodes</th><th>Methods</th><th>HTTP</th></tr></thead>
+      <tbody>
+        <tr>
+                    <td><code>send_messages</code></td>
+                    <td><a href="actions/send_messages.html">Open</a></td>
+                    <td>36</td>
+                    <td>31</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>translate_text</code></td>
+                    <td><a href="actions/translate_text.html">Open</a></td>
+                    <td>36</td>
+                    <td>31</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>summarize_text</code></td>
+                    <td><a href="actions/summarize_text.html">Open</a></td>
+                    <td>36</td>
+                    <td>31</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>parse_text</code></td>
+                    <td><a href="actions/parse_text.html">Open</a></td>
+                    <td>36</td>
+                    <td>31</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>draft_email</code></td>
+                    <td><a href="actions/draft_email.html">Open</a></td>
+                    <td>36</td>
+                    <td>31</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>ai_classify</code></td>
+                    <td><a href="actions/ai_classify.html">Open</a></td>
+                    <td>36</td>
+                    <td>31</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>analyze_text</code></td>
+                    <td><a href="actions/analyze_text.html">Open</a></td>
+                    <td>36</td>
+                    <td>31</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>analyze_image</code></td>
+                    <td><a href="actions/analyze_image.html">Open</a></td>
+                    <td>36</td>
+                    <td>31</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>generate_embeddings</code></td>
+                    <td><a href="actions/generate_embeddings.html">Open</a></td>
+                    <td>32</td>
+                    <td>27</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>generate_embedding_single</code></td>
+                    <td><a href="actions/generate_embedding_single.html">Open</a></td>
+                    <td>4</td>
+                    <td>2</td>
+                    <td>1</td>
+                  </tr>
+<tr>
+                    <td><code>find_neighbors</code></td>
+                    <td><a href="actions/find_neighbors.html">Open</a></td>
+                    <td>34</td>
+                    <td>29</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>upsert_index_datapoints</code></td>
+                    <td><a href="actions/upsert_index_datapoints.html">Open</a></td>
+                    <td>30</td>
+                    <td>25</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>test_connection</code></td>
+                    <td><a href="actions/test_connection.html">Open</a></td>
+                    <td>3</td>
+                    <td>2</td>
+                    <td>0</td>
+                  </tr>
+<tr>
+                    <td><code>get_prediction</code></td>
+                    <td><a href="actions/get_prediction.html">Open</a></td>
+                    <td>2</td>
+                    <td>0</td>
+                    <td>1</td>
+                  </tr>
+<tr>
+                    <td><code>fetch_drive_file</code></td>
+                    <td><a href="actions/fetch_drive_file.html">Open</a></td>
+                    <td>27</td>
+                    <td>22</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>list_drive_files</code></td>
+                    <td><a href="actions/list_drive_files.html">Open</a></td>
+                    <td>25</td>
+                    <td>20</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>batch_fetch_drive_files</code></td>
+                    <td><a href="actions/batch_fetch_drive_files.html">Open</a></td>
+                    <td>27</td>
+                    <td>22</td>
+                    <td>4</td>
+                  </tr>
+<tr>
+                    <td><code>monitor_drive_changes</code></td>
+                    <td><a href="actions/monitor_drive_changes.html">Open</a></td>
+                    <td>24</td>
+                    <td>19</td>
+                    <td>4</td>
+                  </tr>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>
