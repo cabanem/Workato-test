@@ -1442,7 +1442,7 @@ if __FILE__ == $0
   rescue => e
     warn "[metrics] Failed: #{e.message}"
     metrics = nil
-  end
+  end 
 
   node_classes = metrics ? Viz.build_node_classes(analyzer.graph, metrics) : {}
 
