@@ -12,10 +12,13 @@
       # Developer options
       { name: 'verbose_errors', label: 'Verbose errors', group: 'Developer options', type: 'boolean', control_type: 'checkbox',
         hint: 'When enabled, include upstream response bodies in error messages. Disable in production.' },
+      { name: 'include_trace', label: 'Include trace', group: 'Developer options', type: 'boolean', control_type: 'checkbox', optional: true, default: true, sticky: true,
+        hint: 'Include trace.correlation_id and trace.duration_ms in outputs. Disable in production.' },
       # Authentication
       { name: 'auth_type', label: 'Authentication type', group: 'Authentication', control_type: 'select',  default: 'custom', optional: false, extends_schema: true, 
         options: [ ['Client credentials', 'custom'], %w[OAuth2 oauth2] ], hint: 'Select the authentication type for connecting to Google Vertex AI.'},
       # Vertex AI environment
+      # -- Region
       { name: 'region', label: 'Region', group: 'Vertex AI environment', control_type: 'select',  optional: false,
         options: [
           ['US central 1', 'us-central1'],
@@ -38,19 +41,23 @@
         toggle_field: {
           name: 'region', label: 'Region', type: 'string', control_type: 'text', optional: false, 
           toggle_hint: 'Use custom value', hint: "Enter the region you want to use" } },
+      # -- Project
       { name: 'project', label: 'Project', group: 'Vertex AI environment', optional: false,  hint: 'E.g abc-dev-1234' },
+      # -- API version
       { name: 'version', label: 'Version', group: 'Vertex AI environment', optional: false,  default: 'v1', hint: 'E.g. v1beta1' },
       # Model discovery and validation
+      # - Enable dynamic fetching of models from API (Model Garden)
       { name: 'dynamic_models', label: 'Refresh model list from API (Model Garden)', group: 'Model discovery and validation', type: 'boolean', 
         control_type: 'checkbox', optional: true, hint: 'Fetch available Gemini/Embedding models at runtime. Falls back to a curated static list on errors.' },
+      # - Include preview/experimental models
       { name: 'include_preview_models', label: 'Include preview/experimental models', group: 'Model discovery and validation', type: 'boolean', control_type: 'checkbox', 
         optional: true, sticky: true, hint: 'Also include Experimental/Private/Public Preview models. Leave unchecked for GA-only in production.' },
+      # - Validate model access before running actions
       { name: 'validate_model_on_run', label: 'Validate model before run', group: 'Model discovery and validation', type: 'boolean', control_type: 'checkbox',
         optional: true, sticky: true, hint: 'Pre-flight check the chosen model and your project access before sending the request. Recommended.' },
+      # -- Rate limiting
       { name: 'enable_rate_limiting', label: 'Enable rate limiting', group: 'Model discovery and validation', type: 'boolean', control_type: 'checkbox', 
-        optional: true, default: true, hint: 'Automatically throttle requests to stay within Vertex AI quotas' },
-      { name: 'include_trace', label: 'Include trace', group: 'Developer options', type: 'boolean', control_type: 'checkbox', optional: true, default: true, sticky: true,
-        hint: 'Include trace.correlation_id and trace.duration_ms in outputs. Disable in production.' }
+        optional: true, default: true, hint: 'Automatically throttle requests to stay within Vertex AI quotas' }
     ],
     authorization: {
       type: 'multi',
@@ -2541,7 +2548,7 @@
     },
 
     # ─────────────────────────────────────────────────────────────────────────────
-    # Test connection (unchanged shape; aligns with your current action)
+    # Test connection
     # ─────────────────────────────────────────────────────────────────────────────
     test_connection_output: {
       fields: lambda do |_connection, _config_fields, _object_definitions|

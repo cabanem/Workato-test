@@ -10,12 +10,16 @@
   connection: {
     fields: [
       # Developer options
-      { name: 'verbose_errors', label: 'Verbose errors', group: 'Developer options', type: 'boolean', control_type: 'checkbox',
-        hint: 'When enabled, include upstream response bodies in error messages. Disable in production.' },
+      # -- Verbose errors
+      { name: 'verbose_errors', label: 'Verbose errors', group: 'Developer options', type: 'boolean', control_type: 'checkbox', hint: 'When enabled, include upstream response bodies in error messages.' },
+      # -- Include trace
+      { name: 'include_trace', label: 'Include trace', group: 'Developer options', type: 'boolean', control_type: 'checkbox', optional: true, default: true, sticky: true,
+        hint: 'Include trace.correlation_id and trace.duration_ms in outputs. Disable in production.' },
       # Authentication
       { name: 'auth_type', label: 'Authentication type', group: 'Authentication', control_type: 'select',  default: 'custom', optional: false, extends_schema: true, 
         options: [ ['Client credentials', 'custom'], %w[OAuth2 oauth2] ], hint: 'Select the authentication type for connecting to Google Vertex AI.'},
       # Vertex AI environment
+      # -- Region
       { name: 'region', label: 'Region', group: 'Vertex AI environment', control_type: 'select',  optional: false,
         options: [
           ['US central 1', 'us-central1'],
@@ -38,19 +42,22 @@
         toggle_field: {
           name: 'region', label: 'Region', type: 'string', control_type: 'text', optional: false, 
           toggle_hint: 'Use custom value', hint: "Enter the region you want to use" } },
+      # -- Project
       { name: 'project', label: 'Project', group: 'Vertex AI environment', optional: false,  hint: 'E.g abc-dev-1234' },
       { name: 'version', label: 'Version', group: 'Vertex AI environment', optional: false,  default: 'v1', hint: 'E.g. v1beta1' },
       # Model discovery and validation
+      # -- Enable dynamic fetching of models from API (Model Garden)
       { name: 'dynamic_models', label: 'Refresh model list from API (Model Garden)', group: 'Model discovery and validation', type: 'boolean', 
         control_type: 'checkbox', optional: true, hint: 'Fetch available Gemini/Embedding models at runtime. Falls back to a curated static list on errors.' },
+      # -- Include preview/experimental models
       { name: 'include_preview_models', label: 'Include preview/experimental models', group: 'Model discovery and validation', type: 'boolean', control_type: 'checkbox', 
         optional: true, sticky: true, hint: 'Also include Experimental/Private/Public Preview models. Leave unchecked for GA-only in production.' },
+      # -- Validate model access before running actions
       { name: 'validate_model_on_run', label: 'Validate model before run', group: 'Model discovery and validation', type: 'boolean', control_type: 'checkbox',
         optional: true, sticky: true, hint: 'Pre-flight check the chosen model and your project access before sending the request. Recommended.' },
+      # -- Enable rate limiting
       { name: 'enable_rate_limiting', label: 'Enable rate limiting', group: 'Model discovery and validation', type: 'boolean', control_type: 'checkbox', 
-        optional: true, default: true, hint: 'Automatically throttle requests to stay within Vertex AI quotas' },
-      { name: 'include_trace', label: 'Include trace', group: 'Developer options', type: 'boolean', control_type: 'checkbox', optional: true, default: true, sticky: true,
-        hint: 'Include trace.correlation_id and trace.duration_ms in outputs. Disable in production.' }
+        optional: true, default: true, hint: 'Automatically throttle requests to stay within Vertex AI quotas' }
     ],
     authorization: {
       type: 'multi',
@@ -195,24 +202,19 @@
           'Send messages to <span class=\'provider\'>Gemini</span> models'
         end
       end,
-
       help: {
         body: 'This action sends a message to Vertex AI, and gathers a response using the selected Gemini Model. ' \
               'Outputs include telemetry pills: trace (correlation_id, duration_ms), vertex (response_id, model_version), and rate_limit_status.'
       },
-
       input_fields: lambda do |object_definitions|
         object_definitions['send_messages_input']
       end,
-
       execute: lambda do |connection, input, _eis, _eos|
         call('run_vertex', connection, input, :send_message, verb: :generate)
       end,
-
       output_fields: lambda do |object_definitions|
         object_definitions['send_messages_output']
       end,
-
       sample_output: lambda do |_connection, _input|
         call('sample_record_output', 'send_message')
       end
@@ -229,15 +231,12 @@
       input_fields: lambda do |object_definitions|
         object_definitions['translate_text_input']
       end,
-
       execute: lambda do |connection, input, _eis, _eos|
         call('run_vertex', connection, input, :translate, verb: :generate, extract: { type: :generic, json_response: true })
       end,
-
       output_fields: lambda do |object_definitions|
         object_definitions['translate_text_output']
       end,
-
       sample_output: lambda do |_connection, _input|
         call('sample_record_output', 'translate_text')
       end
@@ -250,19 +249,15 @@
         body: 'This action summarizes input text into a shorter version. The length of the summary can be configured. ' \
               'Outputs include telemetry pills: trace (correlation_id, duration_ms) and vertex (response_id, model_version), plus rate_limit_status.'
       },
-
       input_fields: lambda do |object_definitions|
         object_definitions['summarize_text_input']
       end,
-
       execute: lambda do |connection, input, _eis, _eos|
         call('run_vertex', connection, input, :summarize, verb: :generate, extract: { type: :generic })
       end,
-
       output_fields: lambda do |object_definitions|
         object_definitions['summarize_text_output']
       end,
-
       sample_output: lambda do |_connection, _input|
         call('sample_record_output', 'summarize_text')
       end
@@ -328,7 +323,6 @@
         body: 'This action uses AI to classify text into one of the provided categories. Returns confidence scores and alternative classifications. Designed to work with text prepared by RAG_Utils prepare_for_ai action. ' \
               'Outputs include telemetry pills: trace (correlation_id, duration_ms), vertex (response_id, model_version), and rate_limit_status.'
       },
-
       input_fields: lambda do |object_definitions|
         [
           { name: 'text', label: 'Text to classify', type: 'string', optional: false, hint: 'Text content to classify (preferably from RAG_Utils prepare_for_ai)' },
@@ -353,7 +347,6 @@
             ] }
         ].concat(object_definitions['config_schema'].only('safetySettings'))
       end,
-
       output_fields: lambda do |object_definitions|
         [
           { name: 'selected_category', label: 'Selected category', type: 'string' },
@@ -381,13 +374,11 @@
         .concat(object_definitions['trace_schema'])
         .concat(object_definitions['vertex_meta_schema'])
       end,
-
       execute: lambda do |connection, input, _eis, _eos|
         call('run_vertex', connection, input, :ai_classify,
              verb: :generate,
              extract: { type: :classify })
       end,
-
       sample_output: lambda do |_connection, input|
         {
           'selected_category' => input['categories']&.first&.[]('key') || 'urgent',
@@ -412,15 +403,12 @@
       input_fields: lambda do |object_definitions|
         object_definitions['analyze_text_input']
       end,
-
       execute: lambda do |connection, input, _eis, _eos|
         call('run_vertex', connection, input, :analyze, verb: :generate, extract: { type: :generic, json_response: true })
       end,
-
       output_fields: lambda do |object_definitions|
         object_definitions['analyze_text_output']
       end,
-
       sample_output: lambda do
         call('sample_record_output', 'analyze_text')
       end
@@ -439,15 +427,12 @@
       input_fields: lambda do |object_definitions|
         object_definitions['analyze_image_input']
       end,
-
       execute: lambda do |connection, input, _eis, _eos|
         call('run_vertex', connection, input, :analyze, verb: :generate, extract: { type: :generic, json_response: true })
       end,
-
       output_fields: lambda do |object_definitions|
         object_definitions['analyze_image_output']
       end,
-
       sample_output: lambda do
         call('sample_record_output', 'analyze_image')
       end
@@ -567,7 +552,6 @@
         body: 'Generate a numerical vector for a single text input. Optimized for RAG query flows. ' \
               'Outputs include a trace pill (correlation_id, duration_ms) for debugging.'
       },
-
       input_fields: lambda do |object_definitions|
         [
           { name: 'text', label: 'Text', type: 'string', optional: false, hint: 'Single text string to embed. Must not exceed 8192 tokens (approximately 6000 words).' },
@@ -612,11 +596,9 @@
             hint: 'Document title to prepend to text content for better embedding quality' }
         ]
       end,
-
       execute: lambda do |connection, input, _eis, _eos|
         call('generate_embedding_single_exec', connection, input)
       end,
-
       output_fields: lambda do |object_definitions|
         [
           { name: 'vector', label: 'Embedding vector', type: 'array', of: 'number', hint: 'Array of float values representing the text embedding' },
@@ -629,7 +611,6 @@
           ]}
         ]
       end,
-
       sample_output: lambda do |_connection, input|
         {
           'vector' => Array.new(768) { rand(-1.0..1.0).round(6) },
@@ -651,20 +632,16 @@
         body: "This action queries a deployed Vector Search index endpoint to find nearest neighbors (k-NN). IMPORTANT: Use the endpoint's own host (public endpoint domain or PSC DNS). Returning full datapoints increases latency and cost. " \
               'Outputs include a trace pill (correlation_id, duration_ms) for observability.'
       },
-
       input_fields: lambda do |object_definitions|
         object_definitions['find_neighbors_input']
       end,
-
       execute: lambda do |connection, input, _eis, _eos|
         resp = call('vindex_find_neighbors', connection, input)
         call('transform_find_neighbors_response', resp).merge('trace' => resp['trace'])
       end,
-
       output_fields: lambda do |object_definitions|
         object_definitions['find_neighbors_output']
       end,
-
       sample_output: lambda do
         {
           'nearestNeighbors' => [
