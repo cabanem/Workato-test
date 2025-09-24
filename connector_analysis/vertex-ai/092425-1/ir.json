@@ -1,0 +1,1673 @@
+{
+  "connector": {
+    "title": "Google Vertex AI",
+    "auth_modes": [
+      "oauth2",
+      "custom"
+    ]
+  },
+  "actions": [
+    {
+      "name": "send_messages",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "send_messages_input"
+      ],
+      "output_object_defs": [
+        "send_messages_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_eis",
+          "_eos"
+        ],
+        "calls": [
+          "run_vertex"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": "send_message",
+        "kwargs": {
+          "template": "send_message",
+          "verb": "generate",
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "translate_text",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "translate_text_input"
+      ],
+      "output_object_defs": [
+        "translate_text_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_eis",
+          "_eos"
+        ],
+        "calls": [
+          "run_vertex"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": "translate",
+        "kwargs": {
+          "template": "translate",
+          "verb": "generate",
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "summarize_text",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "summarize_text_input"
+      ],
+      "output_object_defs": [
+        "summarize_text_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_eis",
+          "_eos"
+        ],
+        "calls": [
+          "run_vertex"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": "summarize",
+        "kwargs": {
+          "template": "summarize",
+          "verb": "generate",
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "parse_text",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "parse_text_input"
+      ],
+      "output_object_defs": [
+        "parse_text_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_eis",
+          "_eos"
+        ],
+        "calls": [
+          "run_vertex"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": "parse",
+        "kwargs": {
+          "template": "parse",
+          "verb": "generate",
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "draft_email",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "draft_email_input"
+      ],
+      "output_object_defs": [
+        "draft_email_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_eis",
+          "_eos"
+        ],
+        "calls": [
+          "run_vertex"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": "email",
+        "kwargs": {
+          "template": "email",
+          "verb": "generate",
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "ai_classify",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "ai_classify_input"
+      ],
+      "output_object_defs": [
+        "ai_classify_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_eis",
+          "_eos"
+        ],
+        "calls": [
+          "run_vertex"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": "ai_classify",
+        "kwargs": {
+          "template": "ai_classify",
+          "verb": "generate",
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "analyze_text",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "analyze_text_input"
+      ],
+      "output_object_defs": [
+        "analyze_text_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_eis",
+          "_eos"
+        ],
+        "calls": [
+          "run_vertex"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": "analyze",
+        "kwargs": {
+          "template": "analyze",
+          "verb": "generate",
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "analyze_image",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "analyze_image_input"
+      ],
+      "output_object_defs": [
+        "analyze_image_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_eis",
+          "_eos"
+        ],
+        "calls": [
+          "run_vertex"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": "analyze",
+        "kwargs": {
+          "template": "analyze",
+          "verb": "generate",
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "generate_embeddings",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "generate_embeddings_input"
+      ],
+      "output_object_defs": [
+        "generate_embeddings_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_eis",
+          "_eos"
+        ],
+        "calls": [
+          "generate_embeddings_batch_exec"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "generate_embedding_single",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "generate_embedding_single_input"
+      ],
+      "output_object_defs": [
+        "generate_embedding_single_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_eis",
+          "_eos"
+        ],
+        "calls": [
+          "generate_embedding_single_exec"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "find_neighbors",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "find_neighbors_input"
+      ],
+      "output_object_defs": [
+        "find_neighbors_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_eis",
+          "_eos"
+        ],
+        "calls": [
+          "vindex_find_neighbors",
+          "transform_find_neighbors_response"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "upsert_index_datapoints",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "upsert_index_datapoints_input"
+      ],
+      "output_object_defs": [
+        "upsert_index_datapoints_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input"
+        ],
+        "calls": [
+          "batch_upsert_datapoints"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "test_connection",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+        "test_connection_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input"
+        ],
+        "calls": [
+          "probe_vertex_ai"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "get_prediction",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "get_prediction_input"
+      ],
+      "output_object_defs": [
+        "prediction"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input"
+        ],
+        "calls": [
+
+        ],
+        "direct_http": [
+          "post"
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "fetch_drive_file",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "fetch_drive_file_input"
+      ],
+      "output_object_defs": [
+        "fetch_drive_file_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input"
+        ],
+        "calls": [
+          "extract_drive_file_id",
+          "fetch_drive_file_full"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "list_drive_files",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "list_drive_files_input"
+      ],
+      "output_object_defs": [
+        "list_drive_files_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input"
+        ],
+        "calls": [
+          "extract_drive_file_id",
+          "build_drive_query",
+          "with_resilience",
+          "api_request",
+          "drive_api_url",
+          "handle_drive_error"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "batch_fetch_drive_files",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "batch_fetch_drive_files_input"
+      ],
+      "output_object_defs": [
+        "batch_fetch_drive_files_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input"
+        ],
+        "calls": [
+
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "monitor_drive_changes",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+        "monitor_drive_changes_input"
+      ],
+      "output_object_defs": [
+        "monitor_drive_changes_output"
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input"
+        ],
+        "calls": [
+          "extract_drive_file_id",
+          "with_resilience",
+          "api_request",
+          "drive_api_url",
+          "handle_drive_error"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    }
+  ],
+  "methods": [
+    {
+      "name": "new_correlation_id",
+      "lambda_params": [
+        "prefix = 'vx'"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "now_ms",
+      "lambda_params": [
+
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "with_resilience",
+      "lambda_params": [
+        "_connection",
+        "key: 'generic'",
+        "max_retries: 3",
+        "base_sleep: 0.5",
+        "retry_on_request: []",
+        "retry_on_response: [429",
+        "500",
+        "502",
+        "503",
+        "504]",
+        "&block"
+      ],
+      "calls": [
+        "new_correlation_id"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "api_request",
+      "lambda_params": [
+        "_connection",
+        "verb",
+        "url",
+        "options = {}"
+      ],
+      "calls": [
+        "new_correlation_id"
+      ],
+      "direct_http": [
+        "get",
+        "delete",
+        "post",
+        "put"
+      ]
+    },
+    {
+      "name": "rate_limit_from_headers",
+      "lambda_params": [
+        "headers: {}"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "safe_json_parse",
+      "lambda_params": [
+        "text"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "vertex_base_url",
+      "lambda_params": [
+        "connection"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "vertex_models_url",
+      "lambda_params": [
+        "connection",
+        "model",
+        "verb"
+      ],
+      "calls": [
+        "vertex_base_url"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "vertex_headers",
+      "lambda_params": [
+        "_connection",
+        "cid"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "validate_model!",
+      "lambda_params": [
+        "_connection",
+        "model"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "build_vertex_body",
+      "lambda_params": [
+        "_connection",
+        "input",
+        "operation"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "run_vertex",
+      "lambda_params": [
+        "connection",
+        "input",
+        "operation",
+        "verb: :generate",
+        "extract: { type: :generic",
+        "json_response: false }"
+      ],
+      "calls": [
+        "validate_model!",
+        "vertex_models_url",
+        "build_vertex_body",
+        "with_resilience",
+        "api_request",
+        "vertex_headers",
+        "safe_json_parse",
+        "extract_generic",
+        "extract_parsed",
+        "extract_email",
+        "extract_classify",
+        "merge_common_telemetry"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "first_text_from_candidates",
+      "lambda_params": [
+        "resp"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "vertex_meta_from_response",
+      "lambda_params": [
+        "resp"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "usage_from_response",
+      "lambda_params": [
+        "resp"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "safety_from_response",
+      "lambda_params": [
+        "resp"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "merge_common_telemetry",
+      "lambda_params": [
+        "out",
+        "resp"
+      ],
+      "calls": [
+        "usage_from_response",
+        "vertex_meta_from_response"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "extract_generic",
+      "lambda_params": [
+        "resp",
+        "json_response: false"
+      ],
+      "calls": [
+        "first_text_from_candidates",
+        "safe_json_parse"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "extract_parsed",
+      "lambda_params": [
+        "resp",
+        "schema_json"
+      ],
+      "calls": [
+        "first_text_from_candidates",
+        "safe_json_parse"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "extract_email",
+      "lambda_params": [
+        "resp"
+      ],
+      "calls": [
+        "first_text_from_candidates",
+        "safe_json_parse"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "extract_classify",
+      "lambda_params": [
+        "resp",
+        "options"
+      ],
+      "calls": [
+        "first_text_from_candidates",
+        "safe_json_parse",
+        "safety_from_response",
+        "usage_from_response"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "generate_embeddings_batch_exec",
+      "lambda_params": [
+        "connection",
+        "input"
+      ],
+      "calls": [
+        "validate_model!",
+        "vertex_models_url",
+        "with_resilience",
+        "api_request",
+        "vertex_headers",
+        "merge_common_telemetry"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "generate_embedding_single_exec",
+      "lambda_params": [
+        "connection",
+        "input"
+      ],
+      "calls": [
+        "validate_model!",
+        "vertex_models_url",
+        "with_resilience",
+        "api_request",
+        "vertex_headers",
+        "merge_common_telemetry"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "vindex_find_neighbors",
+      "lambda_params": [
+        "_connection",
+        "input"
+      ],
+      "calls": [
+        "with_resilience",
+        "api_request"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "transform_find_neighbors_response",
+      "lambda_params": [
+        "resp"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "batch_upsert_datapoints",
+      "lambda_params": [
+        "connection",
+        "index_id",
+        "datapoints",
+        "update_mask"
+      ],
+      "calls": [
+        "vertex_base_url",
+        "with_resilience",
+        "api_request",
+        "vertex_headers"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "drive_api_url",
+      "lambda_params": [
+        "endpoint",
+        "file_id = nil"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "extract_drive_file_id",
+      "lambda_params": [
+        "id_or_url"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "build_drive_query",
+      "lambda_params": [
+        "opts"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "handle_drive_error",
+      "lambda_params": [
+        "_connection",
+        "code",
+        "body",
+        "message",
+        "ctx"
+      ],
+      "calls": [
+        "safe_json_parse"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "fetch_drive_file_full",
+      "lambda_params": [
+        "connection",
+        "file_id",
+        "include_content"
+      ],
+      "calls": [
+        "with_resilience",
+        "api_request",
+        "drive_api_url",
+        "handle_drive_error"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "classify_drive_change",
+      "lambda_params": [
+        "change",
+        "include_removed"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "safety_ratings_output_sample",
+      "lambda_params": [
+
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "usage_output_sample",
+      "lambda_params": [
+
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "sample_record_output",
+      "lambda_params": [
+        "kind"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "format_parse_sample",
+      "lambda_params": [
+        "schema_json"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "probe_vertex_ai",
+      "lambda_params": [
+        "connection",
+        "test_models: false"
+      ],
+      "calls": [
+        "vertex_base_url",
+        "api_request"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "probe_drive",
+      "lambda_params": [
+        "_connection",
+        "verbose: false"
+      ],
+      "calls": [
+        "api_request",
+        "drive_api_url"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "probe_index",
+      "lambda_params": [
+        "connection",
+        "index_id"
+      ],
+      "calls": [
+        "vertex_base_url",
+        "api_request"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "vertex_rpm_limits",
+      "lambda_params": [
+
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    }
+  ],
+  "object_definitions": [
+    {
+      "name": "trace_schema",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "vertex_meta_schema",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "rate_limit_schema",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "safety_ratings_schema",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "usage_schema",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "text_model_schema",
+      "picklists_used": [
+        "available_text_models"
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "gen_options_schema",
+      "picklists_used": [
+        "response_type"
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "tools_schema",
+      "picklists_used": [
+        "function_call_mode"
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "safety_settings_schema",
+      "picklists_used": [
+        "safety_categories",
+        "safety_threshold",
+        "safety_method"
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "system_instruction_schema",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "text_input_field",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "send_messages_input",
+      "picklists_used": [
+        "chat_role"
+      ],
+      "object_defs_referenced": [
+        "text_model_schema",
+        "tools_schema",
+        "safety_settings_schema",
+        "system_instruction_schema",
+        "gen_options_schema"
+      ]
+    },
+    {
+      "name": "send_messages_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "safety_ratings_schema",
+        "usage_schema",
+        "rate_limit_schema",
+        "trace_schema",
+        "vertex_meta_schema"
+      ]
+    },
+    {
+      "name": "translate_text_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "text_model_schema",
+        "safety_settings_schema",
+        "gen_options_schema"
+      ]
+    },
+    {
+      "name": "translate_text_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "safety_ratings_schema",
+        "usage_schema",
+        "rate_limit_schema",
+        "trace_schema",
+        "vertex_meta_schema"
+      ]
+    },
+    {
+      "name": "summarize_text_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "text_model_schema",
+        "text_input_field",
+        "safety_settings_schema",
+        "gen_options_schema"
+      ]
+    },
+    {
+      "name": "summarize_text_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "safety_ratings_schema",
+        "usage_schema",
+        "rate_limit_schema",
+        "trace_schema",
+        "vertex_meta_schema"
+      ]
+    },
+    {
+      "name": "analyze_text_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "text_model_schema",
+        "safety_settings_schema",
+        "gen_options_schema"
+      ]
+    },
+    {
+      "name": "analyze_text_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "safety_ratings_schema",
+        "usage_schema",
+        "rate_limit_schema",
+        "trace_schema",
+        "vertex_meta_schema"
+      ]
+    },
+    {
+      "name": "parse_text_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "text_model_schema",
+        "safety_settings_schema",
+        "gen_options_schema"
+      ]
+    },
+    {
+      "name": "parse_text_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "safety_ratings_schema",
+        "usage_schema",
+        "rate_limit_schema",
+        "trace_schema",
+        "vertex_meta_schema"
+      ]
+    },
+    {
+      "name": "draft_email_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "text_model_schema",
+        "safety_settings_schema",
+        "gen_options_schema"
+      ]
+    },
+    {
+      "name": "draft_email_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "safety_ratings_schema",
+        "usage_schema",
+        "rate_limit_schema",
+        "trace_schema",
+        "vertex_meta_schema"
+      ]
+    },
+    {
+      "name": "ai_classify_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "text_model_schema",
+        "safety_settings_schema",
+        "gen_options_schema"
+      ]
+    },
+    {
+      "name": "ai_classify_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "safety_ratings_schema",
+        "usage_schema",
+        "rate_limit_schema",
+        "trace_schema",
+        "vertex_meta_schema"
+      ]
+    },
+    {
+      "name": "analyze_image_input",
+      "picklists_used": [
+        "available_image_models"
+      ],
+      "object_defs_referenced": [
+        "safety_settings_schema",
+        "gen_options_schema"
+      ]
+    },
+    {
+      "name": "analyze_image_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "safety_ratings_schema",
+        "usage_schema",
+        "rate_limit_schema",
+        "trace_schema",
+        "vertex_meta_schema"
+      ]
+    },
+    {
+      "name": "generate_embeddings_input",
+      "picklists_used": [
+        "available_embedding_models",
+        "embedding_task_list"
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "generate_embeddings_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "rate_limit_schema",
+        "trace_schema"
+      ]
+    },
+    {
+      "name": "generate_embedding_single_input",
+      "picklists_used": [
+        "available_embedding_models",
+        "embedding_task_list"
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "generate_embedding_single_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "rate_limit_schema",
+        "trace_schema"
+      ]
+    },
+    {
+      "name": "find_neighbors_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "find_neighbors_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "trace_schema"
+      ]
+    },
+    {
+      "name": "upsert_index_datapoints_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "upsert_index_datapoints_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "drive_file_fields",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "drive_file_extended",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "drive_file_fields",
+        "trace_schema"
+      ]
+    },
+    {
+      "name": "fetch_drive_file_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "fetch_drive_file_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "drive_file_extended"
+      ]
+    },
+    {
+      "name": "list_drive_files_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "list_drive_files_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "drive_file_fields",
+        "trace_schema"
+      ]
+    },
+    {
+      "name": "batch_fetch_drive_files_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "batch_fetch_drive_files_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "drive_file_extended"
+      ]
+    },
+    {
+      "name": "monitor_drive_changes_input",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "monitor_drive_changes_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+        "trace_schema"
+      ]
+    },
+    {
+      "name": "test_connection_output",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "prediction",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    }
+  ],
+  "pick_lists": [
+    {
+      "name": "available_text_models"
+    },
+    {
+      "name": "available_image_models"
+    },
+    {
+      "name": "available_embedding_models"
+    },
+    {
+      "name": "message_types"
+    },
+    {
+      "name": "numeric_comparison_op"
+    },
+    {
+      "name": "safety_categories"
+    },
+    {
+      "name": "safety_threshold"
+    },
+    {
+      "name": "safety_method"
+    },
+    {
+      "name": "response_type"
+    },
+    {
+      "name": "chat_role"
+    },
+    {
+      "name": "languages_picklist"
+    },
+    {
+      "name": "embedding_task_list"
+    }
+  ]
+}

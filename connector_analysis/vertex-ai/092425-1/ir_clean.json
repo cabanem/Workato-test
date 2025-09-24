@@ -1,0 +1,1594 @@
+{
+  "connector": {
+    "title": "Google Vertex AI",
+    "auth_modes": [
+      "oauth2",
+      "custom"
+    ]
+  },
+  "actions": [
+    {
+      "name": "send_messages",
+      "input_object_defs": [
+        "send_messages_input"
+      ],
+      "output_object_defs": [
+        "send_messages_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "send_message",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_model!",
+          "run_vertex → vertex_models_url → vertex_base_url",
+          "run_vertex → build_vertex_body",
+          "run_vertex → with_resilience → new_correlation_id",
+          "run_vertex → api_request → new_correlation_id",
+          "run_vertex → api_request → HTTP:GET",
+          "run_vertex → api_request → HTTP:DELETE",
+          "run_vertex → api_request → HTTP:POST",
+          "run_vertex → api_request → HTTP:PUT",
+          "run_vertex → vertex_headers",
+          "run_vertex → safe_json_parse",
+          "run_vertex → extract_generic → first_text_from_candidates",
+          "run_vertex → extract_generic → safe_json_parse",
+          "run_vertex → extract_parsed → first_text_from_candidates",
+          "run_vertex → extract_parsed → safe_json_parse",
+          "run_vertex → extract_email → first_text_from_candidates",
+          "run_vertex → extract_email → safe_json_parse",
+          "run_vertex → extract_classify → first_text_from_candidates",
+          "run_vertex → extract_classify → safe_json_parse",
+          "run_vertex → extract_classify → safety_from_response",
+          "run_vertex → extract_classify → usage_from_response",
+          "run_vertex → merge_common_telemetry → usage_from_response",
+          "run_vertex → merge_common_telemetry → vertex_meta_from_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "chat_role",
+        "function_call_mode",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "translate_text",
+      "input_object_defs": [
+        "translate_text_input"
+      ],
+      "output_object_defs": [
+        "translate_text_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "translate",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_model!",
+          "run_vertex → vertex_models_url → vertex_base_url",
+          "run_vertex → build_vertex_body",
+          "run_vertex → with_resilience → new_correlation_id",
+          "run_vertex → api_request → new_correlation_id",
+          "run_vertex → api_request → HTTP:GET",
+          "run_vertex → api_request → HTTP:DELETE",
+          "run_vertex → api_request → HTTP:POST",
+          "run_vertex → api_request → HTTP:PUT",
+          "run_vertex → vertex_headers",
+          "run_vertex → safe_json_parse",
+          "run_vertex → extract_generic → first_text_from_candidates",
+          "run_vertex → extract_generic → safe_json_parse",
+          "run_vertex → extract_parsed → first_text_from_candidates",
+          "run_vertex → extract_parsed → safe_json_parse",
+          "run_vertex → extract_email → first_text_from_candidates",
+          "run_vertex → extract_email → safe_json_parse",
+          "run_vertex → extract_classify → first_text_from_candidates",
+          "run_vertex → extract_classify → safe_json_parse",
+          "run_vertex → extract_classify → safety_from_response",
+          "run_vertex → extract_classify → usage_from_response",
+          "run_vertex → merge_common_telemetry → usage_from_response",
+          "run_vertex → merge_common_telemetry → vertex_meta_from_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "summarize_text",
+      "input_object_defs": [
+        "summarize_text_input"
+      ],
+      "output_object_defs": [
+        "summarize_text_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "summarize",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_model!",
+          "run_vertex → vertex_models_url → vertex_base_url",
+          "run_vertex → build_vertex_body",
+          "run_vertex → with_resilience → new_correlation_id",
+          "run_vertex → api_request → new_correlation_id",
+          "run_vertex → api_request → HTTP:GET",
+          "run_vertex → api_request → HTTP:DELETE",
+          "run_vertex → api_request → HTTP:POST",
+          "run_vertex → api_request → HTTP:PUT",
+          "run_vertex → vertex_headers",
+          "run_vertex → safe_json_parse",
+          "run_vertex → extract_generic → first_text_from_candidates",
+          "run_vertex → extract_generic → safe_json_parse",
+          "run_vertex → extract_parsed → first_text_from_candidates",
+          "run_vertex → extract_parsed → safe_json_parse",
+          "run_vertex → extract_email → first_text_from_candidates",
+          "run_vertex → extract_email → safe_json_parse",
+          "run_vertex → extract_classify → first_text_from_candidates",
+          "run_vertex → extract_classify → safe_json_parse",
+          "run_vertex → extract_classify → safety_from_response",
+          "run_vertex → extract_classify → usage_from_response",
+          "run_vertex → merge_common_telemetry → usage_from_response",
+          "run_vertex → merge_common_telemetry → vertex_meta_from_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "parse_text",
+      "input_object_defs": [
+        "parse_text_input"
+      ],
+      "output_object_defs": [
+        "parse_text_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "parse",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_model!",
+          "run_vertex → vertex_models_url → vertex_base_url",
+          "run_vertex → build_vertex_body",
+          "run_vertex → with_resilience → new_correlation_id",
+          "run_vertex → api_request → new_correlation_id",
+          "run_vertex → api_request → HTTP:GET",
+          "run_vertex → api_request → HTTP:DELETE",
+          "run_vertex → api_request → HTTP:POST",
+          "run_vertex → api_request → HTTP:PUT",
+          "run_vertex → vertex_headers",
+          "run_vertex → safe_json_parse",
+          "run_vertex → extract_generic → first_text_from_candidates",
+          "run_vertex → extract_generic → safe_json_parse",
+          "run_vertex → extract_parsed → first_text_from_candidates",
+          "run_vertex → extract_parsed → safe_json_parse",
+          "run_vertex → extract_email → first_text_from_candidates",
+          "run_vertex → extract_email → safe_json_parse",
+          "run_vertex → extract_classify → first_text_from_candidates",
+          "run_vertex → extract_classify → safe_json_parse",
+          "run_vertex → extract_classify → safety_from_response",
+          "run_vertex → extract_classify → usage_from_response",
+          "run_vertex → merge_common_telemetry → usage_from_response",
+          "run_vertex → merge_common_telemetry → vertex_meta_from_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "draft_email",
+      "input_object_defs": [
+        "draft_email_input"
+      ],
+      "output_object_defs": [
+        "draft_email_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "email",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_model!",
+          "run_vertex → vertex_models_url → vertex_base_url",
+          "run_vertex → build_vertex_body",
+          "run_vertex → with_resilience → new_correlation_id",
+          "run_vertex → api_request → new_correlation_id",
+          "run_vertex → api_request → HTTP:GET",
+          "run_vertex → api_request → HTTP:DELETE",
+          "run_vertex → api_request → HTTP:POST",
+          "run_vertex → api_request → HTTP:PUT",
+          "run_vertex → vertex_headers",
+          "run_vertex → safe_json_parse",
+          "run_vertex → extract_generic → first_text_from_candidates",
+          "run_vertex → extract_generic → safe_json_parse",
+          "run_vertex → extract_parsed → first_text_from_candidates",
+          "run_vertex → extract_parsed → safe_json_parse",
+          "run_vertex → extract_email → first_text_from_candidates",
+          "run_vertex → extract_email → safe_json_parse",
+          "run_vertex → extract_classify → first_text_from_candidates",
+          "run_vertex → extract_classify → safe_json_parse",
+          "run_vertex → extract_classify → safety_from_response",
+          "run_vertex → extract_classify → usage_from_response",
+          "run_vertex → merge_common_telemetry → usage_from_response",
+          "run_vertex → merge_common_telemetry → vertex_meta_from_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "ai_classify",
+      "input_object_defs": [
+        "ai_classify_input"
+      ],
+      "output_object_defs": [
+        "ai_classify_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "ai_classify",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_model!",
+          "run_vertex → vertex_models_url → vertex_base_url",
+          "run_vertex → build_vertex_body",
+          "run_vertex → with_resilience → new_correlation_id",
+          "run_vertex → api_request → new_correlation_id",
+          "run_vertex → api_request → HTTP:GET",
+          "run_vertex → api_request → HTTP:DELETE",
+          "run_vertex → api_request → HTTP:POST",
+          "run_vertex → api_request → HTTP:PUT",
+          "run_vertex → vertex_headers",
+          "run_vertex → safe_json_parse",
+          "run_vertex → extract_generic → first_text_from_candidates",
+          "run_vertex → extract_generic → safe_json_parse",
+          "run_vertex → extract_parsed → first_text_from_candidates",
+          "run_vertex → extract_parsed → safe_json_parse",
+          "run_vertex → extract_email → first_text_from_candidates",
+          "run_vertex → extract_email → safe_json_parse",
+          "run_vertex → extract_classify → first_text_from_candidates",
+          "run_vertex → extract_classify → safe_json_parse",
+          "run_vertex → extract_classify → safety_from_response",
+          "run_vertex → extract_classify → usage_from_response",
+          "run_vertex → merge_common_telemetry → usage_from_response",
+          "run_vertex → merge_common_telemetry → vertex_meta_from_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "analyze_text",
+      "input_object_defs": [
+        "analyze_text_input"
+      ],
+      "output_object_defs": [
+        "analyze_text_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "analyze",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_model!",
+          "run_vertex → vertex_models_url → vertex_base_url",
+          "run_vertex → build_vertex_body",
+          "run_vertex → with_resilience → new_correlation_id",
+          "run_vertex → api_request → new_correlation_id",
+          "run_vertex → api_request → HTTP:GET",
+          "run_vertex → api_request → HTTP:DELETE",
+          "run_vertex → api_request → HTTP:POST",
+          "run_vertex → api_request → HTTP:PUT",
+          "run_vertex → vertex_headers",
+          "run_vertex → safe_json_parse",
+          "run_vertex → extract_generic → first_text_from_candidates",
+          "run_vertex → extract_generic → safe_json_parse",
+          "run_vertex → extract_parsed → first_text_from_candidates",
+          "run_vertex → extract_parsed → safe_json_parse",
+          "run_vertex → extract_email → first_text_from_candidates",
+          "run_vertex → extract_email → safe_json_parse",
+          "run_vertex → extract_classify → first_text_from_candidates",
+          "run_vertex → extract_classify → safe_json_parse",
+          "run_vertex → extract_classify → safety_from_response",
+          "run_vertex → extract_classify → usage_from_response",
+          "run_vertex → merge_common_telemetry → usage_from_response",
+          "run_vertex → merge_common_telemetry → vertex_meta_from_response"
+        ]
+      },
+      "picklists_used": [
+        "available_text_models",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ]
+    },
+    {
+      "name": "analyze_image",
+      "input_object_defs": [
+        "analyze_image_input"
+      ],
+      "output_object_defs": [
+        "analyze_image_output"
+      ],
+      "execute": {
+        "method": "run_vertex",
+        "params": {
+          "template": "analyze",
+          "verb": "generate"
+        },
+        "transitive_calls": [
+          "run_vertex → validate_model!",
+          "run_vertex → vertex_models_url → vertex_base_url",
+          "run_vertex → build_vertex_body",
+          "run_vertex → with_resilience → new_correlation_id",
+          "run_vertex → api_request → new_correlation_id",
+          "run_vertex → api_request → HTTP:GET",
+          "run_vertex → api_request → HTTP:DELETE",
+          "run_vertex → api_request → HTTP:POST",
+          "run_vertex → api_request → HTTP:PUT",
+          "run_vertex → vertex_headers",
+          "run_vertex → safe_json_parse",
+          "run_vertex → extract_generic → first_text_from_candidates",
+          "run_vertex → extract_generic → safe_json_parse",
+          "run_vertex → extract_parsed → first_text_from_candidates",
+          "run_vertex → extract_parsed → safe_json_parse",
+          "run_vertex → extract_email → first_text_from_candidates",
+          "run_vertex → extract_email → safe_json_parse",
+          "run_vertex → extract_classify → first_text_from_candidates",
+          "run_vertex → extract_classify → safe_json_parse",
+          "run_vertex → extract_classify → safety_from_response",
+          "run_vertex → extract_classify → usage_from_response",
+          "run_vertex → merge_common_telemetry → usage_from_response",
+          "run_vertex → merge_common_telemetry → vertex_meta_from_response"
+        ]
+      },
+      "picklists_used": [
+        "available_image_models",
+        "response_type",
+        "safety_categories",
+        "safety_method",
+        "safety_threshold"
+      ],
+      "note": "Action 'analyze_image' uses template :analyze. Did you mean :analyze_image?",
+      "notes": [
+        "Action 'analyze_image' uses template :analyze. Did you mean :analyze_image?"
+      ]
+    },
+    {
+      "name": "generate_embeddings",
+      "input_object_defs": [
+        "generate_embeddings_input"
+      ],
+      "output_object_defs": [
+        "generate_embeddings_output"
+      ],
+      "execute": {
+        "method": "generate_embeddings_batch_exec",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "generate_embeddings_batch_exec → validate_model!",
+          "generate_embeddings_batch_exec → vertex_models_url → vertex_base_url",
+          "generate_embeddings_batch_exec → with_resilience → new_correlation_id",
+          "generate_embeddings_batch_exec → api_request → new_correlation_id",
+          "generate_embeddings_batch_exec → api_request → HTTP:GET",
+          "generate_embeddings_batch_exec → api_request → HTTP:DELETE",
+          "generate_embeddings_batch_exec → api_request → HTTP:POST",
+          "generate_embeddings_batch_exec → api_request → HTTP:PUT",
+          "generate_embeddings_batch_exec → vertex_headers",
+          "generate_embeddings_batch_exec → merge_common_telemetry → usage_from_response",
+          "generate_embeddings_batch_exec → merge_common_telemetry → vertex_meta_from_response"
+        ]
+      },
+      "picklists_used": [
+        "available_embedding_models",
+        "embedding_task_list"
+      ]
+    },
+    {
+      "name": "generate_embedding_single",
+      "input_object_defs": [
+        "generate_embedding_single_input"
+      ],
+      "output_object_defs": [
+        "generate_embedding_single_output"
+      ],
+      "execute": {
+        "method": "generate_embedding_single_exec",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "generate_embedding_single_exec → validate_model!",
+          "generate_embedding_single_exec → vertex_models_url → vertex_base_url",
+          "generate_embedding_single_exec → with_resilience → new_correlation_id",
+          "generate_embedding_single_exec → api_request → new_correlation_id",
+          "generate_embedding_single_exec → api_request → HTTP:GET",
+          "generate_embedding_single_exec → api_request → HTTP:DELETE",
+          "generate_embedding_single_exec → api_request → HTTP:POST",
+          "generate_embedding_single_exec → api_request → HTTP:PUT",
+          "generate_embedding_single_exec → vertex_headers",
+          "generate_embedding_single_exec → merge_common_telemetry → usage_from_response",
+          "generate_embedding_single_exec → merge_common_telemetry → vertex_meta_from_response"
+        ]
+      },
+      "picklists_used": [
+        "available_embedding_models",
+        "embedding_task_list"
+      ]
+    },
+    {
+      "name": "find_neighbors",
+      "input_object_defs": [
+        "find_neighbors_input"
+      ],
+      "output_object_defs": [
+        "find_neighbors_output"
+      ],
+      "execute": {
+        "method": "vindex_find_neighbors",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "vindex_find_neighbors → with_resilience → new_correlation_id",
+          "vindex_find_neighbors → api_request → new_correlation_id",
+          "vindex_find_neighbors → api_request → HTTP:GET",
+          "vindex_find_neighbors → api_request → HTTP:DELETE",
+          "vindex_find_neighbors → api_request → HTTP:POST",
+          "vindex_find_neighbors → api_request → HTTP:PUT",
+          "transform_find_neighbors_response"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "upsert_index_datapoints",
+      "input_object_defs": [
+        "upsert_index_datapoints_input"
+      ],
+      "output_object_defs": [
+        "upsert_index_datapoints_output"
+      ],
+      "execute": {
+        "method": "batch_upsert_datapoints",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "batch_upsert_datapoints → vertex_base_url",
+          "batch_upsert_datapoints → with_resilience → new_correlation_id",
+          "batch_upsert_datapoints → api_request → new_correlation_id",
+          "batch_upsert_datapoints → api_request → HTTP:GET",
+          "batch_upsert_datapoints → api_request → HTTP:DELETE",
+          "batch_upsert_datapoints → api_request → HTTP:POST",
+          "batch_upsert_datapoints → api_request → HTTP:PUT",
+          "batch_upsert_datapoints → vertex_headers"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "test_connection",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+        "test_connection_output"
+      ],
+      "execute": {
+        "method": "probe_vertex_ai",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "probe_vertex_ai → vertex_base_url",
+          "probe_vertex_ai → api_request → new_correlation_id",
+          "probe_vertex_ai → api_request → HTTP:GET",
+          "probe_vertex_ai → api_request → HTTP:DELETE",
+          "probe_vertex_ai → api_request → HTTP:POST",
+          "probe_vertex_ai → api_request → HTTP:PUT"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "get_prediction",
+      "input_object_defs": [
+        "get_prediction_input"
+      ],
+      "output_object_defs": [
+        "prediction"
+      ],
+      "execute": {
+        "method": "HTTP:POST",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "HTTP:POST"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "fetch_drive_file",
+      "input_object_defs": [
+        "fetch_drive_file_input"
+      ],
+      "output_object_defs": [
+        "fetch_drive_file_output"
+      ],
+      "execute": {
+        "method": "extract_drive_file_id",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "extract_drive_file_id",
+          "fetch_drive_file_full → with_resilience → new_correlation_id",
+          "fetch_drive_file_full → api_request → new_correlation_id",
+          "fetch_drive_file_full → api_request → HTTP:GET",
+          "fetch_drive_file_full → api_request → HTTP:DELETE",
+          "fetch_drive_file_full → api_request → HTTP:POST",
+          "fetch_drive_file_full → api_request → HTTP:PUT",
+          "fetch_drive_file_full → drive_api_url",
+          "fetch_drive_file_full → handle_drive_error → safe_json_parse"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "list_drive_files",
+      "input_object_defs": [
+        "list_drive_files_input"
+      ],
+      "output_object_defs": [
+        "list_drive_files_output"
+      ],
+      "execute": {
+        "method": "api_request",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "extract_drive_file_id",
+          "build_drive_query",
+          "with_resilience → new_correlation_id",
+          "api_request → new_correlation_id",
+          "api_request → HTTP:GET",
+          "api_request → HTTP:DELETE",
+          "api_request → HTTP:POST",
+          "api_request → HTTP:PUT",
+          "drive_api_url",
+          "handle_drive_error → safe_json_parse"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "batch_fetch_drive_files",
+      "input_object_defs": [
+        "batch_fetch_drive_files_input"
+      ],
+      "output_object_defs": [
+        "batch_fetch_drive_files_output"
+      ],
+      "execute": {
+        "method": "execute",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          ""
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "monitor_drive_changes",
+      "input_object_defs": [
+        "monitor_drive_changes_input"
+      ],
+      "output_object_defs": [
+        "monitor_drive_changes_output"
+      ],
+      "execute": {
+        "method": "api_request",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "extract_drive_file_id",
+          "with_resilience → new_correlation_id",
+          "api_request → new_correlation_id",
+          "api_request → HTTP:GET",
+          "api_request → HTTP:DELETE",
+          "api_request → HTTP:POST",
+          "api_request → HTTP:PUT",
+          "drive_api_url",
+          "handle_drive_error → safe_json_parse"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "name": "new_correlation_id",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "now_ms",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "with_resilience",
+      "calls": [
+        "new_correlation_id"
+      ]
+    },
+    {
+      "name": "api_request",
+      "calls": [
+        "new_correlation_id"
+      ]
+    },
+    {
+      "name": "rate_limit_from_headers",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "safe_json_parse",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "vertex_base_url",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "vertex_models_url",
+      "calls": [
+        "vertex_base_url"
+      ]
+    },
+    {
+      "name": "vertex_headers",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "validate_model!",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "build_vertex_body",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "run_vertex",
+      "calls": [
+        "validate_model!",
+        "vertex_models_url",
+        "build_vertex_body",
+        "with_resilience",
+        "api_request",
+        "vertex_headers",
+        "safe_json_parse",
+        "extract_generic",
+        "extract_parsed",
+        "extract_email",
+        "extract_classify",
+        "merge_common_telemetry"
+      ]
+    },
+    {
+      "name": "first_text_from_candidates",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "vertex_meta_from_response",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "usage_from_response",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "safety_from_response",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "merge_common_telemetry",
+      "calls": [
+        "usage_from_response",
+        "vertex_meta_from_response"
+      ]
+    },
+    {
+      "name": "extract_generic",
+      "calls": [
+        "first_text_from_candidates",
+        "safe_json_parse"
+      ]
+    },
+    {
+      "name": "extract_parsed",
+      "calls": [
+        "first_text_from_candidates",
+        "safe_json_parse"
+      ]
+    },
+    {
+      "name": "extract_email",
+      "calls": [
+        "first_text_from_candidates",
+        "safe_json_parse"
+      ]
+    },
+    {
+      "name": "extract_classify",
+      "calls": [
+        "first_text_from_candidates",
+        "safe_json_parse",
+        "safety_from_response",
+        "usage_from_response"
+      ]
+    },
+    {
+      "name": "generate_embeddings_batch_exec",
+      "calls": [
+        "validate_model!",
+        "vertex_models_url",
+        "with_resilience",
+        "api_request",
+        "vertex_headers",
+        "merge_common_telemetry"
+      ]
+    },
+    {
+      "name": "generate_embedding_single_exec",
+      "calls": [
+        "validate_model!",
+        "vertex_models_url",
+        "with_resilience",
+        "api_request",
+        "vertex_headers",
+        "merge_common_telemetry"
+      ]
+    },
+    {
+      "name": "vindex_find_neighbors",
+      "calls": [
+        "with_resilience",
+        "api_request"
+      ]
+    },
+    {
+      "name": "transform_find_neighbors_response",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "batch_upsert_datapoints",
+      "calls": [
+        "vertex_base_url",
+        "with_resilience",
+        "api_request",
+        "vertex_headers"
+      ]
+    },
+    {
+      "name": "drive_api_url",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "extract_drive_file_id",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "build_drive_query",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "handle_drive_error",
+      "calls": [
+        "safe_json_parse"
+      ]
+    },
+    {
+      "name": "fetch_drive_file_full",
+      "calls": [
+        "with_resilience",
+        "api_request",
+        "drive_api_url",
+        "handle_drive_error"
+      ]
+    },
+    {
+      "name": "classify_drive_change",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "safety_ratings_output_sample",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "usage_output_sample",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "sample_record_output",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "format_parse_sample",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "probe_vertex_ai",
+      "calls": [
+        "vertex_base_url",
+        "api_request"
+      ]
+    },
+    {
+      "name": "probe_drive",
+      "calls": [
+        "api_request",
+        "drive_api_url"
+      ]
+    },
+    {
+      "name": "probe_index",
+      "calls": [
+        "vertex_base_url",
+        "api_request"
+      ]
+    },
+    {
+      "name": "vertex_rpm_limits",
+      "calls": [
+
+      ]
+    }
+  ],
+  "object_definitions": [
+    {
+      "name": "trace_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "ai_classify_output",
+        "analyze_image_output",
+        "analyze_text_output",
+        "draft_email_output",
+        "drive_file_extended",
+        "find_neighbors_output",
+        "generate_embedding_single_output",
+        "generate_embeddings_output",
+        "list_drive_files_output",
+        "monitor_drive_changes_output",
+        "parse_text_output",
+        "send_messages_output",
+        "summarize_text_output",
+        "translate_text_output"
+      ]
+    },
+    {
+      "name": "vertex_meta_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "ai_classify_output",
+        "analyze_image_output",
+        "analyze_text_output",
+        "draft_email_output",
+        "parse_text_output",
+        "send_messages_output",
+        "summarize_text_output",
+        "translate_text_output"
+      ]
+    },
+    {
+      "name": "rate_limit_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "ai_classify_output",
+        "analyze_image_output",
+        "analyze_text_output",
+        "draft_email_output",
+        "generate_embedding_single_output",
+        "generate_embeddings_output",
+        "parse_text_output",
+        "send_messages_output",
+        "summarize_text_output",
+        "translate_text_output"
+      ]
+    },
+    {
+      "name": "safety_ratings_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "ai_classify_output",
+        "analyze_image_output",
+        "analyze_text_output",
+        "draft_email_output",
+        "parse_text_output",
+        "send_messages_output",
+        "summarize_text_output",
+        "translate_text_output"
+      ]
+    },
+    {
+      "name": "usage_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "ai_classify_output",
+        "analyze_image_output",
+        "analyze_text_output",
+        "draft_email_output",
+        "parse_text_output",
+        "send_messages_output",
+        "summarize_text_output",
+        "translate_text_output"
+      ]
+    },
+    {
+      "name": "text_model_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "ai_classify_input",
+        "analyze_text_input",
+        "draft_email_input",
+        "parse_text_input",
+        "send_messages_input",
+        "summarize_text_input",
+        "translate_text_input"
+      ]
+    },
+    {
+      "name": "gen_options_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "ai_classify_input",
+        "analyze_image_input",
+        "analyze_text_input",
+        "draft_email_input",
+        "parse_text_input",
+        "send_messages_input",
+        "summarize_text_input",
+        "translate_text_input"
+      ]
+    },
+    {
+      "name": "tools_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "send_messages_input"
+      ]
+    },
+    {
+      "name": "safety_settings_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "ai_classify_input",
+        "analyze_image_input",
+        "analyze_text_input",
+        "draft_email_input",
+        "parse_text_input",
+        "send_messages_input",
+        "summarize_text_input",
+        "translate_text_input"
+      ]
+    },
+    {
+      "name": "system_instruction_schema",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "send_messages_input"
+      ]
+    },
+    {
+      "name": "text_input_field",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "summarize_text_input"
+      ]
+    },
+    {
+      "name": "send_messages_input",
+      "used_by_actions": [
+        "send_messages"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "send_messages_output",
+      "used_by_actions": [
+        "send_messages"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "translate_text_input",
+      "used_by_actions": [
+        "translate_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "translate_text_output",
+      "used_by_actions": [
+        "translate_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "summarize_text_input",
+      "used_by_actions": [
+        "summarize_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "summarize_text_output",
+      "used_by_actions": [
+        "summarize_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "analyze_text_input",
+      "used_by_actions": [
+        "analyze_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "analyze_text_output",
+      "used_by_actions": [
+        "analyze_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "parse_text_input",
+      "used_by_actions": [
+        "parse_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "parse_text_output",
+      "used_by_actions": [
+        "parse_text"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "draft_email_input",
+      "used_by_actions": [
+        "draft_email"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "draft_email_output",
+      "used_by_actions": [
+        "draft_email"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "ai_classify_input",
+      "used_by_actions": [
+        "ai_classify"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "ai_classify_output",
+      "used_by_actions": [
+        "ai_classify"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "analyze_image_input",
+      "used_by_actions": [
+        "analyze_image"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "analyze_image_output",
+      "used_by_actions": [
+        "analyze_image"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "generate_embeddings_input",
+      "used_by_actions": [
+        "generate_embeddings"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "generate_embeddings_output",
+      "used_by_actions": [
+        "generate_embeddings"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "generate_embedding_single_input",
+      "used_by_actions": [
+        "generate_embedding_single"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "generate_embedding_single_output",
+      "used_by_actions": [
+        "generate_embedding_single"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "find_neighbors_input",
+      "used_by_actions": [
+        "find_neighbors"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "find_neighbors_output",
+      "used_by_actions": [
+        "find_neighbors"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "upsert_index_datapoints_input",
+      "used_by_actions": [
+        "upsert_index_datapoints"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "upsert_index_datapoints_output",
+      "used_by_actions": [
+        "upsert_index_datapoints"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "drive_file_fields",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "drive_file_extended",
+        "list_drive_files_output"
+      ]
+    },
+    {
+      "name": "drive_file_extended",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+        "batch_fetch_drive_files_output",
+        "fetch_drive_file_output"
+      ]
+    },
+    {
+      "name": "fetch_drive_file_input",
+      "used_by_actions": [
+        "fetch_drive_file"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "fetch_drive_file_output",
+      "used_by_actions": [
+        "fetch_drive_file"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "list_drive_files_input",
+      "used_by_actions": [
+        "list_drive_files"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "list_drive_files_output",
+      "used_by_actions": [
+        "list_drive_files"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "batch_fetch_drive_files_input",
+      "used_by_actions": [
+        "batch_fetch_drive_files"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "batch_fetch_drive_files_output",
+      "used_by_actions": [
+        "batch_fetch_drive_files"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "monitor_drive_changes_input",
+      "used_by_actions": [
+        "monitor_drive_changes"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "monitor_drive_changes_output",
+      "used_by_actions": [
+        "monitor_drive_changes"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "test_connection_output",
+      "used_by_actions": [
+        "test_connection"
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "prediction",
+      "used_by_actions": [
+        "get_prediction"
+      ],
+      "used_by_objects": [
+
+      ]
+    }
+  ],
+  "pick_lists": [
+    {
+      "name": "available_text_models",
+      "used_by_objects": [
+        "text_model_schema"
+      ],
+      "used_by_actions": [
+        "ai_classify",
+        "analyze_text",
+        "draft_email",
+        "parse_text",
+        "send_messages",
+        "summarize_text",
+        "translate_text"
+      ]
+    },
+    {
+      "name": "available_image_models",
+      "used_by_objects": [
+        "analyze_image_input"
+      ],
+      "used_by_actions": [
+        "analyze_image"
+      ]
+    },
+    {
+      "name": "available_embedding_models",
+      "used_by_objects": [
+        "generate_embedding_single_input",
+        "generate_embeddings_input"
+      ],
+      "used_by_actions": [
+        "generate_embedding_single",
+        "generate_embeddings"
+      ]
+    },
+    {
+      "name": "message_types",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    },
+    {
+      "name": "numeric_comparison_op",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    },
+    {
+      "name": "safety_categories",
+      "used_by_objects": [
+        "safety_settings_schema"
+      ],
+      "used_by_actions": [
+        "ai_classify",
+        "analyze_image",
+        "analyze_text",
+        "draft_email",
+        "parse_text",
+        "send_messages",
+        "summarize_text",
+        "translate_text"
+      ]
+    },
+    {
+      "name": "safety_threshold",
+      "used_by_objects": [
+        "safety_settings_schema"
+      ],
+      "used_by_actions": [
+        "ai_classify",
+        "analyze_image",
+        "analyze_text",
+        "draft_email",
+        "parse_text",
+        "send_messages",
+        "summarize_text",
+        "translate_text"
+      ]
+    },
+    {
+      "name": "safety_method",
+      "used_by_objects": [
+        "safety_settings_schema"
+      ],
+      "used_by_actions": [
+        "ai_classify",
+        "analyze_image",
+        "analyze_text",
+        "draft_email",
+        "parse_text",
+        "send_messages",
+        "summarize_text",
+        "translate_text"
+      ]
+    },
+    {
+      "name": "response_type",
+      "used_by_objects": [
+        "gen_options_schema"
+      ],
+      "used_by_actions": [
+        "ai_classify",
+        "analyze_image",
+        "analyze_text",
+        "draft_email",
+        "parse_text",
+        "send_messages",
+        "summarize_text",
+        "translate_text"
+      ]
+    },
+    {
+      "name": "chat_role",
+      "used_by_objects": [
+        "send_messages_input"
+      ],
+      "used_by_actions": [
+        "send_messages"
+      ]
+    },
+    {
+      "name": "languages_picklist",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    },
+    {
+      "name": "embedding_task_list",
+      "used_by_objects": [
+        "generate_embedding_single_input",
+        "generate_embeddings_input"
+      ],
+      "used_by_actions": [
+        "generate_embedding_single",
+        "generate_embeddings"
+      ]
+    }
+  ]
+}
