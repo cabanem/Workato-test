@@ -27,7 +27,7 @@ jobs:
       # Ensure deps
       # - run: bundle install --quiet
       - name: Build visuals
-        run: ruby connector_analyzer.rb path/to/connector.rb -o out
+        run: ruby scripts/connector_analyzer.rb connectors/vertex-ai.rb -o out
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
