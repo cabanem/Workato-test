@@ -94,16 +94,24 @@
             }.to_param
             "https://accounts.google.com/o/oauth2/v2/auth?#{params}"
           end,
-          acquire: lambda do |connection, auth_code|
-            response = post('https://oauth2.googleapis.com/token').
-                       payload(
-                         client_id: connection['client_id'],
-                         client_secret: connection['client_secret'],
-                         grant_type: 'authorization_code',
-                         code: auth_code,
-                         redirect_uri: 'https://www.workato.com/oauth/callback'
-                       ).request_format_www_form_urlencoded
-            [response, nil, nil]
+          acquire: lambda do |connection|
+            jwt_body_claim = {
+              'iat'   => now.to_i,
+              'exp'   => 1.hour.from_now.to_i,
+              'aud'   => 'https://oauth2.googleapis.com/token',
+              'iss'   => connection['service_account_email'],
+              'sub'   => connection['service_account_email'],
+              'scope' => call('oauth_scopes').join(' ')
+            }
+            private_key = connection['private_key'].gsub('\\n', "\n")
+            jwt_token = workato.jwt_encode(jwt_body_claim, private_key, 'RS256')
+
+            response = post('https://oauth2.googleapis.com/token',
+                            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                            assertion: jwt_token).
+                      request_format_www_form_urlencoded
+
+            { access_token: response['access_token'] }
           end,
           refresh: lambda do |connection, refresh_token|
             post('https://oauth2.googleapis.com/token').
@@ -169,7 +177,7 @@
   test: lambda do |connection|
     resp = call('with_resilience', connection, key: 'vertex.datasets.list') do |cid|
       call('api_request', connection, :get,
-        "#{call('project_region_path', connection)}/datasets",
+        "#{call('vertex_base_url', connection)}/datasets",
         { params: { pageSize: 1 },
           headers: { 'X-Correlation-Id' => cid },
           context: { action: 'List datasets', correlation_id: cid } })
@@ -231,7 +239,8 @@
         object_definitions['translate_text_input']
       end,
       execute: lambda do |connection, input, _eis, _eos|
-        call('run_vertex', connection, input, :translate, verb: :generate, extract: { type: :generic, json_response: true })
+        call('run_vertex', connection, input, :translate, verb: :generate,
+            extract: { type: :generic, json_response: false })
       end,
       output_fields: lambda do |object_definitions|
         object_definitions['translate_text_output']
@@ -345,7 +354,8 @@
         object_definitions['analyze_text_input']
       end,
       execute: lambda do |connection, input, _eis, _eos|
-        call('run_vertex', connection, input, :analyze, verb: :generate, extract: { type: :generic, json_response: true })
+        call('run_vertex', connection, input, :analyze, verb: :generate,
+            extract: { type: :generic, json_response: false })
       end,
       output_fields: lambda do |object_definitions|
         object_definitions['analyze_text_output']
@@ -369,7 +379,8 @@
         object_definitions['analyze_image_input']
       end,
       execute: lambda do |connection, input, _eis, _eos|
-        call('run_vertex', connection, input, :analyze, verb: :generate, extract: { type: :generic, json_response: true })
+        call('run_vertex', connection, input, :analyze, verb: :generate,
+            extract: { type: :generic, json_response: false })
       end,
       output_fields: lambda do |object_definitions|
         object_definitions['analyze_image_output']
@@ -601,41 +612,6 @@
       end
     },
 
-    # Legacy (kept for BC)
-    get_prediction: {
-      title: 'Vertex -- Get prediction (legacy)',
-      subtitle: 'Get prediction in Google Vertex AI',
-      description: 'DEPRECATED: PaLM2 text-bison :predict',
-      help: lambda do
-        {
-          body: '**Deprecated** - retained for backwards compatibility. Returns raw predictions and token metadata.',
-          learn_more_url: 'https://cloud.google.com/vertex-ai/docs/generative-ai/model-reference/text',
-          learn_more_text: 'Learn more'
-        }
-      end,
-      input_fields: lambda do |object_definitions|
-        object_definitions['get_prediction_input']
-      end,
-      execute: lambda do |connection, input|
-        post("projects/#{connection['project']}/locations/#{connection['region']}/publishers/google/models/text-bison:predict", input)
-          .after_error_response(/.*/) do |_, body, _, message|
-            error("#{message}: #{body}")
-          end
-      end,
-      output_fields: lambda do |object_definitions|
-        object_definitions['prediction']
-      end,
-      sample_output: lambda do |_connection|
-        {
-          'predictions' => [{ 'content' => 'Sample legacy prediction' }],
-          'metadata' => { 'tokenMetadata' => {
-            'inputTokenCount'  => { 'totalTokens' => 10, 'totalBillableCharacters' => 40 },
-            'outputTokenCount' => { 'totalTokens' => 20, 'totalBillableCharacters' => 80 }
-          } }
-        }
-      end
-    },
-
     # ─────────────────────────────────────────────────────────────────────────────
     # Google Drive
     # ─────────────────────────────────────────────────────────────────────────────
@@ -665,6 +641,7 @@
     list_drive_files: {
       title: 'Drive -- List Google Drive files',
       subtitle: 'Retrieve a list of files from Google Drive',
+      bulk: true,
       description: lambda do |input|
         folder_id = input['folder_id']
         folder_id.present? ? "List files in Google Drive folder: #{folder_id}" : 'List files from Google Drive'
@@ -832,13 +809,11 @@
         page_size = [input.fetch('page_size', 100), 1000].min
 
         if page_token.blank?
-          start_params = { supportsAllDrives: include_shared_drives }
-          start_params[:driveId] = folder_id if folder_id.present? && include_shared_drives
-          start_params[:spaces]  = 'drive'   if folder_id.present?
+          start_params[:driveId]  = input['drive_id'] if include_shared_drives && input['drive_id'].present?
+          changes_params[:driveId]= input['drive_id'] if include_shared_drives && input['drive_id'].present?
 
           start_response = call('with_resilience', connection, key: 'drive.changes.start_token') do |cid|
-            call('api_request', connection, :get,
-              call('drive_api_url', :start_token),
+            call('api_request', connection, :get, call('drive_api_url', :start_token),
               {
                 params: start_params,
                 headers: { 'X-Correlation-Id' => cid },
@@ -961,6 +936,15 @@
   },
 
   methods: {
+    # ─────────────────────────────────────────────────────────────────────────────
+    # OAuth Scopes
+    # ─────────────────────────────────────────────────────────────────────────────
+    oauth_scopes: lambda do
+      [
+        'https://www.googleapis.com/auth/cloud-platform',
+        'https://www.googleapis.com/auth/drive.readonly'
+      ]
+    end,
     # ─────────────────────────────────────────────────────────────────────────────
     # Core observability & resilience
     # ─────────────────────────────────────────────────────────────────────────────
@@ -1108,69 +1092,100 @@
     build_vertex_body: lambda do |_connection, input, operation|
       body = {}
 
-      # 1) contents (raw Vertex message format) wins
+      # 1) contents (raw)
       if input['contents'].is_a?(Array)
         body['contents'] = input['contents']
-      # 2) messages (role/text simplified) → convert to Vertex content parts
+
+      # 2) messages → contents (preserving text + file/inline data)
       elsif input['messages'].is_a?(Array)
         body['contents'] = input['messages'].map do |m|
-          {
-            'role' => (m['role'] || 'user'),
-            'parts' => Array(m['parts'] || (m['text'] ? [{ 'text' => m['text'] }] : []))
-          }
+          parts = []
+          parts += Array(m['parts']) if m['parts'].is_a?(Array)
+          parts << { 'text' => m['text'] } if m['text'].present?
+          if m['fileData'].present?
+            parts << { 'fileData' => {
+              'mimeType' => m.dig('fileData', 'mimeType'),
+              'fileUri'  => m.dig('fileData', 'fileUri')
+            }.compact }
+          end
+          if m['inlineData'].present?
+            parts << { 'inlineData' => {
+              'mimeType' => m.dig('inlineData', 'mimeType'),
+              'data'     => m.dig('inlineData', 'data')
+            }.compact }
+          end
+          { 'role' => (m['role'] || 'user'), 'parts' => parts }
         end
-      # 3) single text → single message
+
+      # 3) single text
       elsif input['text'].present?
         body['contents'] = [{ 'role' => 'user', 'parts' => [{ 'text' => input['text'] }] }]
       end
 
-      # Optional multimodal: image bytes/url (if caller provided)
+      # Optional multimodal: image bytes/url
       if input['image_url'].present?
         body['contents'] ||= []
-        body['contents'] << { 'role' => 'user', 'parts' => [{ 'fileData' => { 'mime_type' => input['image_mime'] || 'image/png', 'file_uri' => input['image_url'] } }] }
+        body['contents'] << { 'role' => 'user', 'parts' => [
+          { 'fileData' => { 'mimeType' => (input['image_mime'] || 'image/png'), 'fileUri' => input['image_url'] } }
+        ] }
       elsif input['image_bytes'].present?
         body['contents'] ||= []
-        body['contents'] << { 'role' => 'user', 'parts' => [{ 'inlineData' => { 'mime_type' => input['image_mime'] || 'image/png', 'data' => input['image_bytes'] } }] }
+        body['contents'] << { 'role' => 'user', 'parts' => [
+          { 'inlineData' => { 'mimeType' => (input['image_mime'] || 'image/png'), 'data' => input['image_bytes'] } }
+        ] }
       end
 
-      # System instruction and tools if present
-      body['system_instruction'] = input['system_instruction'] if input['system_instruction'].present?
-      body['tools']              = input['tools'] if input['tools'].present?
+      # System instruction (correct casing)
+      body['systemInstruction'] = input['system_instruction'] if input['system_instruction'].present?
 
-      # Generation config (temperature, topP, topK, maxOutputTokens…)
+      # Tools (coerce parameters to JSON objects)
+      if input['tools'].present?
+        tools = input['tools'].map do |t|
+          fds = t['functionDeclarations']&.map do |fd|
+            params_obj = call('safe_json_parse', fd['parameters']) || fd['parameters']
+            fd.merge('parameters' => params_obj)
+          end
+          t.merge('functionDeclarations' => fds)
+        end
+        body['tools'] = tools
+      end
+
+      # toolConfig passthrough
+      body['toolConfig'] = input['toolConfig'] if input['toolConfig'].present?
+
+      # Generation config (correct casing + all supported keys)
       if input['options'].is_a?(Hash)
         gc = {}
-        gc['temperature']      = input['options']['temperature'] if input['options'].key?('temperature')
-        gc['topP']             = input['options']['topP']        if input['options'].key?('topP')
-        gc['topK']             = input['options']['topK']        if input['options'].key?('topK')
-        gc['maxOutputTokens']  = input['options']['max_tokens']  if input['options'].key?('max_tokens')
-        body['generation_config'] = gc unless gc.empty?
+        gc['temperature']      = input['options']['temperature']       if input['options'].key?('temperature')
+        gc['topP']             = input['options']['topP']              if input['options'].key?('topP')
+        gc['topK']             = input['options']['topK']              if input['options'].key?('topK')
+        gc['maxOutputTokens']  = input['options']['max_tokens']        if input['options'].key?('max_tokens')
+        gc['candidateCount']   = input['options']['candidateCount']    if input['options'].key?('candidateCount')
+        gc['stopSequences']    = input['options']['stopSequences']     if input['options'].key?('stopSequences')
+        gc['responseMimeType'] = input['options']['responseMimeType']  if input['options'].key?('responseMimeType')
+        gc['seed']             = input['options']['seed']              if input['options'].key?('seed')
+        body['generationConfig'] = gc unless gc.empty?
       end
 
-      # Safety settings if provided in input (many of your actions append config_schema.only('safetySettings'))
+      # Safety settings
       body['safetySettings'] = input['safetySettings'] if input['safetySettings'].present?
 
-      # Operation‑specific nudges (lightweight, optional)
+      # Operation‑specific nudges
       case operation
-      when :translate
-        # Encourage JSON‑only reply for extractors that set json_response: true
-        body['tools'] ||= []
       when :parse
-        # If schema provided, include a brief instruction for structured output
         if input['object_schema'].present?
-          body['system_instruction'] ||= {}
-          body['system_instruction']['parts'] ||= []
-          body['system_instruction']['parts'] << { 'text' => "Return ONLY valid JSON that matches this schema: #{input['object_schema']}" }
+          body['systemInstruction'] ||= {}
+          body['systemInstruction']['parts'] ||= []
+          body['systemInstruction']['parts'] << { 'text' => "Return ONLY valid JSON that matches this schema: #{input['object_schema']}" }
         end
       when :email
-        # Gentle steer to subject/body keys
         si = "Draft an email. Return JSON with keys: subject, body."
-        body['system_instruction'] ||= { 'parts' => [{ 'text' => si }] }
+        body['systemInstruction'] ||= { 'parts' => [{ 'text' => si }] }
       when :ai_classify
         if input['categories'].is_a?(Array)
           cats = input['categories'].map { |c| "#{c['key']}: #{c['description']}" }.join("\n")
           steer = "Classify into one of the categories below. Return JSON {selected_category, confidence, alternatives[]}.\nCategories:\n#{cats}"
-          body['system_instruction'] ||= { 'parts' => [{ 'text' => steer }] }
+          body['systemInstruction'] ||= { 'parts' => [{ 'text' => steer }] }
         end
       end
 
@@ -1446,11 +1461,18 @@
       error('index_id required')    if index_id.blank?
       error('datapoints required')  if !datapoints.is_a?(Array) || datapoints.empty?
 
-      base = call('vertex_base_url', connection)
-      url  = "#{base}/#{index_id.split('/projects/').last ? index_id : index_id}" # tolerate full resource or relative
-      url  = "#{base}/#{index_id}" unless index_id.start_with?('projects/')
+      # Build index path + host region from the resource itself when provided
+      if index_id.start_with?('projects/')
+        index_path  = index_id
+        host_region = index_id[/projects\/[^\/]+\/locations\/([^\/]+)/, 1] || connection['region']
+      else
+        host_region = connection['region']
+        index_path  = "projects/#{connection['project']}/locations/#{host_region}/indexes/#{index_id}"
+      end
 
-      upsert_url = "#{url}:upsertDatapoints"
+      api_base  = "https://#{host_region}-aiplatform.googleapis.com/#{connection['version'] || 'v1'}"
+      url       = "#{api_base}/#{index_path}"
+      upsert_url= "#{url}:upsertDatapoints"
 
       chunks = datapoints.each_slice(100).to_a
       successful = 0
@@ -1577,7 +1599,7 @@
     fetch_drive_file_full: lambda do |connection, file_id, include_content|
       call('with_resilience', connection, key: 'drive.files.get') do |cid|
         # Metadata
-        meta = call('api_request', connection, :get, "#{call('drive_api_url', :files)}/files/#{file_id}", {
+        meta = call('api_request', connection, :get, call('drive_api_url', :file, file_id), {
           params: { fields: 'id,name,mimeType,size,modifiedTime,md5Checksum' },
           headers: { 'X-Correlation-Id' => cid },
           error_handler: lambda do |code, body, message|
@@ -1586,12 +1608,12 @@
         })
 
         out = {
-          'id' => meta['id'],
-          'name' => meta['name'],
-          'mime_type' => meta['mimeType'],
-          'size' => meta['size']&.to_i,
+          'id'            => meta['id'],
+          'name'          => meta['name'],
+          'mime_type'     => meta['mimeType'],
+          'size'          => meta['size']&.to_i,
           'modified_time' => meta['modifiedTime'],
-          'checksum' => meta['md5Checksum']
+          'checksum'      => meta['md5Checksum']
         }
 
         if include_content
@@ -1603,7 +1625,7 @@
                           when 'application/vnd.google-apps.presentation' then 'text/plain'
                           else 'text/plain'
                           end
-            export = call('api_request', connection, :get, "#{call('drive_api_url', :files)}/files/#{file_id}/export", {
+            export = call('api_request', connection, :get, call('drive_api_url', :export, file_id), {
               params: { mimeType: export_mime },
               headers: { 'X-Correlation-Id' => cid }
             })
@@ -1611,7 +1633,7 @@
             out['needs_processing'] = false
           else
             # Binary file (PDFs/images) — return marker
-            dl = call('api_request', connection, :get, "#{call('drive_api_url', :files)}/files/#{file_id}", {
+            dl = call('api_request', connection, :get, call('drive_api_url', :download, file_id), {
               params: { alt: 'media' }, headers: { 'X-Correlation-Id' => cid }
             })
             out['content'] = dl.is_a?(Hash) ? dl['data'] : dl
@@ -1714,13 +1736,13 @@
       }.compact
     end,
 
-    probe_drive: lambda do |_connection, verbose: false|
+    probe_drive: lambda do |connection, verbose: false|
       started = Time.now
       status = 'connected'
       warning = nil
       begin
-        # hit changes.getStartPageToken as a permission probe
-        _ = call('api_request', nil, :get, "#{call('drive_api_url', :start_token)}/changes/startPageToken", { headers: { 'Accept' => 'application/json' } })
+        _ = call('api_request', connection, :get, call('drive_api_url', :start_token),
+                { headers: { 'Accept' => 'application/json' } })
       rescue => e
         status = 'failed'
         warning = e.message
@@ -2414,13 +2436,13 @@
     list_drive_files_input: {
       fields: lambda do |_connection, _config_fields, _object_definitions|
         [
-          { name: 'folder_id',       label: 'Folder ID or URL', type: 'string',  optional: true },
-          { name: 'max_results',     label: 'Maximum results',   type: 'integer', optional: true, default: 100 },
+          { name: 'folder_id',       label: 'Folder ID or URL',  type: 'string',    optional: true },
+          { name: 'max_results',     label: 'Maximum results',   type: 'integer',   optional: true, default: 100 },
           { name: 'modified_after',  label: 'Modified after',    type: 'date_time', optional: true },
           { name: 'modified_before', label: 'Modified before',   type: 'date_time', optional: true },
-          { name: 'mime_type',       label: 'MIME type filter',  type: 'string', optional: true },
-          { name: 'exclude_folders', label: 'Exclude folders',   type: 'boolean', optional: true, default: false },
-          { name: 'page_token',      label: 'Page token',        type: 'string', optional: true }
+          { name: 'mime_type',       label: 'MIME type filter',  type: 'string',    optional: true },
+          { name: 'exclude_folders', label: 'Exclude folders',   type: 'boolean',   optional: true, default: false, control_type: 'checkbox' },
+          { name: 'page_token',      label: 'Page token',        type: 'string',    optional: true }
         ]
       end
     },
@@ -2473,9 +2495,11 @@
         [
           { name: 'page_token',             type: 'string',  optional: true },
           { name: 'folder_id',              type: 'string',  optional: true },
-          { name: 'include_removed',        type: 'boolean', optional: true, default: false },
-          { name: 'include_shared_drives',  type: 'boolean', optional: true, default: false },
-          { name: 'page_size',              type: 'integer', optional: true, default: 100 }
+          { name: 'include_removed',        type: 'boolean', optional: true, default: false, control_type: 'checkbox' },
+          { name: 'include_shared_drives',  type: 'boolean', optional: true, default: false, control_type: 'checkbox' },
+          { name: 'page_size',              type: 'integer', optional: true, default: 100 },
+          { name: 'drive_id', label: 'Shared drive ID', type: 'string', optional: true },
+
         ]
       end
     },
@@ -2728,6 +2752,10 @@
     # ─────────────────────────────────────────────────────────────────────────────
     message_types: lambda do
       [] # deprecated – kept as a no-op to avoid breaking old recipes
+    end,
+    
+    function_call_mode: lambda do
+      [['Auto', 'AUTO'], ['Any', 'ANY'], ['None', 'NONE']]
     end,
 
     # ─────────────────────────────────────────────────────────────────────────────

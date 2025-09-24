@@ -1123,7 +1123,7 @@
           },
           {
             name: 'include_content', label: 'Include content', type: 'boolean',
-            optional: true, default: true,
+            optional: true, default: true, 
             hint: 'Set to false to fetch only metadata without file content'
           }
         ]
