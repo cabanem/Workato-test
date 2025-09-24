@@ -10,18 +10,11 @@
   connection: {
     fields: [
       # Developer options
-      { # - verbose_errors
-        name: 'verbose_errors', label: 'Verbose errors',
-        group: 'Developer options', type: 'boolean', control_type: 'checkbox',
-        hint: 'When enabled, include upstream response bodies in error messages. Disable in production.'
-      },
+      { name: 'verbose_errors', label: 'Verbose errors', group: 'Developer options', type: 'boolean', control_type: 'checkbox',
+        hint: 'When enabled, include upstream response bodies in error messages. Disable in production.' },
       # Authentication
-      { # - auth_type
-        name: 'auth_type', label: 'Authentication type', group: 'Authentication',
-        control_type: 'select',  default: 'custom', optional: false, extends_schema: true, 
-        hint: 'Select the authentication type for connecting to Google Vertex AI.',
-        options: [ ['Client credentials', 'custom'], %w[OAuth2 oauth2] ] 
-      },
+      { name: 'auth_type', label: 'Authentication type', group: 'Authentication', control_type: 'select',  default: 'custom', optional: false, extends_schema: true, 
+        options: [ ['Client credentials', 'custom'], %w[OAuth2 oauth2] ], hint: 'Select the authentication type for connecting to Google Vertex AI.'},
       # Vertex AI environment
       { name: 'region', label: 'Region', group: 'Vertex AI environment', control_type: 'select',  optional: false,
         options: [
@@ -55,7 +48,9 @@
       { name: 'validate_model_on_run', label: 'Validate model before run', group: 'Model discovery and validation', type: 'boolean', control_type: 'checkbox',
         optional: true, sticky: true, hint: 'Pre-flight check the chosen model and your project access before sending the request. Recommended.' },
       { name: 'enable_rate_limiting', label: 'Enable rate limiting', group: 'Model discovery and validation', type: 'boolean', control_type: 'checkbox', 
-        optional: true, default: true, hint: 'Automatically throttle requests to stay within Vertex AI quotas' }
+        optional: true, default: true, hint: 'Automatically throttle requests to stay within Vertex AI quotas' },
+      { name: 'include_trace', label: 'Include trace', group: 'Developer options', type: 'boolean', control_type: 'checkbox', optional: true, default: true, sticky: true,
+        hint: 'Include trace.correlation_id and trace.duration_ms in outputs. Disable in production.' }
     ],
     authorization: {
       type: 'multi',
@@ -172,15 +167,19 @@
   },
 
   test: lambda do |connection|
-    # Validate connection/access to Vertex AI
-    call('api_request', connection, :get,
-      "#{call('project_region_path', connection)}/datasets",
-      { params: { pageSize: 1 } })
+    resp = call('with_resilience', connection, key: 'vertex.datasets.list') do |cid|
+      call('api_request', connection, :get,
+        "#{call('project_region_path', connection)}/datasets",
+        { params: { pageSize: 1 },
+          headers: { 'X-Correlation-Id' => cid },
+          context: { action: 'List datasets', correlation_id: cid } })
+    end
+
     begin
       drive_probe = call('probe_drive', connection, verbose: false)
-      { vertex_ai: "connected", drive_access: drive_probe['status'], files_visible: drive_probe['files_found'] }
+      { vertex_ai: 'connected', drive_access: drive_probe['status'], files_visible: drive_probe['files_found'], trace: resp['trace'] }
     rescue => e
-      { vertex_ai: "connected", drive_access: "error - #{e.message}" }
+      { vertex_ai: 'connected', drive_access: "error - #{e.message}", trace: resp['trace'] }
     end
   end,
 
@@ -198,7 +197,8 @@
       end,
 
       help: {
-        body: 'This action sends a message to Vertex AI, and gathers a response using the selected Gemini Model.'
+        body: 'This action sends a message to Vertex AI, and gathers a response using the selected Gemini Model. ' \
+              'Outputs include telemetry pills: trace (correlation_id, duration_ms), vertex (response_id, model_version), and rate_limit_status.'
       },
 
       input_fields: lambda do |object_definitions|
@@ -223,7 +223,8 @@
       subtitle: 'Translate text between languages',
       description: "Translate text into a different language using models from Google Vertex AI",
       help: {
-        body: 'This action translates inputted text into a different language. While other languages may be possible, languages not on the predefined list may not provide reliable translations.'
+        body: 'This action translates inputted text into a different language. While other languages may be possible, languages not on the predefined list may not provide reliable translations. ' \
+              'Outputs include telemetry pills: trace (correlation_id, duration_ms) and vertex (response_id, model_version), plus rate_limit_status.'
       },
       input_fields: lambda do |object_definitions|
         object_definitions['translate_text_input']
@@ -246,8 +247,10 @@
       subtitle: 'Get a summary of the input text in configurable length',
       description: "Summarize text using models from Google Vertex AI",
       help: {
-        body: 'This action summarizes input text into a shorter version. The length of the summary can be configured.'
+        body: 'This action summarizes input text into a shorter version. The length of the summary can be configured. ' \
+              'Outputs include telemetry pills: trace (correlation_id, duration_ms) and vertex (response_id, model_version), plus rate_limit_status.'
       },
+
       input_fields: lambda do |object_definitions|
         object_definitions['summarize_text_input']
       end,
@@ -268,7 +271,8 @@
       title: 'Vertex -- Parse text',
       subtitle: 'Extract structured data from freeform text',
       help: {
-        body: 'This action helps process input text to find specific information based on defined guidelines. The processed information is then available as datapills.'
+        body: 'This action helps process input text to find specific information based on defined guidelines. The processed information is then available as datapills. ' \
+              'Outputs include telemetry pills: trace (correlation_id, duration_ms) and vertex (response_id, model_version), plus rate_limit_status.'
       },
       description: "Parse text to find specific information using models from Google Vertex AI",
 
@@ -295,12 +299,10 @@
       subtitle: 'Generate an email based on user description',
       description: "Generate draft email using models from Google Vertex AI",
       help: {
-        body: 'This action generates an email and parses input into datapills ' \
-              'containing a subject line and body for easy mapping into future ' \
-              'recipe actions. Note that the body contains placeholder text for ' \
-              "a salutation if this information isn't present in the email description."
+        body: 'This action generates an email and parses input into datapills containing a subject line and body for easy mapping into future recipe actions. ' \
+              "Note that the body contains placeholder text for a salutation if this information isn't present in the email description. " \
+              'Outputs include telemetry pills: trace (correlation_id, duration_ms) and vertex (response_id, model_version), plus rate_limit_status.'
       },
-
       input_fields: lambda do |object_definitions|
         object_definitions['draft_email_input']
       end,
@@ -323,9 +325,8 @@
       subtitle: 'Classify text using AI with confidence scoring',
       description: "Classify text into predefined categories using models from Google Vertex AI with confidence scores and alternatives",
       help: {
-        body: 'This action uses AI to classify text into one of the provided categories. ' \
-              'Returns confidence scores and alternative classifications. Designed to work ' \
-              'with text prepared by RAG_Utils prepare_for_ai action.'
+        body: 'This action uses AI to classify text into one of the provided categories. Returns confidence scores and alternative classifications. Designed to work with text prepared by RAG_Utils prepare_for_ai action. ' \
+              'Outputs include telemetry pills: trace (correlation_id, duration_ms), vertex (response_id, model_version), and rate_limit_status.'
       },
 
       input_fields: lambda do |object_definitions|
@@ -356,40 +357,48 @@
       output_fields: lambda do |object_definitions|
         [
           { name: 'selected_category', label: 'Selected category', type: 'string' },
-          { name: 'confidence', label: 'Confidence score', type: 'number', hint: 'Confidence score (0.0-1.0)' },
+          { name: 'confidence', label: 'Confidence score', type: 'number' },
           { name: 'alternatives', label: 'Alternative classifications', type: 'array', of: 'object',
             properties: [
               { name: 'category', type: 'string' },
               { name: 'confidence', type: 'number' }
             ]
           },
-          { name: 'usage_metrics', label: 'Usage metrics', type: 'object', properties: [
-            { name: 'prompt_token_count', type: 'integer' },
-            { name: 'candidates_token_count', type: 'integer' },
-            { name: 'total_token_count', type: 'integer' }
-          ]}
-        ].concat(object_definitions['safety_rating_schema'])
-      end,
-
-      sample_output: lambda do |_connection, input|
-        {
-          'selected_category' => input['categories']&.first&.[]('key') || 'urgent',
-          'confidence' => 0.95,
-          'alternatives' => [
-            { 'category' => 'normal', 'confidence' => 0.05 }
-          ],
-          'usage_metrics' => {
-            'prompt_token_count' => 45,
-            'candidates_token_count' => 12,
-            'total_token_count' => 57
-          }
-        }.merge(call('safety_ratings_output_sample'))
+          { name: 'requires_human_review', type: 'boolean' },
+          { name: 'confidence_threshold',  type: 'number' },
+          { name: 'pass_fail',             type: 'boolean' },
+          { name: 'action_required',       type: 'string' }
+        ]
+        .concat(object_definitions['safety_rating_schema'])
+        .concat([
+          { name: 'usage', label: 'Usage metrics', type: 'object', properties: [
+            { name: 'promptTokenCount', type: 'integer' },
+            { name: 'candidatesTokenCount', type: 'integer' },
+            { name: 'totalTokenCount', type: 'integer' }
+          ] }
+        ])
+        .concat(object_definitions['rate_limit_schema'])
+        .concat(object_definitions['trace_schema'])
+        .concat(object_definitions['vertex_meta_schema'])
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
         call('run_vertex', connection, input, :ai_classify,
              verb: :generate,
              extract: { type: :classify })
+      end,
+
+      sample_output: lambda do |_connection, input|
+        {
+          'selected_category' => input['categories']&.first&.[]('key') || 'urgent',
+          'confidence' => 0.95,
+          'alternatives' => [ { 'category' => 'normal', 'confidence' => 0.05 } ],
+          'usage' => { 'promptTokenCount' => 45, 'candidatesTokenCount' => 12, 'totalTokenCount' => 57 },
+          'pass_fail' => true,
+          'action_required' => 'use_classification',
+          'trace' => { 'correlation_id' => 'sample-cid', 'duration_ms' => 123 },
+          'vertex' => { 'response_id' => 'sample-response-id', 'model_version' => 'gemini-1.5-pro' }
+        }.merge(call('safety_ratings_output_sample'))
       end
     },
     analyze_text: {
@@ -397,9 +406,9 @@
       subtitle: 'Contextual analysis of text to answer user-provided questions',
       description: "Analyze text to answer user-provided questions using models from Google Vertex AI",
       help: {
-        body: "This action performs a contextual analysis of a text to answer user-provided questions. If the answer isn't found in the text, the datapill will be empty."
+        body: "This action performs a contextual analysis of a text to answer user-provided questions. If the answer isn't found in the text, the datapill will be empty. " \
+              'Outputs include telemetry pills: trace (correlation_id, duration_ms) and vertex (response_id, model_version), plus rate_limit_status.'
       },
-
       input_fields: lambda do |object_definitions|
         object_definitions['analyze_text_input']
       end,
@@ -424,9 +433,9 @@
       description: "Analyses passed <span class='provider'>image</span> using " \
                    "Gemini models in <span class='provider'>Google Vertex AI</span>",
       help: {
-        body: 'This action analyses passed image and answers related question.'
+        body: 'This action analyses passed image and answers related question. ' \
+              'Outputs include telemetry pills: trace (correlation_id, duration_ms) and vertex (response_id, model_version), plus rate_limit_status.'
       },
-
       input_fields: lambda do |object_definitions|
         object_definitions['analyze_image_input']
       end,
@@ -450,10 +459,8 @@
       description: 'Generate text embeddings for multiple texts using Google models in Google Vertex AI',
       batch: true,
       help: {
-        body: 'Batch text embedding generates numerical vectors for multiple text inputs efficiently. ' \
-              'It processes an array of texts and returns vectors that capture the meaning ' \
-              'and context of each text. These vectors can be used for similarity search, ' \
-              'clustering, classification, and other natural language processing tasks.'
+        body: 'Batch text embedding generates numerical vectors for multiple text inputs efficiently. It processes an array of texts and returns vectors for similarity search and more. ' \
+              'Outputs include a trace pill (correlation_id, duration_ms) for debugging.'
       },
 
       input_fields: lambda do |object_definitions|
@@ -514,16 +521,18 @@
           { name: 'api_calls_saved', label: 'API calls saved', type: 'integer', hint: 'Number of API calls saved through batching' },
           { name: 'estimated_cost_savings', label: 'Estimated cost savings', type: 'number', hint: 'Estimated cost savings in USD from batching' },
           { name: 'pass_fail', label: 'Batch success', type: 'boolean', hint: 'True if all embeddings were generated successfully' },
-          { name: 'action_required', label: 'Action required', type: 'string', hint: 'Next recommended action based on results' }
+          { name: 'action_required', label: 'Action required', type: 'string', hint: 'Next recommended action based on results' },
+          { name: 'trace', label: 'Trace', type: 'object', properties: [
+            { name: 'correlation_id', type: 'string' },
+            { name: 'duration_ms', type: 'integer' }
+          ]}
         ]
       end,
 
       sample_output: lambda do |_connection, input|
         sample_embedding = {
-          'id' => 'text_1',
-          'vector' => Array.new(768) { rand(-1.0..1.0).round(6) },
-          'dimensions' => 768,
-          'metadata' => { 'source' => 'sample' }
+          'id' => 'text_1', 'vector' => Array.new(768) { rand(-1.0..1.0).round(6) },
+          'dimensions' => 768, 'metadata' => { 'source' => 'sample' }
         }
         {
           'batch_id' => input['batch_id'] || 'batch_001',
@@ -544,19 +553,19 @@
           'api_calls_saved' => 0,
           'estimated_cost_savings' => 0.0,
           'pass_fail' => true,
-          'action_required' => 'ready_for_indexing'
+          'action_required' => 'ready_for_indexing',
+          'trace' => { 'correlation_id' => 'sample-cid', 'duration_ms' => 123 }
         }
       end
+
     },
     generate_embedding_single: {
       title: 'Vertex -- Generate single text embedding',
       subtitle: 'Generate embedding for a single text input',
       description: 'Generate text embedding for a single text using Google models in Google Vertex AI',
       help: {
-        body: 'Generate a numerical vector for a single text input. This is optimized for RAG query flows ' \
-              'where you need to embed a single user query to find similar documents. The vector captures ' \
-              'the semantic meaning of the text and can be used for similarity search, retrieval, and ' \
-              'other natural language processing tasks.'
+        body: 'Generate a numerical vector for a single text input. Optimized for RAG query flows. ' \
+              'Outputs include a trace pill (correlation_id, duration_ms) for debugging.'
       },
 
       input_fields: lambda do |object_definitions|
@@ -599,13 +608,8 @@
               hint: 'E.g., RETRIEVAL_QUERY, RETRIEVAL_DOCUMENT, SEMANTIC_SIMILARITY'
             }
           },
-          {
-            name: 'title',
-            label: 'Title',
-            type: 'string',
-            optional: true,
-            hint: 'Document title to prepend to text content for better embedding quality'
-          }
+          { name: 'title', label: 'Title', type: 'string', optional: true,
+            hint: 'Document title to prepend to text content for better embedding quality' }
         ]
       end,
 
@@ -618,7 +622,11 @@
           { name: 'vector', label: 'Embedding vector', type: 'array', of: 'number', hint: 'Array of float values representing the text embedding' },
           { name: 'dimensions', label: 'Vector dimensions', type: 'integer', hint: 'Number of dimensions in the vector' },
           { name: 'model_used', label: 'Model used', type: 'string', hint: 'The embedding model that was used' },
-          { name: 'token_count', label: 'Token count', type: 'integer', hint: 'Estimated number of tokens processed' }
+          { name: 'token_count', label: 'Token count', type: 'integer', hint: 'Estimated number of tokens processed' },
+          { name: 'trace', label: 'Trace', type: 'object', properties: [
+            { name: 'correlation_id', type: 'string' },
+            { name: 'duration_ms', type: 'integer' }
+          ]}
         ]
       end,
 
@@ -627,7 +635,8 @@
           'vector' => Array.new(768) { rand(-1.0..1.0).round(6) },
           'dimensions' => 768,
           'model_used' => input['model'] || 'publishers/google/models/text-embedding-004',
-          'token_count' => 15
+          'token_count' => 15,
+          'trace' => { 'correlation_id' => 'sample-cid', 'duration_ms' => 123 }
         }
       end
     },
@@ -639,11 +648,8 @@
       retry_on_response: [429, 500, 502, 503, 504],
       max_retries: 3,
       help: {
-        body: "This action queries a deployed Vector Search index endpoint to find nearest neighbors "\
-              "(k-NN). IMPORTANT: Use the endpoint's own host (public endpoint domain or PSC DNS). "\
-              "Final URL looks like https://{INDEX_ENDPOINT_HOST}/v1/projects/{PROJECT}/locations/{LOCATION}/"\
-              "indexEndpoints/{INDEX_ENDPOINT_ID}:findNeighbors. "\
-              "Returning full datapoints increases latency and cost."
+        body: "This action queries a deployed Vector Search index endpoint to find nearest neighbors (k-NN). IMPORTANT: Use the endpoint's own host (public endpoint domain or PSC DNS). Returning full datapoints increases latency and cost. " \
+              'Outputs include a trace pill (correlation_id, duration_ms) for observability.'
       },
 
       input_fields: lambda do |object_definitions|
@@ -651,34 +657,8 @@
       end,
 
       execute: lambda do |connection, input, _eis, _eos|
-        # Build payload and normalized host
-        payload = call('build_ai_payload', :find_neighbors, input)
-        host = call('normalize_host', input['index_endpoint_host'])
-
-        version = connection['version'].presence || 'v1'
-        project = connection['project']
-        region = connection['region']
-        endpoint_id = input['index_endpoint_id']
-        
-        # Validate required parameters
-        error('Project is required') if project.blank?
-        error('Region is required') if region.blank?
-        error('Index endpoint ID is required') if endpoint_id.blank?
-        # Construct the full URL
-        url = "https://#{host}/#{version}/projects/#{project}/locations/#{region}/" \
-              "indexEndpoints/#{endpoint_id}:findNeighbors"
-        # Make the request
-        response = call('api_request', connection, :post, url, {
-          payload: payload,
-          context: { action: 'Find neighbors',
-                     host: host, endpoint_id: endpoint_id, region: region },
-          error_handler: lambda do |code, body, message|
-            call('handle_vertex_error', connection, code, body, message, { action: 'Find neighbors', host: host, endpoint_id: endpoint_id, region: region })
-          end
-        })
-
-        # Transform to recipe-friendly structure
-        call('transform_find_neighbors_response', response)
+        resp = call('vindex_find_neighbors', connection, input)
+        call('transform_find_neighbors_response', resp).merge('trace' => resp['trace'])
       end,
 
       output_fields: lambda do |object_definitions|
@@ -689,30 +669,20 @@
         {
           'nearestNeighbors' => [
             {
-              'id' => 'query-0',
+              'id' => 'query-1',
               'neighbors' => [
                 {
-                  'distance' => 0.1234,
                   'datapoint' => {
-                    'datapointId' => 'dp_123',
-                    # Present only when returnFullDatapoint = true
-                    'featureVector' => [0.1, -0.2, 0.3],
-                    'restricts' => [
-                      { 'namespace' => 'color', 'allowList' => ['red'] }
-                    ],
-                    'numericRestricts' => [
-                      { 'namespace' => 'price', 'op' => 'LESS_EQUAL', 'valueFloat' => 9.99 }
-                    ],
-                    'crowdingTag' => { 'crowdingAttribute' => 'brand_A' },
-                    'sparseEmbedding' => {
-                      'values' => [0.4, 0.2],
-                      'dimensions' => [5, 17]
-                    }
-                  }
+                    'datapointId' => 'doc_001_chunk_1',
+                    'featureVector' => [0.1, 0.2, 0.3],
+                    'crowdingTag' => { 'crowdingAttribute' => 'doc_001' }
+                  },
+                  'distance' => 0.95
                 }
               ]
             }
-          ]
+          ],
+          'trace' => { 'correlation_id' => 'sample-cid', 'duration_ms' => 123 }
         }
       end
     },
@@ -1138,15 +1108,12 @@
           'Fetch content from a Google Drive file'
         end
       end,
-
       help: {
-        body: 'This action fetches content from a Google Drive file. ' \
-              'Automatically handles Google Workspace files (Docs, Sheets, Slides) by exporting them to text format. ' \
-              'Regular files are downloaded directly. Includes metadata and change detection via checksums.',
+        body: 'This action fetches content from a Google Drive file. Automatically handles Google Workspace files by exporting to text; regular files are downloaded directly. Includes metadata and change detection via checksums. ' \
+              'Outputs include a trace pill (correlation_id, duration_ms) for debugging.',
         learn_more_url: 'https://developers.google.com/drive/api/v3/reference/files/get',
         learn_more_text: 'Google Drive API Documentation'
       },
-
       input_fields: lambda do |object_definitions|
         [
           {
@@ -1185,11 +1152,9 @@
           'List files from Google Drive'
         end
       end,
-
       help: {
-        body: 'This action retrieves a list of files from Google Drive with flexible filtering options. ' \
-              'Supports folder filtering, date ranges, MIME type filtering, and pagination. ' \
-              'Results are ordered by modification time (newest first).',
+        body: 'This action retrieves a list of files from Google Drive with flexible filtering options. Supports folder filtering, date ranges, MIME type filtering, and pagination. Results are ordered by modification time (newest first). ' \
+              'Outputs include a trace pill (correlation_id, duration_ms) for debugging.',
         learn_more_url: 'https://developers.google.com/drive/api/v3/reference/files/list',
         learn_more_text: 'Google Drive API Documentation'
       },
@@ -1236,42 +1201,23 @@
 
       output_fields: lambda do |object_definitions|
         [
-          {
-            name: 'files', label: 'Files', type: 'array', of: 'object',
-            properties: object_definitions['drive_file_fields'],
-            hint: 'Array of file objects matching the query'
-          },
-          {
-            name: 'count', label: 'Files count', type: 'integer',
-            hint: 'Number of files returned in this response'
-          },
-          {
-            name: 'has_more', label: 'Has more pages', type: 'boolean',
-            hint: 'True if there are more results available'
-          },
-          {
-            name: 'next_page_token', label: 'Next page token', type: 'string',
-            hint: 'Token to use for retrieving the next page of results'
-          },
-          {
-            name: 'query_used', label: 'Query used', type: 'string',
-            hint: 'The actual query string used for filtering'
-          }
+          { name: 'files', label: 'Files', type: 'array', of: 'object', properties: object_definitions['drive_file_fields'] },
+          { name: 'count', label: 'Files count', type: 'integer' },
+          { name: 'has_more', label: 'Has more pages', type: 'boolean' },
+          { name: 'next_page_token', label: 'Next page token', type: 'string' },
+          { name: 'query_used', label: 'Query used', type: 'string' },
+          { name: 'trace', label: 'Trace', type: 'object', properties: [
+            { name: 'correlation_id', type: 'string' },
+            { name: 'duration_ms', type: 'integer' }
+          ] }
         ]
       end,
 
       execute: lambda do |connection, input|
-        # Step 1: Input processing
-        folder_id = nil
-        if input['folder_id'].present?
-          folder_id = call('extract_drive_file_id', input['folder_id'])
-        end
-
-        # Convert date inputs to ISO 8601 format if present
-        modified_after = input['modified_after']&.iso8601
+        folder_id = input['folder_id'].present? ? call('extract_drive_file_id', input['folder_id']) : nil
+        modified_after  = input['modified_after']&.iso8601
         modified_before = input['modified_before']&.iso8601
 
-        # Step 2: Build query using helper
         query_options = {
           folder_id: folder_id,
           modified_after: modified_after,
@@ -1282,9 +1228,8 @@
 
         query_string = call('build_drive_query', query_options)
 
-        # Step 3: Prepare API parameters
         max_results = [input.fetch('max_results', 100), 1000].min
-        page_size = [max_results, 1000].min
+        page_size   = [max_results, 1000].min
 
         api_params = {
           q: query_string,
@@ -1292,27 +1237,23 @@
           fields: 'nextPageToken,files(id,name,mimeType,size,modifiedTime,md5Checksum)',
           orderBy: 'modifiedTime desc'
         }
+        api_params[:pageToken] = input['page_token'] if input['page_token'].present?
 
-        # Add page token if provided
-        if input['page_token'].present?
-          api_params[:pageToken] = input['page_token']
+        response = call('with_resilience', connection, key: 'drive.files.list') do |cid|
+          call('api_request', connection, :get,
+            call('drive_api_url', :files),
+            {
+              params: api_params,
+              headers: { 'X-Correlation-Id' => cid },
+              context: { action: 'List Drive files', correlation_id: cid },
+              error_handler: lambda do |code, body, message|
+                error(call('handle_drive_error', connection, code, body, message, { correlation_id: cid }))
+              end
+            }
+          )
         end
 
-        # Step 4: Make API request
-        response = call('api_request', connection, :get,
-          call('drive_api_url', :files),
-          {
-            params: api_params,
-            error_handler: lambda do |code, body, message|
-              error(call('handle_drive_error', connection, code, body, message))
-            end
-          }
-        )
-
-        # Step 5: Process response
         files = response['files'] || []
-
-        # Convert file objects to match our output schema
         processed_files = files.map do |file|
           {
             'id' => file['id'],
@@ -1324,13 +1265,13 @@
           }
         end
 
-        # Step 6: Build response
         {
           'files' => processed_files,
           'count' => processed_files.length,
           'has_more' => response['nextPageToken'].present?,
           'next_page_token' => response['nextPageToken'],
-          'query_used' => query_string
+          'query_used' => query_string,
+          'trace' => response['trace']
         }
       end
     },
@@ -1347,15 +1288,12 @@
           'Batch fetch files from Google Drive'
         end
       end,
-
       help: {
-        body: 'This action fetches content from multiple Google Drive files in a single operation. ' \
-              'Provides detailed success/failure tracking with metrics. Can skip errors or fail fast. ' \
-              'Reuses the fetch_drive_file logic for consistent handling of Google Workspace and regular files.',
+        body: 'This action fetches content from multiple Google Drive files in a single operation. Provides detailed success/failure tracking with metrics. Can skip errors or fail fast. Reuses the fetch_drive_file logic for consistent handling. ' \
+              'Outputs include a trace pill (correlation_id, duration_ms) for debugging.',
         learn_more_url: 'https://developers.google.com/drive/api/v3/reference/files/get',
         learn_more_text: 'Google Drive API Documentation'
       },
-
       input_fields: lambda do |object_definitions|
         [
           {
@@ -1491,11 +1429,9 @@
           'Start monitoring Drive changes (initial scan)'
         end
       end,
-
       help: {
-        body: 'This action tracks changes in Google Drive since the last check. ' \
-              'Use page tokens to maintain state between checks for incremental updates. ' \
-              'On first run, it returns a start token. Subsequent runs return actual changes.',
+        body: 'This action tracks changes in Google Drive since the last check. Use page tokens to maintain state between checks for incremental updates. On first run, it returns a start token; subsequent runs return actual changes. ' \
+              'Outputs include a trace pill (correlation_id, duration_ms) for debugging.',
         learn_more_url: 'https://developers.google.com/drive/api/v3/manage-changes',
         learn_more_text: 'Google Drive Changes API Documentation'
       },
@@ -1571,123 +1507,81 @@
             ],
             hint: 'Complete list of all changes detected'
           },
-          {
-            name: 'new_page_token',
-            label: 'New page token',
-            type: 'string',
-            hint: 'Save this token for the next incremental check'
-          },
-          {
-            name: 'files_added',
-            label: 'Files added',
-            type: 'array',
-            of: 'object',
+          { name: 'new_page_token', label: 'New page token', type: 'string', hint: 'Save this token for the next incremental check'},
+          { name: 'files_added', label: 'Files added', type: 'array', of: 'object', hint: 'New files created since last check',
             properties: [
               { name: 'id', label: 'File ID', type: 'string' },
               { name: 'name', label: 'File name', type: 'string' },
               { name: 'mimeType', label: 'MIME type', type: 'string' },
               { name: 'modifiedTime', label: 'Modified time', type: 'date_time' }
-            ],
-            hint: 'New files created since last check'
-          },
-          {
-            name: 'files_modified', 
-            label: 'Files modified',
-            type: 'array',
-            of: 'object',
+            ]},
+          { name: 'files_modified', label: 'Files modified', type: 'array', of: 'object', hint: 'Files that have been modified',
             properties: [
               { name: 'id', label: 'File ID', type: 'string' },
               { name: 'name', label: 'File name', type: 'string' },
               { name: 'mimeType', label: 'MIME type', type: 'string' },
               { name: 'modifiedTime', label: 'Modified time', type: 'date_time' },
               { name: 'checksum', label: 'New checksum', type: 'string' }
-            ],
-            hint: 'Files that have been modified'
-          },
-          {
-            name: 'files_removed',
-            label: 'Files removed', 
-            type: 'array',
-            of: 'object',
+            ]},
+          { name: 'files_removed', label: 'Files removed', type: 'array', of: 'object', hint: 'Files that have been removed or trashed',
             properties: [
               { name: 'fileId', label: 'File ID', type: 'string' },
               { name: 'time', label: 'Removal time', type: 'date_time' }
-            ],
-            hint: 'Files that have been deleted or trashed'
-          },
-          {
-            name: 'summary',
-            label: 'Change summary',
-            type: 'object',
+            ]},
+          { name: 'summary', label: 'Change summary', type: 'object', hint: 'Summary statistics of changes',
             properties: [
               { name: 'total_changes', label: 'Total changes', type: 'integer' },
               { name: 'added_count', label: 'Files added', type: 'integer' },
               { name: 'modified_count', label: 'Files modified', type: 'integer' },
               { name: 'removed_count', label: 'Files removed', type: 'integer' },
               { name: 'has_more', label: 'Has more changes', type: 'boolean' }
-            ],
-            hint: 'Summary statistics of changes'
-          },
-          {
-            name: 'is_initial_token',
-            label: 'Is initial token',
-            type: 'boolean',
-            hint: 'True if this was the initial setup (no changes returned)'
-          }
+            ]},
+          { name: 'is_initial_token', label: 'Is initial token', type: 'boolean', hint: 'True if this was the initial setup (no changes returned)' },
+          { name: 'trace', label: 'Trace', type: 'object', properties: [
+            { name: 'correlation_id', type: 'string' },
+            { name: 'duration_ms', type: 'integer' }
+          ]}
         ]
       end,
 
       execute: lambda do |connection, input|
-        # Step 1: Determine if we need a start token or have one
         page_token = input['page_token']
         folder_id = input['folder_id'].present? ? call('extract_drive_file_id', input['folder_id']) : nil
         include_removed = input['include_removed'] || false
         include_shared_drives = input['include_shared_drives'] || false
         page_size = [input.fetch('page_size', 100), 1000].min
 
-        # Step 2: Get start token if not provided
         if page_token.blank?
-          # Initial setup - get starting page token
-          start_params = {
-            supportsAllDrives: include_shared_drives
-          }
-          
-          # Add folder restriction if specified
-          if folder_id.present?
-            start_params[:driveId] = folder_id if include_shared_drives
-            start_params[:spaces] = 'drive'
+          start_params = { supportsAllDrives: include_shared_drives }
+          start_params[:driveId] = folder_id if folder_id.present? && include_shared_drives
+          start_params[:spaces]  = 'drive'   if folder_id.present?
+
+          start_response = call('with_resilience', connection, key: 'drive.changes.start_token') do |cid|
+            call('api_request', connection, :get,
+              call('drive_api_url', :start_token),
+              {
+                params: start_params,
+                headers: { 'X-Correlation-Id' => cid },
+                context: { action: 'Get Drive start token', correlation_id: cid },
+                error_handler: lambda do |code, body, message|
+                  error(call('handle_drive_error', connection, code, body, message, { correlation_id: cid }))
+                end
+              }
+            )
           end
-          
-          start_response = call('api_request', connection, :get,
-            call('drive_api_url', :start_token),
-            {
-              params: start_params,
-              context: { action: 'Get Drive start token' },
-              error_handler: lambda do |code, body, message|
-                error(call('handle_drive_error', connection, code, body, message))
-              end
-            }
-          )
-          
-          # Return initial token for future use
+
           return {
             'changes' => [],
             'new_page_token' => start_response['startPageToken'],
             'files_added' => [],
             'files_modified' => [],
             'files_removed' => [],
-            'summary' => {
-              'total_changes' => 0,
-              'added_count' => 0,
-              'modified_count' => 0,
-              'removed_count' => 0,
-              'has_more' => false
-            },
-            'is_initial_token' => true
+            'summary' => { 'total_changes' => 0, 'added_count' => 0, 'modified_count' => 0, 'removed_count' => 0, 'has_more' => false },
+            'is_initial_token' => true,
+            'trace' => start_response['trace']
           }
         end
 
-        # Step 3: Get actual changes using the token
         changes_params = {
           pageToken: page_token,
           pageSize: page_size,
@@ -1695,34 +1589,27 @@
           supportsAllDrives: include_shared_drives,
           includeRemoved: include_removed
         }
-        
-        # Add folder restriction if specified
-        if folder_id.present? && include_shared_drives
-          changes_params[:driveId] = folder_id
-        end
-        
-        changes_response = call('api_request', connection, :get,
-          call('drive_api_url', :changes),
-          {
-            params: changes_params,
-            context: { action: 'List Drive changes' },
-            error_handler: lambda do |code, body, message|
-              error(call('handle_drive_error', connection, code, body, message))
-            end
-          }
-        )
+        changes_params[:driveId] = folder_id if folder_id.present? && include_shared_drives
 
-        # Step 4: Process the changes
+        changes_response = call('with_resilience', connection, key: 'drive.changes.list') do |cid|
+          call('api_request', connection, :get,
+            call('drive_api_url', :changes),
+            {
+              params: changes_params,
+              headers: { 'X-Correlation-Id' => cid },
+              context: { action: 'List Drive changes', correlation_id: cid },
+              error_handler: lambda do |code, body, message|
+                error(call('handle_drive_error', connection, code, body, message, { correlation_id: cid }))
+              end
+            }
+          )
+        end
+
         all_changes = changes_response['changes'] || []
-        
-        # Filter by folder if specified and not using shared drives
+
         if folder_id.present? && !include_shared_drives
           all_changes = all_changes.select do |change|
-            if change['file'] && change['file']['parents']
-              change['file']['parents'].include?(folder_id)
-            else
-              false
-            end
+            change['file'] && change['file']['parents'] && change['file']['parents'].include?(folder_id)
           end
         end
 
@@ -1745,16 +1632,14 @@
           end
         end
 
-        # Step 6: Determine next page token
         next_token = changes_response['nextPageToken'] || changes_response['newStartPageToken']
         has_more = changes_response['nextPageToken'].present?
 
-        # Step 7: Build response
         {
           'changes' => all_changes,
           'new_page_token' => next_token,
           'files_added' => files_added,
-          'files_modified' => files_modified, 
+          'files_modified' => files_modified,
           'files_removed' => files_removed,
           'summary' => {
             'total_changes' => all_changes.length,
@@ -1763,7 +1648,8 @@
             'removed_count' => files_removed.length,
             'has_more' => has_more
           },
-          'is_initial_token' => false
+          'is_initial_token' => false,
+          'trace' => changes_response['trace']
         }
       end,
 
@@ -1788,32 +1674,111 @@
           ],
           'new_page_token' => 'token_xyz789',
           'files_added' => [
-            {
-              'id' => 'abc123',
-              'name' => 'document.pdf',
-              'mimeType' => 'application/pdf',
-              'modifiedTime' => '2024-01-15T10:29:45Z'
-            }
+            { 'id' => 'abc123', 'name' => 'document.pdf', 'mimeType' => 'application/pdf', 'modifiedTime' => '2024-01-15T10:29:45Z' }
           ],
           'files_modified' => [],
           'files_removed' => [],
           'summary' => {
-            'total_changes' => 1,
-            'added_count' => 1,
-            'modified_count' => 0,
-            'removed_count' => 0,
-            'has_more' => false
+            'total_changes' => 1, 'added_count' => 1, 'modified_count' => 0, 'removed_count' => 0, 'has_more' => false
           },
-          'is_initial_token' => false
+          'is_initial_token' => false,
+          'trace' => { 'correlation_id' => 'sample-cid', 'duration_ms' => 123 }
         }
       end
     }
   },
 
   methods: {
+    # ======= NEW =====================
+    # --- NEW: Correlation ID generator (robust without requires)
+    gen_correlation_id: lambda do
+      begin
+        SecureRandom.uuid
+      rescue NameError
+        # Fallback if SecureRandom isn't available
+        t = (Time.now.to_f * 1000).to_i.to_s(36)
+        r = rand(36**8).to_s(36).rjust(8, '0')
+        "#{t}-#{r}"
+      end
+    end,
+
+    # --- NEW: Unified resilience wrapper (rate limit + CB retry + timing + CID)
+    with_resilience: lambda do |connection, key:, model: nil, retry_on: nil, &block|
+      cfg = call('rate_limit_defaults')
+      retry_on ||= cfg['retry_on']
+
+      rl  = call('enforce_vertex_rate_limits', connection, model || key, 'inference')
+      include_trace = connection['include_trace'] != false
+      cid = call('gen_correlation_id')
+      started = Time.now
+
+      result = call('circuit_breaker_retry', connection, key, { retry_on: retry_on }) do
+        block.call(cid)
+      end
+
+      duration_ms = ((Time.now - started) * 1000).round
+
+      if result.is_a?(Hash)
+        out = result.dup
+        out['rate_limit_status'] ||= rl
+        if include_trace
+          out['trace'] = { 'correlation_id' => cid, 'duration_ms' => duration_ms }
+        else
+          out.delete('trace')
+        end
+        out
+      else
+        result
+      end
+    end,
+
+    # --- NEW: Vertex Vector Search helpers ---
+    vindex_url: lambda do |connection, host, path|
+      version = connection['version'].presence || 'v1'
+      "https://#{call('normalize_host', host)}/#{version}/projects/#{connection['project']}/locations/#{connection['region']}/#{path}"
+    end,
+
+    vindex_find_neighbors: lambda do |connection, input|
+      host        = input['index_endpoint_host']
+      endpoint_id = input['index_endpoint_id']
+      url         = call('vindex_url', connection, host, "indexEndpoints/#{endpoint_id}:findNeighbors")
+      payload     = call('build_ai_payload', :find_neighbors, input, connection)
+
+      call('with_resilience', connection, key: 'vertex.find_neighbors') do |cid|
+        call('api_request', connection, :post, url, {
+          payload: payload,
+          headers: { 'X-Correlation-Id' => cid },
+          context: {
+            action: 'Find neighbors',
+            host: call('normalize_host', host),
+            endpoint_id: endpoint_id,
+            region: connection['region'],
+            correlation_id: cid
+          },
+          error_handler: lambda do |code, body, message|
+            call('handle_vertex_error', connection, code, body, message, {
+              action: 'Find neighbors',
+              host: call('normalize_host', host),
+              endpoint_id: endpoint_id,
+              region: connection['region'],
+              correlation_id: cid
+            })
+          end
+        })
+      end
+    end,
+
     # ======= LEAF DEPENDENCIES =======
     log_debug: lambda { |msg| puts(msg) },
-    rate_limit_defaults: lambda { { 'max_retries' => 3, 'base_delay' => 1.0, 'max_delay' => 30.0 } },
+    rate_limit_defaults: lambda do
+      {
+        'max_retries' => 3,
+        'base_delay'  => 1.0,
+        'max_delay'   => 30.0,
+        'retry_on'    => [429, 500, 502, 503, 504, 'timeout', 'connection']
+      }
+    end,
+
     oauth_scopes: lambda do
       [
         'https://www.googleapis.com/auth/cloud-platform',
@@ -1892,20 +1857,16 @@
       # Parse the body for structured error information
       error_details = begin
         parsed = parse_json(body)
-        # Google APIs often nest the error message
         parsed.dig('error', 'message') || parsed['message'] || body
       rescue
         body
       end
-      
+
       # Build base message based on status code
       base_message = case code
-      when 400
-        "Invalid request format"
-      when 401
-        "Authentication failed - please check your credentials"
-      when 403
-        "Permission denied - verify Vertex AI API is enabled"
+      when 400 then "Invalid request format"
+      when 401 then "Authentication failed - please check your credentials"
+      when 403 then "Permission denied - verify Vertex AI API is enabled"
       when 404
         if context[:action] == 'Find neighbors'
           "Index endpoint not found. Please verify:\n" \
@@ -1915,57 +1876,41 @@
         else
           "Resource not found"
         end
+      when 429 then "Rate limit exceeded - please wait before retrying"
+      when 500 then "Google service error - temporary issue"
+      when 502, 503, 504 then "Google service temporarily unavailable"
+      else "API error"
+      end
 
-      when 429
-        "Rate limit exceeded - please wait before retrying"
-      when 500
-        "Google service error - temporary issue"
-      when 502, 503, 504
-        "Google service temporarily unavailable"
-      else
-        "API error"
-      end
-      
       # Add context if provided
-      if context[:action].present?
-        base_message = "#{context[:action]} failed: #{base_message}"
-      end
-      
-      # Build final message
-      if connection['verbose_errors']
-        error_message = "#{base_message} (HTTP #{code})"
+      base_message = "#{context[:action]} failed: #{base_message}" if context[:action].present?
+
+      # Correlation id (if present)
+      suffix = context[:correlation_id].present? ? " [cid: #{context[:correlation_id]}]" : ""
+
+      if connection && connection['verbose_errors']
+        error_message = "#{base_message} (HTTP #{code})#{suffix}"
         error_message += "\nDetails: #{error_details}" if error_details.present?
         error_message += "\nOriginal: #{message}" if message != error_details
         error(error_message)
       else
         hint = case code
-        when 401, 403
-          "\nEnable verbose errors in connection settings for details"
-        when 429
-          "\nConsider adding delays between requests"
-        when 500..599
-          "\nThis is usually temporary - retry in a few moments"
-        else
-          ""
+        when 401, 403 then "\nEnable verbose errors in connection settings for details"
+        when 429 then "\nConsider adding delays between requests"
+        when 500..599 then "\nThis is usually temporary - retry in a few moments"
+        else ""
         end
-        error("#{base_message}#{hint}")
+        error("#{base_message}#{suffix}#{hint}")
       end
     end,
+    # 9/23/25 - added functional header support
     api_request: lambda do |connection, method, url, options = {}|
       # Build the request based on method
       request = case method.to_sym
       when :get
-        if options[:params]
-          get(url).params(options[:params])
-        else
-          get(url)
-        end
+        get(url)
       when :post
-        if options[:payload]
-          post(url, options[:payload])
-        else
-          post(url)
-        end
+        options[:payload] ? post(url, options[:payload]) : post(url)
       when :put
         put(url, options[:payload])
       when :delete
@@ -1973,10 +1918,12 @@
       else
         error("Unsupported HTTP method: #{method}")
       end
-      
+
+      request = request.params(options[:params]) if options[:params]
+      request = request.headers(options[:headers]) if options[:headers]
+
       # Apply standard error handling
       request.after_error_response(/.*/) do |code, body, _header, message|
-        # Check if custom error handler provided
         if options[:error_handler]
           options[:error_handler].call(code, body, message)
         else
@@ -1984,38 +1931,54 @@
         end
       end
     end,
+
     vertex_request: lambda do |connection, method, path_or_url, **opts|
       url = path_or_url.start_with?('http') ? path_or_url : call('vertex_api_url', connection, path_or_url)
-      call('api_request', connection, method, url, opts)
+      call('with_resilience', connection, key: "vertex.#{method}") do |cid|
+        opts[:headers] = (opts[:headers] || {}).merge('X-Correlation-Id' => cid)
+        opts[:context] = (opts[:context] || {}).merge(correlation_id: cid, action: opts.dig(:context, :action) || "Vertex #{method}")
+        call('api_request', connection, method, url, opts)
+      end
     end,
+
     drive_request: lambda do |connection, method, endpoint, **opts|
       url = call('drive_api_url', endpoint, opts.delete(:file_id), opts)
+      ctx = opts[:context] || {}
       opts[:error_handler] ||= lambda do |code, body, message|
-        error(call('handle_drive_error', connection, code, body, message))
+        error(call('handle_drive_error', connection, code, body, message, ctx))
       end
-      call('api_request', connection, method, url, opts)
+
+      call('with_resilience', connection, key: "drive.#{endpoint}.#{method}") do |cid|
+        opts[:headers] = (opts[:headers] || {}).merge('X-Correlation-Id' => cid)
+        opts[:context] = (opts[:context] || {}).merge(correlation_id: cid, action: ctx[:action] || "Drive #{endpoint}")
+        call('api_request', connection, method, url, opts)
+      end
     end,
-    handle_drive_error: lambda do |connection, code, body, message|
-      service_account_email = connection['service_account_email'] || 
-                             connection['client_id']
+
+    handle_drive_error: lambda do |connection, code, body, message, context = {}|
+      service_account_email = connection['service_account_email'] || connection['client_id']
+      cid_suffix = context[:correlation_id].present? ? " [cid: #{context[:correlation_id]}]" : ""
+
       handlers = {
-        404 => ->(_b, _m) { "File not found in Google Drive. Please verify the file ID and ensure the file exists." },
+        404 => ->(_b, _m) { "File not found in Google Drive#{cid_suffix}. Please verify the file ID and ensure the file exists." },
         403 => ->(b, _m) {
-          if b&.include?('insufficientFilePermissions') || b&.include?('forbidden')
-            "Access denied. Please share the file with the service account: #{service_account_email}"
+          msg = if b&.include?('insufficientFilePermissions') || b&.include?('forbidden')
+            "Access denied#{cid_suffix}. Please share the file with the service account: #{service_account_email}"
           else
-            "Permission denied. Check your Google Drive API access and file permissions."
+            "Permission denied#{cid_suffix}. Check your Google Drive API access and file permissions."
           end
+          msg
         },
-        429 => ->(_b, _m) { "Rate limit exceeded. Please implement request backoff and retry logic." },
-        401 => ->(_b, _m) { "Authentication failed. Please check your OAuth2 token or service account credentials." }
+        429 => ->(_b, _m) { "Rate limit exceeded#{cid_suffix}. Please implement request backoff and retry logic." },
+        401 => ->(_b, _m) { "Authentication failed#{cid_suffix}. Please check your OAuth2 token or service account credentials." }
       }
+
       if handlers[code]
         handlers[code].call(body, message)
       elsif [500, 502, 503].include?(code)
-        "Google Drive API temporary error (#{code}). Please retry after a brief delay."
+        "Google Drive API temporary error (#{code})#{cid_suffix}. Please retry after a brief delay."
       else
-        "Google Drive API error (#{code}): #{message || body}"
+        "Google Drive API error (#{code})#{cid_suffix}: #{message || body}"
       end
     end,
 
@@ -2268,22 +2231,6 @@
         return block.call
       end
     end,
-    rate_limited_ai_request: lambda do |connection, model, action_type, url, payload|
-      # Apply rate limiting before request
-      rate_limit_info = call('enforce_vertex_rate_limits', connection, model, action_type)
-
-      # Make request with 429 retry handling
-      response = call('handle_429_with_backoff', connection, action_type, model) do
-        call('api_request', connection, :post, url, { payload: payload })
-      end
-
-      # Add rate limit info to response if it's a hash
-      if response.is_a?(Hash)
-        response['rate_limit_status'] = rate_limit_info
-      end
-
-      response
-    end,
 
     # ======= VERTEX MODEL DISCOVERY AND VALIDATION =======
     # These methods help validate access to Vertex AI services and resources.
@@ -2443,76 +2390,51 @@
         core_models
       end
     end,
+
     fetch_fresh_publisher_models: lambda do |connection, publisher, region|
-      # Use the regional service endpoint; list is in v1beta1.
-      # Docs: publishers.models.list (v1beta1), supports 'view' and pagination.
-      # https://cloud.google.com/vertex-ai/docs/reference/rest/v1beta1/publishers.models/list
       host = "https://#{region}-aiplatform.googleapis.com"
-      url = "#{host}/v1beta1/publishers/#{publisher}/models"
-      
+      url  = "#{host}/v1beta1/publishers/#{publisher}/models"
+
       models = []
       page_token = nil
       pages_fetched = 0
       max_pages = 5
       page_size = 500
-      total_api_time = 0
-      
+
       begin
         loop do
           pages_fetched += 1
-          
-          # Stop if we've fetched enough pages
-          if pages_fetched > max_pages
-            call('log_debug', "Reached max pages (#{max_pages}). Stopping.")
-            break
-          end
-          
-          # Time each API call for monitoring
-          api_start = Time.now
-          
-          resp = call('api_request', connection, :get, url, {
-            params: { page_size: page_size, page_token: page_token, view: 'PUBLISHER_MODEL_VIEW_BASIC' },
-            context: { action: 'List publisher models' },
-            error_handler: lambda do |code, body, message|
-              if connection['verbose_errors']
-                call('log_debug', "Model listing failed (HTTP #{code}): #{body}")
-              else
-                call('log_debug', "Model listing failed (HTTP #{code}) - using static fallback")
+          break if pages_fetched > max_pages
+
+          resp = call('with_resilience', connection, key: 'vertex.publishers.models.list') do |cid|
+            call('api_request', connection, :get, url, {
+              params: { page_size: page_size, page_token: page_token, view: 'PUBLISHER_MODEL_VIEW_BASIC' },
+              headers: { 'X-Correlation-Id' => cid },
+              context: { action: 'List publisher models', correlation_id: cid },
+              error_handler: lambda do |code, body, message|
+                if connection['verbose_errors']
+                  call('log_debug', "Model listing failed (HTTP #{code}): #{body}")
+                else
+                  call('log_debug', "Model listing failed (HTTP #{code}) - using static fallback")
+                end
+                raise 'API Error'
               end
-              raise 'API Error'
-            end
-          })
-          
-          api_time = Time.now - api_start
-          total_api_time += api_time
-          
+            })
+          end
+
           batch = resp['publisherModels'] || []
           models.concat(batch)
-          
-          call('log_debug', "Fetched page #{pages_fetched}: #{batch.length} models in #{api_time.round(2)}s")
-          
-          # Check for pagination
           page_token = resp['nextPageToken']
-          
-          # Smart early exit - if we have enough models, stop fetching
-          if models.length >= 100 && !connection['fetch_all_models']
-            call('log_debug', "Have #{models.length} models, stopping early for performance")
-            break
-          end
-          
-          break if page_token.blank? || batch.empty?
+          break if page_token.blank? || batch.empty? || (models.length >= 100 && !connection['fetch_all_models'])
         end
-        
-        call('log_debug', "Total model fetch: #{models.length} models in #{total_api_time.round(2)}s across #{pages_fetched} pages")
 
         models
-        
       rescue => e
         call('log_debug', "Failed to fetch models from API: #{e.message}")
-        # Return empty array to trigger static fallback
         []
       end
     end,
+
     fetch_publisher_models: lambda do |connection, publisher = 'google'|
       # Build the cache key (incl all relevant param to ensure regions/publishers are cached separately)
       region = connection['region'].presence || 'us-central1'
@@ -2563,105 +2485,94 @@
       models
     end,
     validate_publisher_model!: lambda do |connection, model_name|
-      # Early exit conditions (no need to validate in input absent or validation disabled)
       return if model_name.blank?
       return unless connection['validate_model_on_run']
 
-      # Use persistent cache that survives across recipe executions
-      region = connection['region'].presence || 'us-central1'
+      region  = connection['region'].presence || 'us-central1'
       project = connection['project'] || 'default'
-      cache_key = "vertex_model_validation_#{project}_#{region}_#{model_name.gsub('/', '_')}"
+      ok_cache_key   = "vertex_model_validation_#{project}_#{region}_#{model_name.gsub('/', '_')}"
+      fail_cache_key = "vertex_model_validation_fail_#{project}_#{region}_#{model_name.gsub('/', '_')}"
 
-      # Check persistent cache first - if we've validated this model recently, skip
       begin
-        cached_validation = workato.cache.get(cache_key)
-        if cached_validation && cached_validation['validated_at']
-          validated_time = Time.parse(cached_validation['validated_at'])
-          # Use cached result if validation is less than 1 hour old
-          if validated_time > Time.now - 3600
-            call('log_debug', "Model #{model_name} validation cached (#{((Time.now - validated_time) / 60).round(1)}min ago)")
+        if (cached_fail = workato.cache.get(fail_cache_key))
+          error("Model validation recently failed for '#{model_name}' in #{region}: #{cached_fail['message']} (cached)")
+        end
+      rescue => e
+        call('log_debug', "Model validation fail-cache read failed: #{e.message}")
+      end
+
+      begin
+        if (cached_ok = workato.cache.get(ok_cache_key)) && cached_ok['validated_at']
+          validated_time = Time.parse(cached_ok['validated_at']) rescue nil
+          if validated_time && validated_time > Time.now - 3600
+            call('log_debug', "Model #{model_name} validation cached OK (#{((Time.now - validated_time)/60).round(1)}min ago)")
             return
           end
         end
       rescue => e
-        call('log_debug', "Model validation cache read failed: #{e.message}")
-        # Continue with validation if cache fails
+        call('log_debug', "Model validation ok-cache read failed: #{e.message}")
       end
-      
-      # 1. Validate model name format first (no API call needed)
-      # regex checks for the pattern: publishers/{publisher}/models/{model}
+
       unless model_name.match?(/^publishers\/[^\/]+\/models\/[^\/]+$/)
-        error("Invalid model name format: #{model_name}\n" \
-              "Expected format: publishers/{publisher}/models/{model}\n" \
-              "Example: publishers/google/models/gemini-1.5-pro")
+        error("Invalid model name format: #{model_name}\nExpected: publishers/{publisher}/models/{model}")
       end
-      
-      # Verify the model actually exists
-      region = connection['region'].presence || 'us-central1'
-      
-      # Build the validation URL (v1 endpoint for model metadata)
+
       url = "https://#{region}-aiplatform.googleapis.com/v1/#{model_name}"
 
       begin
-        # Make the validation request with specific error handling
-        resp = call('api_request', connection, :get, url, {
-          params: { view: 'PUBLISHER_MODEL_VIEW_BASIC' },
-          context: { action: 'Validate publisher model' },
-          error_handler: lambda do |code, body, message|
-            if code == 404
-              error("Model '#{model_name}' not found in region '#{region}'.\n" \
-                    "Possible issues:\n" \
-                    "• Model name typo (check spelling carefully)\n" \
-                    "• Model not available in #{region} (try us-central1)\n" \
-                    "• Model deprecated or renamed\n" \
-                    "• Using preview model without enabling preview models in connection")
-            elsif code == 403
-              error("Access denied to model '#{model_name}'.\n" \
-                    "To fix this:\n" \
-                    "1. Verify Vertex AI API is enabled in Google Cloud Console\n" \
-                    "2. Check service account has 'Vertex AI User' role\n" \
-                    "3. Ensure billing is enabled for your project\n" \
-                    "4. Confirm project ID is correct: #{connection['project']}")
-            else
-              call('handle_vertex_error', connection, code, body, message)
+        resp = call('with_resilience', connection, key: 'vertex.model.get') do |cid|
+          call('api_request', connection, :get, url, {
+            params: { view: 'PUBLISHER_MODEL_VIEW_BASIC' },
+            headers: { 'X-Correlation-Id' => cid },
+            context: { action: 'Validate publisher model', correlation_id: cid },
+            error_handler: lambda do |code, body, message|
+              if code == 404
+                msg = "Model '#{model_name}' not found in region '#{region}'. Try us-central1 or check spelling."
+                begin
+                  workato.cache.set(fail_cache_key, { 'message' => msg, 'at' => Time.now.iso8601 }, 300)
+                rescue => e
+                  call('log_debug', "Fail-cache write failed: #{e.message}")
+                end
+                error(msg)
+              elsif code == 403
+                msg = "Access denied to model '#{model_name}'. Verify Vertex AI API, billing, and 'Vertex AI User' role."
+                begin
+                  workato.cache.set(fail_cache_key, { 'message' => msg, 'at' => Time.now.iso8601 }, 300)
+                rescue => e
+                  call('log_debug', "Fail-cache write failed: #{e.message}")
+                end
+                error(msg)
+              else
+                call('handle_vertex_error', connection, code, body, message, { action: 'Validate publisher model' })
+              end
             end
-          end
-        })
-        
-        # Additional validation: Check if model is GA when preview models aren't allowed
+          })
+        end
+
         unless connection['include_preview_models']
           stage = resp['launchStage'].to_s
           if stage.present? && stage != 'GA'
-            error("Model '#{model_name}' is in #{stage} stage (not Generally Available).\n" \
-                  "To use preview models:\n" \
-                  "1. Go to your connection settings\n" \
-                  "2. Enable 'Include preview/experimental models'\n" \
-                  "3. Save and retry\n\n" \
-                  "Note: Preview models may have different pricing and stability")
+            error("Model '#{model_name}' is #{stage}; enable 'Include preview/experimental models' to proceed.")
           end
         end
-        
-        # Success! Cache the validation result persistently (1 hour TTL)
+
         begin
-          validation_data = {
+          workato.cache.set(ok_cache_key, {
             'validated_at' => Time.now.iso8601,
             'launch_stage' => resp['launchStage'],
-            'model_version' => resp['versionId'],
+            'model_version'=> resp['versionId'],
             'region' => region
-          }
-          workato.cache.set(cache_key, validation_data, 3600) # 1 hour TTL
+          }, 3600)
         rescue => e
-          call('log_debug', "Model validation cache write failed: #{e.message}")
+          call('log_debug', "OK-cache write failed: #{e.message}")
         end
 
         call('log_debug', "Model #{model_name} validated successfully in #{region}")
-
       rescue => e
-        # If anything goes wrong, provide a clear error message
-        error("Model validation failed: #{e.message}\n" \
-              "This usually means a temporary network issue. Try again in a moment.")
+        error("Model validation failed: #{e.message}\nTry again shortly or check connectivity.")
       end
     end,
+
     dynamic_model_picklist: lambda do |connection, bucket, static_fallback|
       # 1. Check if dynamic models are enabled (return to static if not)
       unless connection['dynamic_models']
@@ -3026,10 +2937,36 @@
     # Unified “validate → build → call → extract”
     run_vertex: lambda do |connection, input, template, verb:, extract: {}|
       call('validate_publisher_model!', connection, input['model'])
+
       payload = input['formatted_prompt'].presence || call('build_ai_payload', template, input, connection)
       url = call('vertex_url_for', connection, input['model'], verb)
-      resp = call('rate_limited_ai_request', connection, input['model'], verb, url, payload)
-      extract.present? ? call('extract_response', resp, extract) : resp
+
+      resp = call('with_resilience', connection, key: "vertex.#{verb}", model: input['model']) do |cid|
+        call('api_request', connection, :post, url, {
+          payload: payload,
+          headers: { 'X-Correlation-Id' => cid },
+          context: {
+            action: verb.to_s == 'generate' ? 'Generate content' : 'Predict',
+            model:  input['model'],
+            correlation_id: cid
+          }
+        })
+      end
+
+      # Perform extraction if requested
+      extracted = extract.present? ? call('extract_response', resp, extract) : resp
+
+      # Standard envelope additions (trace + Vertex metadata + rate limit status)
+      envelope_additions = {
+        'trace' => resp['trace'],
+        'rate_limit_status' => resp['rate_limit_status'],
+        'vertex' => {
+          'response_id'   => resp['responseId'],
+          'model_version' => resp['modelVersion']
+        }.compact
+      }.compact
+
+      extracted.is_a?(Hash) ? extracted.merge(envelope_additions) : extracted
     end,
 
     # ======= RESPONSE EXTRACTION AND NORMALIZATION =======
@@ -3076,55 +3013,55 @@
       }
     end,
     check_finish_reason: lambda do |reason|
-      case reason&.downcase
-      when 'finish_reason_unspecified'
-        error 'ERROR - The finish reason is unspecified.'
-      when 'other'
-        error 'ERROR - Token generation stopped due to an unknown reason.'
-      when 'max_tokens'
-        error 'ERROR - Token generation reached the configured maximum output tokens.'
-      when 'safety'
-        error 'ERROR - Token generation stopped because the content potentially contains ' \
-              'safety violations.'
-      when 'recitation'
-        error 'ERROR - Token generation stopped because the content potentially contains ' \
-              'copyright violations.'
-      when 'blocklist'
-        error 'ERROR - Token generation stopped because the content contains forbidden items.'
-      when 'prohibited_content'
-        error 'ERROR - Token generation stopped for potentially containing prohibited content.'
-      when 'spii'
-        error 'ERROR - Token generation stopped because the content potentially contains ' \
-              'Sensitive Personal Identifiable Information (SPII).'
-      when 'malformed_function_call'
-        error 'ERROR - The function call generated by the model is invalid.'
-      end
+      r = reason.to_s
+      code = r.downcase
+      mapping = {
+        'finish_reason_unspecified' => { 'fatal' => false, 'action_required' => 'retry' },
+        'other'                     => { 'fatal' => false, 'action_required' => 'retry' },
+        'max_tokens'                => { 'fatal' => false, 'action_required' => 'increase_max_tokens' },
+        'safety'                    => { 'fatal' => true,  'action_required' => 'adjust_prompt_or_policy' },
+        'recitation'                => { 'fatal' => true,  'action_required' => 'revise_prompt' },
+        'blocklist'                 => { 'fatal' => true,  'action_required' => 'remove_blocked_content' },
+        'prohibited_content'        => { 'fatal' => true,  'action_required' => 'remove_prohibited_content' },
+        'spii'                      => { 'fatal' => true,  'action_required' => 'remove_sensitive_data' },
+        'malformed_function_call'   => { 'fatal' => true,  'action_required' => 'fix_tooling' }
+      }
+      msg = case code
+            when 'finish_reason_unspecified' then 'Generation stopped for unspecified reason.'
+            when 'other' then 'Generation stopped for unknown reason.'
+            when 'max_tokens' then 'Generation hit the configured max tokens.'
+            when 'safety' then 'Generation blocked by safety filters.'
+            when 'recitation' then 'Generation blocked due to potential copyrighted recitation.'
+            when 'blocklist' then 'Generation blocked by content blocklist.'
+            when 'prohibited_content' then 'Generation blocked due to prohibited content.'
+            when 'spii' then 'Generation blocked due to sensitive personal information.'
+            when 'malformed_function_call' then 'Generated function call was invalid.'
+            else r
+            end
+      base = mapping[code] || { 'fatal' => false, 'action_required' => nil }
+      { 'reason' => r, 'code' => code, 'fatal' => base['fatal'], 'message' => msg, 'action_required' => base['action_required'] }
     end,
-    standard_error_response: lambda do |type, ratings|
+    standard_error_response: lambda do |type, ratings, finish_info = nil|
+      action = finish_info&.[]('action_required') || 'review_and_retry'
+      base = { 'pass_fail' => false, 'action_required' => action, 'has_answer' => false, 'safety_ratings' => ratings || {} }
       case type
       when :generic
-        { 'answer' => 'N/A', 'safety_ratings' => {} }
+        base.merge('answer' => '')
       when :classify
-        { 'selected_category' => 'N/A', 'confidence' => 0.0, 'safety_ratings' => {} }
+        base.merge('selected_category' => 'unknown', 'confidence' => 0.0, 'alternatives' => [])
       else
-        { 'error' => 'Safety ratings check failed', 'safety_ratings' => {} }
+        base.merge('error' => 'Operation could not complete')
       end
     end,
     extract_response: lambda do |resp, options = {}|
-      # Extract options with defaults
       type = options[:type] || :generic
       is_json_response = options[:json_response] || false
 
-      # Common safety and finish reason checks for generative responses
-      if [:generic, :email, :parsed, :classify].include?(type)
-        call('check_finish_reason', resp.dig('candidates', 0, 'finishReason'))
-        ratings = call('get_safety_ratings', resp.dig('candidates', 0, 'safetyRatings'))
-        return call('standard_error_response', type, ratings) if ratings.blank?
-      else
-        ratings = {}
-      end
+      finish_reason = resp&.dig('candidates', 0, 'finishReason')
+      finish_info = call('check_finish_reason', finish_reason)
 
-      # Extract core response based on type
+      ratings = call('get_safety_ratings', resp&.dig('candidates', 0, 'safetyRatings')) || {}
+
       case type
       when :generic
         answer = if is_json_response
@@ -3133,13 +3070,25 @@
                   resp&.dig('candidates', 0, 'content', 'parts', 0, 'text')
                 end
 
-        has_answer = !answer.nil? && !answer.to_s.strip.empty? && answer.to_s.strip != 'N/A'
+        has_answer = answer.present? && answer.to_s.strip != 'N/A'
+        return call('standard_error_response', type, ratings, finish_info).merge('usage' => call('usage_meta', resp)) if finish_info['fatal'] && !has_answer
+
+        pass = has_answer && !finish_info['fatal']
+        action = if finish_info['fatal']
+                  finish_info['action_required']
+                elsif has_answer && finish_info['code'] == 'max_tokens'
+                  'increase_max_tokens'
+                elsif has_answer
+                  'use_answer'
+                else
+                  'retry_or_refine'
+                end
 
         {
           'answer' => answer.to_s,
           'has_answer' => has_answer,
-          'pass_fail' => has_answer,
-          'action_required' => has_answer ? 'use_answer' : 'try_different_question',
+          'pass_fail' => pass,
+          'action_required' => action,
           'answer_length' => answer.to_s.length,
           'safety_ratings' => ratings,
           'usage' => call('usage_meta', resp)
@@ -3151,14 +3100,12 @@
           'subject' => json&.[]('subject'),
           'body' => json&.[]('body'),
           'safety_ratings' => ratings,
-          'usage' => resp['usageMetadata']
+          'usage' => call('usage_meta', resp)
         }
 
       when :parsed
         json = call('extract_json', resp)
-        json&.each_with_object({}) do |(key, value), hash|
-          hash[key] = value
-        end&.merge('safety_ratings' => ratings, 'usage' => resp['usageMetadata'])
+        (json.is_a?(Hash) ? json : {}).merge('safety_ratings' => ratings, 'usage' => call('usage_meta', resp))
 
       when :embedding
         vals = call('extract_embedding_values', resp&.dig('predictions', 0)) || []
@@ -3167,19 +3114,21 @@
       when :classify
         json = call('extract_json', resp)
         json = {} unless json.is_a?(Hash)
-        
-        selected_category = json&.[]('selected_category') || 'N/A'
-        confidence = json&.[]('confidence')&.to_f || 1.0
-        alternatives = json&.[]('alternatives') || []
 
-        # Normalize values
-        selected_category = selected_category.to_s
-        selected_category = 'unknown' if selected_category.empty? || selected_category == 'N/A'
-        confidence = [[confidence, 0.0].max, 1.0].min
+        selected_category = (json['selected_category'] || 'unknown').to_s
+        confidence = [[json['confidence'].to_f, 0.0].max, 1.0].min
+        alternatives = json['alternatives'] || []
 
-        # Decision logic
         confidence_threshold = 0.7
         requires_human_review = confidence < confidence_threshold
+        pass = !requires_human_review && !finish_info['fatal']
+        action = if finish_info['fatal']
+                  finish_info['action_required']
+                elsif requires_human_review
+                  'human_review'
+                else
+                  'use_classification'
+                end
 
         {
           'selected_category' => selected_category,
@@ -3187,16 +3136,17 @@
           'alternatives' => alternatives,
           'requires_human_review' => requires_human_review,
           'confidence_threshold' => confidence_threshold,
-          'pass_fail' => !requires_human_review,
-          'action_required' => requires_human_review ? 'human_review' : 'use_classification',
+          'pass_fail' => pass,
+          'action_required' => action,
           'safety_ratings' => ratings,
-          'usage' => resp['usageMetadata']
+          'usage' => call('usage_meta', resp)
         }
 
       else
-        error("Unknown response extraction type: #{type}")
+        call('standard_error_response', type, ratings, finish_info)
       end
     end,
+
 
     # ======= GOOGLE DRIVE HELPER METHODS =======
     drive_basic_fields: lambda do
@@ -3277,7 +3227,6 @@
       { kind: :added, summary: summary }
     end,
     fetch_file_content: lambda do |connection, file_id, metadata, include_content = true|
-      # Skip content fetching if not requested
       unless include_content
         return {
           'text_content' => '',
@@ -3287,22 +3236,24 @@
         }
       end
 
-      # Determine export type for Google Workspace files
       export_mime_type = call('get_export_mime_type', metadata['mimeType'])
 
       if export_mime_type.present?
-        # Google Workspace file - use export endpoint
-        content_response = call('api_request', connection, :get,
-          call('drive_api_url', :export, file_id),
-          {
-            params: { mimeType: export_mime_type },
-            error_handler: lambda do |code, body, message|
-              error(call('handle_drive_error', connection, code, body, message))
-            end
-          }
-        )
+        # Google Workspace file - export to text
+        content_response = call('with_resilience', connection, key: 'drive.files.export') do |cid|
+          call('api_request', connection, :get,
+            call('drive_api_url', :export, file_id),
+            {
+              params: { mimeType: export_mime_type },
+              headers: { 'X-Correlation-Id' => cid },
+              context: { action: 'Drive export', correlation_id: cid },
+              error_handler: lambda do |code, body, message|
+                error(call('handle_drive_error', connection, code, body, message, { correlation_id: cid }))
+              end
+            }
+          )
+        end
 
-        # Return workspace file result
         {
           'text_content' => content_response.force_encoding('UTF-8'),
           'needs_processing' => false,
@@ -3310,26 +3261,24 @@
           'export_mime_type' => export_mime_type
         }
       else
-        # Regular file - use download endpoint
-        content_response = call('api_request', connection, :get,
-          call('drive_api_url', :download, file_id),
-          {
-            error_handler: lambda do |code, body, message|
-              error(call('handle_drive_error', connection, code, body, message))
-            end
-          }
-        )
+        # Binary or regular text file - download
+        content_response = call('with_resilience', connection, key: 'drive.files.download') do |cid|
+          call('api_request', connection, :get,
+            call('drive_api_url', :download, file_id),
+            {
+              headers: { 'X-Correlation-Id' => cid },
+              context: { action: 'Drive download', correlation_id: cid },
+              error_handler: lambda do |code, body, message|
+                error(call('handle_drive_error', connection, code, body, message, { correlation_id: cid }))
+              end
+            }
+          )
+        end
 
-        # Check if it's a text-based file
         is_text_file = metadata['mimeType']&.start_with?('text/') ||
-                       ['application/json', 'application/xml'].include?(metadata['mimeType'])
+                      ['application/json', 'application/xml'].include?(metadata['mimeType'])
+        needs_processing = ['application/pdf', 'image/'].any? { |prefix| metadata['mimeType']&.start_with?(prefix) }
 
-        # Check if it needs additional processing
-        needs_processing = ['application/pdf', 'image/'].any? { |prefix|
-          metadata['mimeType']&.start_with?(prefix)
-        }
-
-        # Return regular file result
         {
           'text_content' => is_text_file ? content_response.force_encoding('UTF-8') : '',
           'needs_processing' => needs_processing,
@@ -3339,30 +3288,41 @@
       end
     end,
     fetch_drive_file_full: lambda do |connection, file_id, include_content|
-      metadata_response = call('api_request', connection, :get,
-        call('drive_api_url', :file, file_id),
-        {
-          params: { fields: call('drive_basic_fields') },
-          error_handler: lambda do |code, body, message|
-            error(call('handle_drive_error', connection, code, body, message))
-          end
-        }
-      )
+      metadata_response = call('with_resilience', connection, key: 'drive.files.get') do |cid|
+        call('api_request', connection, :get,
+          call('drive_api_url', :file, file_id),
+          {
+            params: { fields: call('drive_basic_fields') },
+            headers: { 'X-Correlation-Id' => cid },
+            context: { action: 'Get Drive file', correlation_id: cid },
+            error_handler: lambda do |code, body, message|
+              error(call('handle_drive_error', connection, code, body, message, { correlation_id: cid }))
+            end
+          }
+        )
+      end
 
       content_result = call('fetch_file_content',
         connection, file_id, metadata_response, include_content
       )
 
-      metadata_response.merge(content_result)
+      # Bubble up the metadata call's trace for the action
+      metadata_response.merge(content_result).merge('trace' => metadata_response['trace'])
     end,
 
     # ======= HEALTH PROBES =======
     probe_vertex_ai: lambda do |connection, test_models: false|
       start_time = Time.now
-      datasets_response = call('api_request', connection, :get,
-        "#{call('project_region_path', connection)}/datasets",
-        { params: { pageSize: 1 }, context: { action: 'List datasets' } }
-      )
+
+      datasets_response = call('with_resilience', connection, key: 'vertex.datasets.list') do |cid|
+        call('api_request', connection, :get,
+          "#{call('project_region_path', connection)}/datasets",
+          { params: { pageSize: 1 },
+            headers: { 'X-Correlation-Id' => cid },
+            context: { action: 'List datasets', correlation_id: cid } }
+        )
+      end
+
       result = {
         'service' => 'Vertex AI',
         'status' => 'connected',
@@ -3370,23 +3330,30 @@
         'permissions_validated' => []
       }
       result['permissions_validated'] << 'aiplatform.datasets.list' if datasets_response
+
       if test_models
         begin
-          models_response = call('api_request', connection, :get,
-            "#{call('project_region_path', connection)}/models",
-            { params: { pageSize: 1 }, context: { action: 'List models' } }
-          )
+          models_response = call('with_resilience', connection, key: 'vertex.models.list') do |cid|
+            call('api_request', connection, :get,
+              "#{call('project_region_path', connection)}/models",
+              { params: { pageSize: 1 }, headers: { 'X-Correlation-Id' => cid },
+                context: { action: 'List models', correlation_id: cid } }
+            )
+          end
           result['permissions_validated'] << 'aiplatform.models.list'
           result['models_accessible'] = models_response.present?
         rescue => e
           result['models_accessible'] = false
           result['warning'] = "Cannot list models: #{e.message}"
         end
+
         begin
-          _ = call('api_request', connection, :get,
-            "https://#{connection['region']}-aiplatform.googleapis.com/v1/publishers/google/models/gemini-1.5-pro",
-            { context: { action: 'Get Gemini model' } }
-          )
+          _ = call('with_resilience', connection, key: 'vertex.publishers.model.get') do |cid|
+            call('api_request', connection, :get,
+              "https://#{connection['region']}-aiplatform.googleapis.com/v1/publishers/google/models/gemini-1.5-pro",
+              { headers: { 'X-Correlation-Id' => cid }, context: { action: 'Get Gemini model', correlation_id: cid } }
+            )
+          end
           result['gemini_access'] = true
           result['permissions_validated'] << 'aiplatform.models.predict'
         rescue => e
@@ -3394,20 +3361,26 @@
           (result['warnings'] ||= []) << "Cannot access Gemini models: #{e.message}"
         end
       end
+
       result
     end,
     probe_drive: lambda do |connection, verbose: false|
       start_time = Time.now
-      drive_response = call('api_request', connection, :get,
-        call('drive_api_url', :files),
-        {
-          params: { pageSize: 1, q: "trashed = false", fields: 'files(id,name,mimeType)' },
-          error_handler: lambda do |code, body, message|
-            error(call('handle_drive_error', connection, code, body, message))
-          end,
-          context: { action: 'List Drive files' }
-        }
-      )
+
+      drive_response = call('with_resilience', connection, key: 'drive.files.list') do |cid|
+        call('api_request', connection, :get,
+          call('drive_api_url', :files),
+          {
+            params: { pageSize: 1, q: 'trashed = false', fields: 'files(id,name,mimeType)' },
+            headers: { 'X-Correlation-Id' => cid },
+            error_handler: lambda do |code, body, message|
+              error(call('handle_drive_error', connection, code, body, message, { correlation_id: cid }))
+            end,
+            context: { action: 'List Drive files', correlation_id: cid }
+          }
+        )
+      end
+
       test = {
         'service' => 'Google Drive',
         'status' => 'connected',
@@ -3415,15 +3388,20 @@
         'files_found' => drive_response['files'].length,
         'permissions_validated' => ['drive.files.list']
       }
+
       if verbose && drive_response['files'].any?
         test['sample_file'] = drive_response['files'].first
       end
+
       if drive_response['files'].any?
         file_id = drive_response['files'].first['id']
         begin
-          call('api_request', connection, :get, call('drive_api_url', :file, file_id),
-            { params: { fields: 'id,size' }, context: { action: 'Get Drive file' } }
-          )
+          call('with_resilience', connection, key: 'drive.files.get') do |cid|
+            call('api_request', connection, :get, call('drive_api_url', :file, file_id),
+              { params: { fields: 'id,size' }, headers: { 'X-Correlation-Id' => cid },
+                context: { action: 'Get Drive file', correlation_id: cid } }
+            )
+          end
           test['permissions_validated'] << 'drive.files.get'
           test['can_read_files'] = true
         rescue => e
@@ -3431,27 +3409,8 @@
           (test['warnings'] ||= []) << "Cannot read file content: #{e.message}"
         end
       end
+
       test
-    end,
-    probe_index: lambda do |connection, index_id|
-      start_time = Time.now
-      index_stats = call('validate_index_access', connection, index_id)
-      {
-        'service' => 'Vector Search Index',
-        'status' => 'connected',
-        'response_time_ms' => ((Time.now - start_time) * 1000).round,
-        'index_details' => {
-          'display_name' => index_stats['display_name'],
-          'state' => index_stats['deployed_state'],
-          'index_update_method' => nil
-        },
-        'deployed' => index_stats['deployed_state'] == 'DEPLOYED',
-        'deployed_count' => nil,
-        'stats' => {
-          'vectors_count' => index_stats['total_datapoints'],
-          'shards_count' => index_stats['shards_count']
-        }
-      }
     end,
 
     # ======= VECTOR SEARCH / INDEX MANAGEMENT =======
@@ -3496,42 +3455,36 @@
       }
     end,
     validate_index_access: lambda do |connection, index_id|
-      # Extract project, region, and index name from the index_id
       index_parts = index_id.split('/')
       if index_parts.length < 6 || index_parts[0] != 'projects' || index_parts[2] != 'locations' || index_parts[4] != 'indexes'
         error("Invalid index_id format. Expected: projects/PROJECT/locations/REGION/indexes/INDEX_ID")
       end
 
       begin
-        # Get index details
-        index_response = call('api_request', connection, :get, index_id, {
-          context: { action: 'Get index details' },
-          error_handler: lambda do |code, body, message|
-            if code == 404
-              error("Index not found: #{index_id}")
-            elsif code == 403
-              error("Permission denied. Service account missing aiplatform.indexes.get permission for index: #{index_id}")
-            else
-              call('handle_vertex_error', connection, code, body, message)
+        index_response = call('with_resilience', connection, key: 'vertex.indexes.get') do |cid|
+          call('api_request', connection, :get, index_id, {
+            headers: { 'X-Correlation-Id' => cid },
+            context: { action: 'Get index details', correlation_id: cid },
+            error_handler: lambda do |code, body, message|
+              if code == 404
+                error("Index not found: #{index_id}")
+              elsif code == 403
+                error("Permission denied. Service account missing aiplatform.indexes.get permission for index: #{index_id}")
+              else
+                call('handle_vertex_error', connection, code, body, message)
+              end
             end
-          end
-        })
-
-        # Check if index is deployed
-        deployed_indexes = index_response['deployedIndexes'] || []
-        if deployed_indexes.empty?
-          error("Index is not deployed. Index must be in DEPLOYED state for upsert operations.")
+          })
         end
 
-        # Get index stats from first deployed index
-        deployed_index = deployed_indexes[0]
-        # Ensure all ID fields are strings and timestamps are ISO 8601
-        created_time = index_response['createTime']
-        updated_time = index_response['updateTime']
+        deployed_indexes = index_response['deployedIndexes'] || []
+        if deployed_indexes.empty?
+          error('Index is not deployed. Index must be in DEPLOYED state for upsert operations.')
+        end
 
-        # Ensure timestamps are in ISO 8601 format (Google already provides ISO 8601)
-        created_time = created_time.to_s if created_time
-        updated_time = updated_time.to_s if updated_time
+        deployed_index = deployed_indexes[0]
+        created_time = index_response['createTime']&.to_s
+        updated_time = index_response['updateTime']&.to_s
 
         index_stats = {
           'index_id' => index_id.to_s,
@@ -3543,21 +3496,22 @@
           'updated_time' => updated_time || ''
         }
 
-        # Try to get more detailed stats if available
         if deployed_index['indexEndpoint']
           endpoint_id = deployed_index['indexEndpoint']
           begin
-            endpoint_response = call('api_request', connection, :get, endpoint_id, {
-              context: { action: 'Get index endpoint' },
-              error_handler: lambda do |_code, _body, _message| nil end
-            })
-
+            endpoint_response = call('with_resilience', connection, key: 'vertex.indexEndpoints.get') do |cid|
+              call('api_request', connection, :get, endpoint_id, {
+                headers: { 'X-Correlation-Id' => cid },
+                context: { action: 'Get index endpoint', correlation_id: cid },
+                error_handler: lambda do |_code, _body, _message| nil end
+              })
+            end
             if endpoint_response
               index_stats['endpoint_state'] = endpoint_response['state'] || 'UNKNOWN'
               index_stats['public_endpoint_enabled'] = endpoint_response['publicEndpointEnabled'] || false
             end
           rescue
-            # Ignore endpoint lookup failures - not critical for validation
+            # ignore
           end
         end
 
@@ -3570,6 +3524,7 @@
         end
       end
     end,
+
     # Helper: Validate datapoint structure
     validate_datapoint: lambda do |dp|
       unless dp['datapoint_id'] && dp['feature_vector']
@@ -3633,11 +3588,14 @@
         begin
           payload = call('build_upsert_payload', batch, update_mask)
 
-          call('api_request', connection, :post, "#{index_id}:upsertDatapoints", {
-            payload: payload,
-            context: { action: 'Upsert datapoints' },
-            error_handler: lambda { |code, body, message| call('handle_upsert_error', code, body, message) }
-          })
+          call('with_resilience', connection, key: 'vertex.indexes.upsertDatapoints') do |cid|
+            call('api_request', connection, :post, "#{index_id}:upsertDatapoints", {
+              payload: payload,
+              headers: { 'X-Correlation-Id' => cid },
+              context: { action: 'Upsert datapoints', correlation_id: cid },
+              error_handler: lambda { |code, body, message| call('handle_upsert_error', code, body, message) }
+            })
+          end
 
           return { success: true, count: batch.length }
 
@@ -3739,14 +3697,18 @@
 
     # Helper: Process single embedding batch
     process_embedding_batch: lambda do |connection, model, batch_texts, task_type, url|
-      call('circuit_breaker_retry', connection, "batch_embedding_#{model}", {
-        max_retries: 2,
-        retry_on: [429, 500, 502, 503, 504, 'timeout', 'connection'],
-        base_delay: 1.0
-      }) do
-        instances = batch_texts.map { |text| call('build_embedding_instance', text, task_type) }
-        payload = { 'instances' => instances }
-        call('rate_limited_ai_request', connection, model, 'embedding', url, payload)
+      instances = batch_texts.map { |text| call('build_embedding_instance', text, task_type) }
+      payload = { 'instances' => instances }
+
+      call('with_resilience', connection, key: 'vertex.embedding', model: model) do |cid|
+        call('api_request', connection, :post, url, {
+          payload: payload,
+          headers: { 'X-Correlation-Id' => cid },
+          context: { action: 'Embedding predict', model: model, correlation_id: cid },
+          error_handler: lambda do |code, body, message|
+            call('handle_vertex_error', connection, code, body, message, { action: 'Embedding predict', model: model, correlation_id: cid })
+          end
+        })
       end
     end,
 
@@ -3759,36 +3721,29 @@
     generate_embeddings_batch_exec: lambda do |connection, input|
       call('validate_publisher_model!', connection, input['model'])
 
-      # Extract inputs
-      batch_id = input['batch_id'].to_s
-      texts = Array(input['texts'] || [])
-      model = input['model']
+      batch_id  = input['batch_id'].to_s
+      texts     = Array(input['texts'] || [])
+      model     = input['model']
       task_type = input['task_type']
 
-      # Configuration
       streaming_mode = input['streaming_mode'] || texts.length > 1000
       max_memory_embeddings = input['max_memory_embeddings'] || 500
       batch_size = 25  # Vertex AI's limit
 
-      # Initialize statistics
-      stats = {
-        batches_processed: 0,
-        successful_requests: 0,
-        failed_requests: 0,
-        total_tokens: 0
-      }
+      stats = { batches_processed: 0, successful_requests: 0, failed_requests: 0, total_tokens: 0 }
       embeddings = []
 
       url = call('vertex_url_for', connection, model, :predict)
       last_rate = nil
+      last_trace = nil
 
-      # Process batches
       texts.each_slice(batch_size) do |batch_texts|
         stats[:batches_processed] += 1
 
         response = call('process_embedding_batch', connection, model, batch_texts, task_type, url)
         predictions = response['predictions'] || []
-        last_rate = response.is_a?(Hash) ? response['rate_limit_status'] : nil
+        last_rate  = response['rate_limit_status'] if response.is_a?(Hash)
+        last_trace = response['trace']            if response.is_a?(Hash)
 
         batch_texts.each_with_index do |text_obj, index|
           result = call('process_embedding_prediction', text_obj, predictions[index])
@@ -3801,26 +3756,20 @@
             stats[:failed_requests] += 1
           end
 
-          # Check memory limits
           if call('should_stream_flush', embeddings, max_memory_embeddings, streaming_mode)
             call('log_debug', "Streaming mode: processed #{embeddings.length} embeddings, continuing...")
           end
         end
       end
 
-      # Calculate batch efficiency metrics
-      batches_processed = stats[:batches_processed]
+      batches_processed   = stats[:batches_processed]
       successful_requests = stats[:successful_requests]
-      failed_requests = stats[:failed_requests]
-      total_tokens = stats[:total_tokens]
-      api_calls_saved = texts.length - batches_processed
-
-      # Estimate cost savings (assuming $0.0001 per API call for embeddings)
-      estimated_cost_savings = api_calls_saved * 0.0001
-
-      # Recipe-friendly output structure
+      failed_requests     = stats[:failed_requests]
+      total_tokens        = stats[:total_tokens]
+      api_calls_saved     = texts.length - batches_processed
+      estimated_cost_savings = (api_calls_saved * 0.0001).round(4)
       first_embedding = embeddings.first || {}
-      all_successful = failed_requests == 0
+      all_successful  = failed_requests == 0
 
       {
         'batch_id' => batch_id,
@@ -3839,7 +3788,7 @@
         'total_tokens' => total_tokens,
         'batches_processed' => batches_processed,
         'api_calls_saved' => api_calls_saved,
-        'estimated_cost_savings' => estimated_cost_savings.round(4),
+        'estimated_cost_savings' => estimated_cost_savings,
         'pass_fail' => all_successful,
         'action_required' => all_successful ? 'ready_for_indexing' : 'retry_failed_embeddings',
         'rate_limit_status' => last_rate,
@@ -3847,56 +3796,49 @@
           'streaming_mode' => streaming_mode,
           'max_memory_embeddings' => max_memory_embeddings,
           'memory_optimized' => streaming_mode && texts.length > max_memory_embeddings
-        }
+        },
+        'trace' => last_trace
       }
     end,
     generate_embedding_single_exec: lambda do |connection, input|
-      # Validate model
       call('validate_publisher_model!', connection, input['model'])
 
-      # Extract inputs
-      text = input['text'].to_s
-      model = input['model']
+      text      = input['text'].to_s
+      model     = input['model']
       task_type = input['task_type']
-      title = input['title']
+      title     = input['title']
 
-      # Validate text length (rough estimate)
-      if text.length > 32000  # Approximately 8192 tokens
+      if text.length > 32000
         error('Text too long. Must not exceed 8192 tokens (approximately 6000 words).')
       end
 
       begin
-        # Prepare content with optional title
         content = title.present? ? "#{title}: #{text}" : text
+        payload = call('build_ai_payload', :text_embedding, { 'text' => content, 'task_type' => task_type, 'title' => title })
+        url     = call('vertex_url_for', connection, model, :predict)
 
-        # Build payload using unified builder
-        payload = call('build_ai_payload', :text_embedding, {
-          'text' => content,
-          'task_type' => task_type,
-          'title' => title
-        })
+        response = call('with_resilience', connection, key: 'vertex.embedding', model: model) do |cid|
+          call('api_request', connection, :post, url, {
+            payload: payload,
+            headers: { 'X-Correlation-Id' => cid },
+            context: { action: 'Embedding predict', model: model, correlation_id: cid },
+            error_handler: lambda do |code, body, message|
+              call('handle_vertex_error', connection, code, body, message, { action: 'Embedding predict', model: model, correlation_id: cid })
+            end
+          })
+        end
 
-        # Build the URL
-        url = call('vertex_url_for', connection, model, :predict)
-
-        # Make rate-limited request
-        response = call('rate_limited_ai_request', connection, model, 'embedding', url, payload)
-
-        # Extract embedding from response
         vector = call('extract_embedding_values', response&.dig('predictions', 0))
-
-        # Estimate token count (rough approximation: ~4 characters per token)
         token_count = (content.length / 4.0).ceil
 
-        # Return single embedding result
         {
           'vector' => vector,
           'dimensions' => vector.length,
           'model_used' => model,
           'token_count' => token_count,
-          'rate_limit_status' => (response.is_a?(Hash) ? response['rate_limit_status'] : nil)
+          'rate_limit_status' => (response.is_a?(Hash) ? response['rate_limit_status'] : nil),
+          'trace' => response['trace']
         }
-
       rescue => e
         error("Failed to generate embedding: #{e.message}")
       end
@@ -3904,6 +3846,10 @@
 
     # ====== SAMPLES AND UX HELPERS =======
     sample_record_output: lambda do |input|
+      t = { 'trace' => { 'correlation_id' => 'sample-cid', 'duration_ms' => 123 } }
+      v = { 'vertex' => { 'response_id' => 'sample-response-id', 'model_version' => 'gemini-1.5-pro' } }
+      rl = { 'rate_limit_status' => { 'requests_last_minute' => 1, 'limit' => 300, 'throttled' => false, 'sleep_ms' => 0 } }
+
       case input
       when 'send_message'
         {
@@ -3912,92 +3858,74 @@
               content: {
                 role: 'model',
                 parts: [
-                  {
-                    text: "Hey there! I'm happy to answer your question about dark clouds."
-                  }
+                  { text: "Hey there! I'm happy to answer your question about dark clouds." }
                 ]
               },
               finishReason: 'STOP',
               safetyRatings: [
-                {
-                  category: 'HARM_CATEGORY_HATE_SPEECH',
-                  probability: 'NEGLIGIBLE',
-                  probabilityScore: 0.022583008,
-                  severity: 'HARM_SEVERITY_NEGLIGIBLE',
-                  severityScore: 0.018554688
-                }
+                { category: 'HARM_CATEGORY_HATE_SPEECH', probability: 'NEGLIGIBLE', probabilityScore: 0.022583008,
+                  severity: 'HARM_SEVERITY_NEGLIGIBLE', severityScore: 0.018554688 }
               ],
               avgLogprobs: -0.19514432351939617
             }
           ],
           usageMetadata: {
-            promptTokenCount: 23,
-            candidatesTokenCount: 557,
-            totalTokenCount: 580,
+            promptTokenCount: 23, candidatesTokenCount: 557, totalTokenCount: 580,
             trafficType: 'ON_DEMAND',
-            promptTokensDetails: [
-              { modality: 'TEXT', tokenCount: 105 }
-            ],
-            candidatesTokensDetails: [
-              { modality: 'TEXT', tokenCount: 516 }
-            ]
+            promptTokensDetails: [ { modality: 'TEXT', tokenCount: 105 } ],
+            candidatesTokensDetails: [ { modality: 'TEXT', tokenCount: 516 } ]
           },
           modelVersion: 'gemini-1.5-pro',
           createTime: '2025-08-01T10:36:16.110916Z',
           responseId: 'oJiMaMTiBoKrmecPqYqFWA'
-        }
+        }.merge(t).merge(v).merge(rl)
+
       when 'translate_text'
-        {
-          answer: '<Translated text>'
-        }.merge(call('safety_ratings_output_sample'),
-                call('usage_output_sample'))
+        { 'answer' => '<Translated text>', 'pass_fail' => true, 'action_required' => 'use_answer' }
+          .merge(call('safety_ratings_output_sample'), call('usage_output_sample'))
+          .merge(t).merge(v)
+
       when 'summarize_text'
-        {
-          answer: '<Summarized text>'
-        }.merge(call('safety_ratings_output_sample'),
-                call('usage_output_sample'))
+        { 'answer' => '<Summarized text>', 'pass_fail' => true, 'action_required' => 'use_answer' }
+          .merge(call('safety_ratings_output_sample'), call('usage_output_sample'))
+          .merge(t).merge(v)
+
       when 'draft_email'
-        {
-          subject: 'Sample email subject',
-          body: 'This is a sample email body'
-        }.merge(call('safety_ratings_output_sample'),
-                call('usage_output_sample'))
+        { 'subject' => 'Sample email subject', 'body' => 'This is a sample email body', 'pass_fail' => true, 'action_required' => 'use_email' }
+          .merge(call('safety_ratings_output_sample'), call('usage_output_sample'))
+          .merge(t).merge(v)
+
       when 'analyze_text'
-        {
-          answer: 'This text describes rainy weather'
-        }.merge(call('safety_ratings_output_sample'),
-                call('usage_output_sample'))
+        { 'answer' => 'This text describes rainy weather', 'pass_fail' => true, 'action_required' => 'use_answer' }
+          .merge(call('safety_ratings_output_sample'), call('usage_output_sample'))
+          .merge(t).merge(v)
+
       when 'analyze_image'
-        {
-          answer: 'This image shows birds'
-        }.merge(call('safety_ratings_output_sample'),
-                call('usage_output_sample'))
+        { 'answer' => 'This image shows birds', 'pass_fail' => true, 'action_required' => 'use_answer' }
+          .merge(call('safety_ratings_output_sample'), call('usage_output_sample'))
+          .merge(t).merge(v)
+
       when 'text_embedding'
+        { 'embedding' => [ { 'value' => -0.04629135504364967 } ] }
+
+      when 'find_neighbors'
         {
-          embedding: [
-            { value: -0.04629135504364967 }
+          nearestNeighbors: [
+            {
+              id: 'query-1',
+              neighbors: [
+                {
+                  datapoint: {
+                    datapointId: 'doc_001_chunk_1',
+                    featureVector: [0.1, 0.2, 0.3],
+                    crowdingTag: { crowdingAttribute: 'doc_001' }
+                  },
+                  distance: 0.95
+                }
+              ]
+            }
           ]
-        }
-        when 'find_neighbors'
-          {
-            nearestNeighbors: [
-              {
-                id: 'query-1',
-                neighbors: [
-                  {
-                    datapoint: {
-                      datapointId: 'doc_001_chunk_1',
-                      featureVector: [0.1, 0.2, 0.3],
-                      crowdingTag: {
-                        crowdingAttribute: 'doc_001'
-                      }
-                    },
-                    distance: 0.95
-                  }
-                ]
-              }
-            ]
-          }
+        }.merge(t)
       end
     end,
     safety_ratings_output_sample: lambda do
@@ -4031,8 +3959,40 @@
       end || {}
     end
   },
-
   object_definitions: {
+    # ====== NEW =======
+    trace_schema: {
+      fields: lambda do |_connection, _config_fields, _object_definitions|
+        [
+          { name: 'trace', type: 'object', properties: [
+            { name: 'correlation_id', type: 'string' },
+            { name: 'duration_ms', type: 'integer' }
+          ] }
+        ]
+      end
+    },
+    vertex_meta_schema: {
+      fields: lambda do |_connection, _config_fields, _object_definitions|
+        [
+          { name: 'vertex', type: 'object', properties: [
+            { name: 'response_id', type: 'string' },
+            { name: 'model_version', type: 'string' }
+          ] }
+        ]
+      end
+    },
+    rate_limit_schema: {
+      fields: lambda do |_connection, _config_fields, _object_definitions|
+        [
+          { name: 'rate_limit_status', type: 'object', properties: [
+            { name: 'requests_last_minute', type: 'integer', label: 'Requests in last minute' },
+            { name: 'limit', type: 'integer', label: 'Rate limit (requests/minute)' },
+            { name: 'throttled', type: 'boolean', label: 'Was throttled' },
+            { name: 'sleep_ms', type: 'integer', label: 'Sleep time (milliseconds)' }
+          ] }
+        ]
+      end
+    },
     # -- COMMON FIELD DEFINITIONS --
     # Common text input field for AI operations
     text_input_field: {
@@ -4066,23 +4026,23 @@
     # Extended Drive file fields with content
     drive_file_extended: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        # Start with base fields (do not mutate shared arrays)
         base_fields = object_definitions['drive_file_fields'].dup
         base_fields + [
           { name: 'owners', label: 'File owners', type: 'array', of: 'object',
             properties: [
-              { name: 'displayName', label: 'Display name', type: 'string' },
-              { name: 'emailAddress', label: 'Email address', type: 'string' }
-            ],
-            hint: 'Array of file owners' },
-          { name: 'text_content', label: 'Text content', type: 'string',
-            hint: 'Extracted text content' },
-          { name: 'needs_processing', label: 'Needs processing', type: 'boolean',
-            hint: 'True if file requires additional processing' },
-          { name: 'export_mime_type', label: 'Export MIME type', type: 'string',
-            hint: 'MIME type used for export' },
-          { name: 'fetch_method', label: 'Fetch method', type: 'string',
-            hint: 'Method used to retrieve content' }
+              { name: 'displayName', type: 'string' },
+              { name: 'emailAddress', type: 'string' }
+            ] },
+          { name: 'text_content', type: 'string' },
+          { name: 'needs_processing', type: 'boolean' },
+          { name: 'export_mime_type', type: 'string' },
+          { name: 'fetch_method', type: 'string' }
+        ] + [
+          # Trace (correlation id + duration)
+          { name: 'trace', type: 'object', properties: [
+            { name: 'correlation_id', type: 'string' },
+            { name: 'duration_ms', type: 'integer' }
+          ] }
         ]
       end
     },
@@ -4508,11 +4468,7 @@
         is_single_message = config_fields['message_type'] == 'single_message'
         message_schema = if is_single_message
                            [
-                             { name: 'message',
-                               label: 'Text to send',
-                               type: 'string',
-                               control_type: 'text-area',
-                               optional: false,
+                             { name: 'message', label: 'Text to send', type: 'string', control_type: 'text-area', optional: false,
                                hint: 'Enter a message to start a conversation with Gemini.' }
                            ]
                          else
@@ -4587,81 +4543,55 @@
       end
     },
     send_messages_output: {
-      fields: lambda do |_connection, _config_fields, _object_definitions|
+      fields: lambda do |_connection, _config_fields, object_definitions|
         [
           { name: 'candidates', type: 'array', of: 'object',
             properties: [
-              { name: 'content',
-                type: 'object',
-                properties: [
-                  { name: 'role' },
-                  { name: 'parts', type: 'array', of: 'object',
-                    properties: [
-                      { name: 'text' },
-                      { name: 'fileData',
-                        type: 'object',
-                        properties: [
-                          { name: 'mimeType', label: 'MIME type' },
-                          { name: 'fileUri', label: 'File URI' }
-                        ] },
-                      { name: 'inlineData',
-                        type: 'object',
-                        properties: [
-                          { name: 'mimeType', label: 'MIME type' },
-                          { name: 'data' }
-                        ] },
-                      { name: 'functionCall',
-                        type: 'object',
-                        properties: [
-                          { name: 'name' },
-                          { name: 'args', label: 'Arguments' }
-                        ] }
-                    ] }
-                ] },
+              { name: 'content', type: 'object', properties: [
+                { name: 'role' },
+                { name: 'parts', type: 'array', of: 'object', properties: [
+                  { name: 'text' },
+                  { name: 'fileData', type: 'object', properties: [
+                    { name: 'mimeType', label: 'MIME type' },
+                    { name: 'fileUri', label: 'File URI' }
+                  ] },
+                  { name: 'inlineData', type: 'object', properties: [
+                    { name: 'mimeType', label: 'MIME type' },
+                    { name: 'data' }
+                  ] },
+                  { name: 'functionCall', type: 'object', properties: [
+                    { name: 'name' },
+                    { name: 'args', label: 'Arguments' }
+                  ] }
+                ] }
+              ] },
               { name: 'finishReason' },
-              { name: 'safetyRatings', type: 'array', of: 'object',
-                properties: [
-                  { name: 'category' },
-                  { name: 'probability' },
-                  { name: 'probabilityScore', type: 'number' },
-                  { name: 'severity' },
-                  { name: 'severityScore', type: 'number' }
-                ] },
+              { name: 'safetyRatings', type: 'array', of: 'object', properties: [
+                { name: 'category' }, { name: 'probability' },
+                { name: 'probabilityScore', type: 'number' },
+                { name: 'severity' }, { name: 'severityScore', type: 'number' }
+              ] },
               { name: 'avgLogprobs', label: 'Average log probabilities', type: 'number' }
             ] },
-          { name: 'usageMetadata',
-            type: 'object',
-            properties: [
-              { name: 'promptTokenCount', type: 'integer' },
-              { name: 'candidatesTokenCount', type: 'integer' },
-              { name: 'totalTokenCount', type: 'integer' },
-              { name: 'trafficType' },
-              { name: 'promptTokensDetails',
-                type: 'array',
-                of: 'object',
-                properties: [
-                  { name: 'modality' },
-                  { name: 'tokenCount', type: 'integer' }
-                ] },
-              { name: 'candidatesTokensDetails',
-                type: 'array',
-                of: 'object',
-                properties: [
-                  { name: 'modality' },
-                  { name: 'tokenCount', type: 'integer' }
-                ] }
+          { name: 'usageMetadata', type: 'object', properties: [
+            { name: 'promptTokenCount', type: 'integer' },
+            { name: 'candidatesTokenCount', type: 'integer' },
+            { name: 'totalTokenCount', type: 'integer' },
+            { name: 'trafficType' },
+            { name: 'promptTokensDetails', type: 'array', of: 'object', properties: [
+              { name: 'modality' }, { name: 'tokenCount', type: 'integer' }
             ] },
+            { name: 'candidatesTokensDetails', type: 'array', of: 'object', properties: [
+              { name: 'modality' }, { name: 'tokenCount', type: 'integer' }
+            ] }
+          ] },
           { name: 'modelVersion' },
           { name: 'createTime', type: 'date_time' },
-          { name: 'responseId' },
-          { name: 'rate_limit_status', type: 'object',
-            properties: [
-              { name: 'requests_last_minute', type: 'integer', label: 'Requests in last minute' },
-              { name: 'limit', type: 'integer', label: 'Rate limit (requests/minute)' },
-              { name: 'throttled', type: 'boolean', label: 'Was throttled' },
-              { name: 'sleep_ms', type: 'integer', label: 'Sleep time (milliseconds)' }
-            ] }
+          { name: 'responseId' }
         ]
+        .concat(object_definitions['rate_limit_schema'])
+        .concat(object_definitions['trace_schema'])
+        .concat(object_definitions['vertex_meta_schema'])
       end
     },
     translate_text_input: {
@@ -4689,7 +4619,15 @@
     },
     translate_text_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [{ name: 'answer', label: 'Translation' }].concat(object_definitions['safety_and_usage'])
+        [
+          { name: 'answer', label: 'Translation' },
+          { name: 'pass_fail', type: 'boolean', label: 'Success' },
+          { name: 'action_required', type: 'string' }
+        ]
+          .concat(object_definitions['safety_and_usage'])
+          .concat(object_definitions['rate_limit_schema'])
+          .concat(object_definitions['trace_schema'])
+          .concat(object_definitions['vertex_meta_schema'])
       end
     },
     summarize_text_input: {
@@ -4703,7 +4641,15 @@
     },
     summarize_text_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [{ name: 'answer', label: 'Summary' }].concat(object_definitions['safety_and_usage'])
+        [
+          { name: 'answer', label: 'Summary' },
+          { name: 'pass_fail', type: 'boolean', label: 'Success' },
+          { name: 'action_required', type: 'string' }
+        ]
+          .concat(object_definitions['safety_and_usage'])
+          .concat(object_definitions['rate_limit_schema'])
+          .concat(object_definitions['trace_schema'])
+          .concat(object_definitions['vertex_meta_schema'])
       end
     },
     parse_text_input: {
@@ -4730,10 +4676,13 @@
     parse_text_output: {
       fields: lambda do |_connection, config_fields, object_definitions|
         next [] if config_fields['object_schema'].blank?
-
         schema = parse_json(config_fields['object_schema'] || '[]')
-        schema.concat(object_definitions['safety_rating_schema']).
-          concat(object_definitions['usage_schema'])
+        schema
+          .concat(object_definitions['safety_rating_schema'])
+          .concat(object_definitions['usage_schema'])
+          .concat(object_definitions['rate_limit_schema'])
+          .concat(object_definitions['trace_schema'])
+          .concat(object_definitions['vertex_meta_schema'])
       end
     },
     draft_email_input: {
@@ -4748,7 +4697,11 @@
         [
           { name: 'subject', label: 'Email subject' },
           { name: 'body', label: 'Email body' }
-        ].concat(object_definitions['safety_and_usage'])
+        ]
+        .concat(object_definitions['safety_and_usage'])
+        .concat(object_definitions['rate_limit_schema'])
+        .concat(object_definitions['trace_schema'])
+        .concat(object_definitions['vertex_meta_schema'])
       end
     },
     analyze_text_input: {
@@ -4763,7 +4716,15 @@
     },
     analyze_text_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [{ name: 'answer', label: 'Analysis' }].concat(object_definitions['safety_and_usage'])
+        [
+          { name: 'answer', label: 'Analysis' },
+          { name: 'pass_fail', type: 'boolean', label: 'Success' },
+          { name: 'action_required', type: 'string' }
+        ]
+        .concat(object_definitions['safety_and_usage'])
+        .concat(object_definitions['rate_limit_schema'])
+        .concat(object_definitions['trace_schema'])
+        .concat(object_definitions['vertex_meta_schema'])
       end
     },
     analyze_image_input: {
@@ -4791,8 +4752,15 @@
     },
     analyze_image_output: {
       fields: lambda do |_connection, _config_fields, object_definitions|
-        [{ name: 'answer', label: 'Analysis' }].concat(object_definitions['safety_and_usage'])
-
+        [
+          { name: 'answer', label: 'Analysis' },
+          { name: 'pass_fail', type: 'boolean', label: 'Success' },
+          { name: 'action_required', type: 'string' }
+        ]
+          .concat(object_definitions['safety_and_usage'])
+          .concat(object_definitions['rate_limit_schema'])
+          .concat(object_definitions['trace_schema'])
+          .concat(object_definitions['vertex_meta_schema'])
       end
     },
     find_neighbors_input: {
@@ -4880,51 +4848,39 @@
       end
     },
     find_neighbors_output: {
-      fields: lambda do |_connection, _config_fields, _object_definitions|
+      fields: lambda do |_connection, _config_fields, object_definitions|
         [
-          # Flattened recipe-friendly structure
-          { name: 'matches_count', label: 'Number of matches', type: 'integer',
-            hint: 'Total number of neighbors found' },
-          { name: 'top_matches', label: 'Top matches (flattened)', type: 'array', of: 'object',
+          { name: 'matches_count', type: 'integer', label: 'Number of matches' },
+          { name: 'top_matches', type: 'array', of: 'object', label: 'Top matches (flattened)',
             properties: [
-              { name: 'datapoint_id', label: 'Datapoint ID', type: 'string' },
-              { name: 'distance', label: 'Distance', type: 'number' },
-              { name: 'similarity_score', label: 'Similarity score (0-1)', type: 'number',
-                hint: 'Normalized similarity score (1 - normalized_distance)' },
-              { name: 'feature_vector', label: 'Feature vector', type: 'array', of: 'number' },
-              { name: 'crowding_attribute', label: 'Crowding attribute', type: 'string' }
+              { name: 'datapoint_id', type: 'string' },
+              { name: 'distance', type: 'number' },
+              { name: 'similarity_score', type: 'number', label: 'Similarity score (0-1)' },
+              { name: 'feature_vector', type: 'array', of: 'number' },
+              { name: 'crowding_attribute', type: 'string' }
             ]
           },
-          { name: 'best_match_id', label: 'Best match ID', type: 'string',
-            hint: 'ID of the closest neighbor for quick recipe access' },
-          { name: 'best_match_score', label: 'Best match score', type: 'number',
-            hint: 'Similarity score of the best match (0-1)' },
-          { name: 'pass_fail', label: 'Search success', type: 'boolean',
-            hint: 'True if at least one neighbor was found' },
-          { name: 'action_required', label: 'Action required', type: 'string',
-            hint: 'Next recommended action based on search results' },
-          # Original nested structure for backward compatibility
-          { name: 'nearestNeighbors', label: 'Nearest neighbors (original)', type: 'array', of: 'object',
+          { name: 'best_match_id', type: 'string' },
+          { name: 'best_match_score', type: 'number' },
+          { name: 'pass_fail', type: 'boolean' },
+          { name: 'action_required', type: 'string' },
+          { name: 'nearestNeighbors', type: 'array', of: 'object', label: 'Nearest neighbors (original)',
             properties: [
-              { name: 'id', label: 'Query datapoint ID' },
-              { name: 'neighbors', type: 'array', of: 'object',
-                properties: [
-                  { name: 'distance', type: 'number' },
-                  { name: 'datapoint', type: 'object',
-                    properties: [
-                      { name: 'datapointId' },
-                      { name: 'featureVector', type: 'array', of: 'number' },
-                      { name: 'restricts', type: 'array', of: 'object' },
-                      { name: 'numericRestricts', type: 'array', of: 'object' },
-                      { name: 'crowdingTag', type: 'object' },
-                      { name: 'sparseEmbedding', type: 'object' }
-                    ]
-                  }
-                ]
-              }
+              { name: 'id' },
+              { name: 'neighbors', type: 'array', of: 'object', properties: [
+                { name: 'distance', type: 'number' },
+                { name: 'datapoint', type: 'object', properties: [
+                  { name: 'datapointId' },
+                  { name: 'featureVector', type: 'array', of: 'number' },
+                  { name: 'restricts', type: 'array', of: 'object' },
+                  { name: 'numericRestricts', type: 'array', of: 'object' },
+                  { name: 'crowdingTag', type: 'object' },
+                  { name: 'sparseEmbedding', type: 'object' }
+                ] }
+              ] }
             ]
           }
-        ]
+        ].concat(object_definitions['trace_schema'])
       end
     },
     safety_rating_schema: {
@@ -4973,7 +4929,6 @@
       end
     }
   },
-
   pick_lists: {
     available_text_models: lambda do |connection|
       static = call('static_model_options')[:text]
