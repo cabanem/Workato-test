@@ -186,3 +186,70 @@ call('enrich_response',
 | find_neighbors | vector_search | distance transformation |
 | fetch_drive_file | fetch_file | content fetching |
 | list_drive_files | list_files | query building |
+
+## Configuration Registry
+
+Given the constraints posed by the Workato environment, configuration will be accessible via a method.
+
+```ruby
+methods: {
+    # Operation configurations as data
+    get_operation_config: lambda do |operation|
+        {
+            # Test operations
+            'translate' => {
+                'endpoint' => { 'path' => ':generateContent', 'method' => 'POST' },
+                'payload'  => {
+                    'format'    => 'vertex_prompt',
+                    'template'  => 'Translate from {from} to {to}:\n```{text}```',
+                    'system'    => 'You are a professional translator.'
+                },
+                'extract' => {
+                    'format' => 'vertex_json',
+                    'path'   => 'response'
+                },
+                'validate' => {
+                    'schema' => [
+                        { 'name' => 'text', 'required' => true },
+                        { 'name' => 'to', 'required' => true }
+                    ]
+                },
+                'resilience' => {
+                    'rate_limit' => { 'rpm' => 60 },
+                    'max_retries' => 3
+                }
+            }, 
+
+            'classify' => { ... }
+        }
+    end
+}
+```
+
+## Methods
+
+1. HTTP request execution
+    - Universal HTTP handler w/built-in resilience mechanism
+    - PARAMS:    method, url, payload, headers, retry_config
+2. Payload builder
+    - PARAMS:   template, variables, format
+    - Build Vertex AI prompt structure as directed by configuration (e.g., direct json payload, batch)
+3. Extract response
+    - PARAMS:   data, path, format
+    - Configuration directed extraction (e.g., JSON field, array, standard response body)
+4. Error recovery
+    - PARAMS:   operation, configuration, calling block
+    - Implements rate limiting, circuit-breaker pattern, retries
+    - Evaluates conditions (e.g., rate limit, circuit breaker)
+5. Transform data
+    - PARAMS:   input, from_format, to_format
+    - Handles data transformation in various forms (e.g., url encoding, k-nn scoring, formatting)
+6. Input validation
+    - PARAMS:   data, schema, constraints
+    - Validates configuration elements (schema, constraint)
+7. Batch processing
+    - PARAMS:   items, batch_size, processor, aggregator
+    - Iterates through batches, checks for aggregator, and aggregates upon completion as required.
+8. Enrich metadata
+    - PARAMS:  response, metadata
+    - Append metadata, trace information, or custom elements as required
