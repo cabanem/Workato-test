@@ -1,3 +1,6 @@
+# Connector schema and notes
+
+```ruby
 {
   title: 'Vertex AI',
 
@@ -208,3 +211,4 @@
     end
   }
 }
+```
