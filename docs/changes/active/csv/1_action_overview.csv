@@ -13,7 +13,3 @@ find_neighbors,Vector,1,10,No,Retry 3x
 upsert_index_datapoints,Vector,1+n/100,7,Yes (100),Retry per batch
 test_connection,Utility,1-6,9,No,Continue on error
 get_prediction,Legacy,1,4,No,Retry 3x
-fetch_drive_file,Drive,1-2,8,No,Retry 3x
-list_drive_files,Drive,1,7,No,Retry 3x
-batch_fetch_drive_files,Drive,n-2n,4,Yes (serial),Skip or fail
-monitor_drive_changes,Drive,1,8,No,Retry 3x

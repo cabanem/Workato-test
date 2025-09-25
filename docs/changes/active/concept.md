@@ -187,8 +187,6 @@ call('enrich_response',
 | analyze_image | image | base63 encoding |
 | generate_embeddings | embed_batch | batch processing |
 | find_neighbors | vector_search | distance transformation |
-| fetch_drive_file | fetch_file | content fetching |
-| list_drive_files | list_files | query building |
 
 ## Configuration Registry
 
@@ -196,35 +194,57 @@ Given the constraints posed by the Workato environment, configuration will be ac
 
 ```ruby
 methods: {
-    # Operation configurations as data
-    get_operation_config: lambda do |operation|
-        {
-            # Test operations
-            'translate' => {
-                'endpoint' => { 'path' => ':generateContent', 'method' => 'POST' },
-                'payload'  => {
-                    'format'    => 'vertex_prompt',
-                    'template'  => 'Translate from {from} to {to}:\n```{text}```',
-                    'system'    => 'You are a professional translator.'
-                },
-                'extract' => {
-                    'format' => 'vertex_json',
-                    'path'   => 'response'
-                },
-                'validate' => {
-                    'schema' => [
-                        { 'name' => 'text', 'required' => true },
-                        { 'name' => 'to', 'required' => true }
-                    ]
-                },
-                'resilience' => {
-                    'rate_limit' => { 'rpm' => 60 },
-                    'max_retries' => 3
-                }
-            }, 
-
-            'classify' => { ... }
+    # Operation configurations as methods
+    operation_config: lambda do |operation|
+        configs = {
+        'translate' => {
+            'prompt_system' => 'You are a professional translator.',
+            'prompt_template' => 'Translate from {from} to {to}: {text}',
+            'temperature' => 0.3,
+            'response_format' => 'json',
+            'extract_field' => 'response',
+            'model_type' => 'text'
+        },
+        'summarize' => {
+            'prompt_system' => 'You are a summarization expert.',
+            'prompt_template' => 'Summarize in {max_words} words: {text}',
+            'temperature' => 0.5,
+            'response_format' => 'text',
+            'model_type' => 'text'
+        },
+        'classify' => {
+            'prompt_system' => 'You are an expert classifier.',
+            'prompt_template' => 'Classify into: {categories}. Text: {text}',
+            'temperature' => 0.1,
+            'response_format' => 'structured_json',
+            'confidence_threshold' => 0.7,
+            'model_type' => 'text'
         }
+        }
+        configs[operation] || error("Unknown operation: #{operation}")
+    end,
+    
+    # Field definitions for each operation
+    operation_fields: lambda do |operation|
+        field_sets = {
+        'translate' => [
+            { name: 'text', control_type: 'text-area', optional: false },
+            { name: 'to', control_type: 'select', pick_list: 'languages', optional: false },
+            { name: 'from', control_type: 'select', pick_list: 'languages', optional: true }
+        ],
+        'summarize' => [
+            { name: 'text', control_type: 'text-area', optional: false },
+            { name: 'max_words', type: 'integer', default: 200 }
+        ],
+        'classify' => [
+            { name: 'text', control_type: 'text-area', optional: false },
+            { name: 'categories', type: 'array', of: 'object', properties: [
+            { name: 'key', optional: false },
+            { name: 'description' }
+            ]}
+        ]
+        }
+        field_sets[operation] || []
     end
 }
 ```
