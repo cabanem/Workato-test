@@ -3,93 +3,102 @@
 
   connection: {
     # Base connection fields; do not use pick_lists here, use "options"
-    fields: [],
+    fields: [
+      { name: 'project', label: 'Project ID', optional: false },
+      { name: 'region',  label: 'Region', optional: false, control_type: 'select', 
+        options: [ 
+          ['US central 1', 'us-central1'],
+          ['US east 1', 'us-east1'],
+          ['US east 4', 'us-east4'],
+          ['US east 5', 'us-east5'],
+          ['US west 1', 'us-west1'],
+          ['US west 4', 'us-west4'],
+          ['US south 1', 'us-south1'],
+        ]},
+      { name: 'service_account_email', label: 'Service Account Email', optional: false },
+      { name: 'client_id', label: 'Client ID', optional: false },
+      { name: 'private_key', label: 'Private Key', optional: false, control_type: 'password', multiline: true }
+    ],
     # Enables the display of additional fields based on connection type
     extended_fields: lambda do |connection|
       # Array
     end,
     authorization: {
-      
-      # Expects "basic_auth", "api_key", "oauth2", "custom_auth", "multi"
-      type: String,
+      type: 'custom_auth',
+      acquire: lambda do |connection|
+        jwt_body_claim = {
+          'iat' => now.to_i,
+          'exp' => 1.hour.from_now.to_i,
+          'aud' => 'https://oauth2.googleapis.com/token',
+          'iss' => connection['service_account_email'],
+          'sub' => connection['service_account_email'],
+          'scope' => 'https://www.googleapis.com/auth/cloud-platform'
+        }
+        private_key = connection['private_key'].gsub('\\n', "\n")
+        jwt_token =
+          workato.jwt_encode(jwt_body_claim,
+                              private_key, 'RS256',
+                              kid: connection['client_id'])
 
-      client_id: lambda do |connection|
-        # string
+        response = post('https://oauth2.googleapis.com/token',
+                        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                        assertion: jwt_token).
+                    request_format_www_form_urlencoded
+
+        { access_token: response['access_token'] }
       end,
-
-      client_secret: lambda do |connection|
-        # string
-      end,
-
-      authorization_url: lambda do |connection|
-        # string
-      end,
-
-      token_url: lambda do |connection|
-        # string
-      end,
-
-      acquire: lambda do |connection, auth_code, redirect_uri, verifier|
-        # hash or array
-      end,
-
-      apply: lambda do |connection, access_token|
-        # see apply documentation for more information
-      end,
-
-      refresh_on: Array,
-
-      detect_on: Array,
-
-      refresh: lambda do |connection, refresh_token|
-        Hash or Array
-      end,
-
-      identity: lambda do |connection|
-        String
-      end,
-
-      # Applies to OAuth2 connections when code grant w/PKCE auth is required
-      pkce: lambda do |verifier, challenge|
-      end,
-
-      selected: lambda do |connection|
-      end,
-
-      # For type: "multi"
-      options: {
-        option_name1: {},
-        option_name2: {}
-      },
-
-      noopener: false
+      refresh_on: [401],
+      apply: lambda do |connection|
+        headers(Authorization: "Bearer #{connection['access_token']}")
+      end
     },
     base_uri: lambda do |connection|
-      # string
+      "https://#{connection['region']}-aiplatform.googleapis.com/v1"
     end
   },
-
-  # Establish connection validity || true if no connection
-  test: lambda do
-    # Boolean
+  # Establish connection validity, should emit bool True if connection exists
+  test: lambda do |connection|
+    get("/projects/#{connection['project']}/locations/#{connection['region']}/datasets").
+      params(pageSize: 1)
   end,
 
   # ---------------------------------------------------------------------------
   # Custom Action
-  # Allows the user to quickly define custom actions to unblock their workflow
-  # in the event that no standard action has been defined
+  # Allows user to quickly define custom actions using established connection
   # ---------------------------------------------------------------------------
   custom_action: true, # boolean
   custom_action_help: {
-    learn_more_url:   '', # string
-    learn_more_text:  '', # string
-    body:             '' # string
+    learn_more_url:   '',
+    learn_more_text:  '',
+    body:             ''
   },
 
   # ---------------------------------------------------------------------------
   # Actions
   # ---------------------------------------------------------------------------
-  actions: {},
+  actions: {
+    # Test action
+    simple_generate: {
+      title: 'Simple AI Generate',
+      input_fields: lambda do
+        [
+          { name: 'model', optional: false, default: 'publishers/google/models/gemini-1.5-flash' },
+          { name: 'prompt', control_type: 'text-area', optional: false }
+        ]
+      end,
+      execute: lambda do |connection, input|
+        url = "#{call('base_url', connection)}/#{input['model']}:generateContent"
+        payload = {
+          'contents' => [{ 'role' => 'user', 'parts' => [{ 'text' => input['prompt'] }] }]
+        }
+
+        call('execute_request', method: 'POST', url: url, payload: payload)
+      end,
+      output_fields: lambda do
+        [{ name: 'response', type: 'object' }]
+      end
+    }
+  },
 
   # ---------------------------------------------------------------------------
   # Triggers
@@ -151,23 +160,11 @@
 
   # ---------------------------------------------------------------------------
   # Object Definitions
-  # - Represent specific resources from a target application
-  # - Stored as an array of hashes
-  # - Possible arguments:
-  #   - connection
-  #   - config_fields
-  #   - object_definitions
-  # - Supply arguments in order to make the field dynamic
   # ---------------------------------------------------------------------------
   object_definitions: {},
 
   # ---------------------------------------------------------------------------
   # Pick Lists
-  # - Used w/some input fields to enumerate options as drop-down
-  # - Input fields using pick_list attribute must be of control_type:
-  #   - select (user to select a single output from drop-down)
-  #   - multiselect (user to select multiple inputs from drop-down)
-  #   - tree (user selects 1 or many from hierarchical drop-down)
   # ---------------------------------------------------------------------------
   pick_lists: {
     unique_pick_list_1: lambda do |connection, pick_list_params|
@@ -178,13 +175,26 @@
   # ---------------------------------------------------------------------------
   # Methods
   # ---------------------------------------------------------------------------
-  methods: {},
+  methods: {
+    execute_request: lambda do |method:, url:, payload: nil, retries: 3|
+      retries.times do |attempt|
+        begin
+          case method.upcase
+          when 'GET' then return get(url)
+          when 'POST' then post(url, payload)
+          end
+        rescue => e
+          raise e if attempt >= retries -1
+            sleep(2 ** attempt)
+        end
+      end
+    end
+  },
 
   # ---------------------------------------------------------------------------
   # Secure Tunnel
-  # - Defaults to 'false' if absent
   # ---------------------------------------------------------------------------
-  secure_tunnel: false, # boolean
+  secure_tunnel: false,
 
   # ---------------------------------------------------------------------------
   # Webhook Keys
@@ -195,16 +205,6 @@
 
   # ---------------------------------------------------------------------------
   # Streams
-  # - Enables the download of large amounts of data in chunks
-  # - Must be used in coordination with an action or trigger
-  # - Usage:
-  #   - stream name acts as the key
-  #   - invoked by any streaming action via `workato.stream.out` callback
   # ---------------------------------------------------------------------------
-  streams: {
-    # Example
-    unique_stream_1: lambda do | input, starting_byte_range, ending_byte_range, byte_size|
-      []
-    end
-  }
+  streams: {}
 }
