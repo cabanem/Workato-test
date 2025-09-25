@@ -1,0 +1,85 @@
+## Table 1: Action Overview
+Action,Category,API Calls,Steps,Batch Support,Error Recovery
+send_messages,AI Text,1,8,No,Retry 3x
+translate_text,AI Text,1,12,No,Retry 3x
+summarize_text,AI Text,1,8,No,Retry 3x
+parse_text,AI Text,1,12,No,Retry 3x
+draft_email,AI Text,1,10,No,Retry 3x
+ai_classify,AI Text,1,12,No,Retry 3x
+analyze_text,AI Text,1,11,No,Retry 3x
+analyze_image,AI Multimodal,1,10,No,Retry 3x
+generate_embeddings,Embedding,n/25,7,Yes (25),Retry per batch
+generate_embedding_single,Embedding,1,10,No,Retry 3x
+find_neighbors,Vector,1,10,No,Retry 3x
+upsert_index_datapoints,Vector,1+n/100,7,Yes (100),Retry per batch
+test_connection,Utility,1-6,9,No,Continue on error
+get_prediction,Legacy,1,4,No,Retry 3x
+fetch_drive_file,Drive,1-2,8,No,Retry 3x
+list_drive_files,Drive,1,7,No,Retry 3x
+batch_fetch_drive_files,Drive,n-2n,4,Yes (serial),Skip or fail
+monitor_drive_changes,Drive,1,8,No,Retry 3x
+
+## Table 2: API Endpoints
+Endpoint Type,Method,Base URL,Path Pattern,Actions Using
+Vertex Generate,POST,{region}-aiplatform.googleapis.com,/v1/projects/{p}/locations/{l}/publishers/google/models/{m}:generateContent,8
+Vertex Predict,POST,{region}-aiplatform.googleapis.com,/v1/projects/{p}/locations/{l}/publishers/google/models/{m}:predict,2
+Vector Search,POST,{custom_host},/v1/projects/{p}/locations/{l}/indexEndpoints/{e}:findNeighbors,1
+Vector Upsert,POST,{region}-aiplatform.googleapis.com,/v1/projects/{p}/locations/{l}/indexes/{i}:upsertDatapoints,1
+Drive Files,GET,www.googleapis.com,/drive/v3/files/{id},3
+Drive Export,GET,www.googleapis.com,/drive/v3/files/{id}/export,1
+Drive Download,GET,www.googleapis.com,/drive/v3/files/{id}?alt=media,1
+Drive List,GET,www.googleapis.com,/drive/v3/files,1
+Drive Changes,GET,www.googleapis.com,/drive/v3/changes,1
+
+## Table 3: Data Processing Pipeline
+Action,Input Processing,Payload Building,Response Extraction,Output Processing
+translate_text,Escape backticks,Template interpolation,JSON parse → 'response',Add safety ratings
+summarize_text,None,Direct text,Plain text,Add metadata
+parse_text,Schema validation,Schema + text,Dynamic JSON,Match to schema
+classify,Categories → text,Low temperature,JSON with confidence,Threshold check
+analyze_text,Escape backticks,Question + text,JSON → 'response',Null if not found
+analyze_image,Base64 encode,Multimodal parts,Text or JSON,Add safety
+embeddings_batch,Split by 25,Instances array,Vector extraction,Aggregate batches
+find_neighbors,Validate host,Query structure,Distance → similarity,Sort by score
+fetch_drive,URL → ID,N/A (GET),Metadata + content,UTF-8 encoding
+
+## Table 4: Core Functions Mapping
+Core Function,Purpose,Input,Output,Used By Actions
+http_request,Execute API call,"method, url, payload",response + trace,All (18)
+build_payload,Create request body,"template, variables",formatted payload,AI actions (8)
+extract_response,Parse response,"data, path, format",extracted value,All (18)
+with_resilience,Error recovery,"operation, block",result or error,All (18)
+transform_data,Convert formats,"input, from, to",transformed data,14 actions
+validate,Check inputs,"data, schema",true or error,15 actions
+process_batch,Handle arrays,"items, size",aggregated results,4 actions
+enrich_response,Add metadata,"response, metadata",enriched response,All (18)
+
+## Table 5: Configuration Schema (Refactored)
+Operation,Endpoint Type,Prompt Template,Response Format,Temperature,Batch Size,Special Processing
+translate,vertex_generate,"Translate from {from} to {to}",json:'response',0.3,1,Escape backticks
+summarize,vertex_generate,"Summarize in {max_words} words",text,0.5,1,None
+classify,vertex_generate,"Classify into: {categories}",structured_json,0.1,1,Confidence threshold
+parse,vertex_generate,"Extract: {schema}",dynamic_json,0.2,1,Schema matching
+embed,vertex_predict,N/A,array:'embeddings',N/A,25,Vector extraction
+vector_search,custom_host,N/A,neighbors,N/A,1,Distance conversion
+fetch_file,drive_api,N/A,metadata+content,N/A,1,MIME detection
+
+## Table 6: Error Handling Patterns
+Error Type,HTTP Code,Retry Strategy,Backoff,Max Attempts,Fallback
+Rate Limit,429,Exponential,2^n sec,3,Sleep & retry
+Server Error,500-504,Exponential,2^n sec,3,Circuit breaker
+Auth Error,401-403,None,N/A,0,Fail fast
+Not Found,404,None,N/A,0,Return null
+Timeout,N/A,Linear,1 sec,3,Increase timeout
+Parse Error,N/A,None,N/A,0,Empty object
+
+## Table 7: Metadata Enrichment
+Metadata Field,Type,Source,Added To,Purpose
+correlation_id,string,Generated,All responses,Request tracing
+duration_ms,integer,Calculated,All responses,Performance monitoring
+success,boolean,Evaluated,All responses,Success indicator
+usage,object,API response,AI actions,Token counting
+safety_ratings,object,API response,AI actions,Content filtering
+action_required,string,Logic,All responses,Next step guidance
+confidence,number,API response,Classification,Review threshold
+pass_fail,boolean,Logic,All responses,Simple success check

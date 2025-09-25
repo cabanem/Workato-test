@@ -4,8 +4,8 @@
   connection: {
     # Base connection fields; do not use pick_lists here, use "options"
     fields: [
-      { name: 'project', label: 'Project ID', optional: false },
-      { name: 'region',  label: 'Region', optional: false, control_type: 'select', 
+      { name: 'project', label: 'Project ID', group: 'Google Cloud Platform', optional: false },
+      { name: 'region',  label: 'Region',     group: 'Google Cloud Platform', optional: false, control_type: 'select', 
         options: [ 
           ['US central 1', 'us-central1'],
           ['US east 1', 'us-east1'],
@@ -15,9 +15,10 @@
           ['US west 4', 'us-west4'],
           ['US south 1', 'us-south1'],
         ]},
-      { name: 'service_account_email', label: 'Service Account Email', optional: false },
-      { name: 'client_id', label: 'Client ID', optional: false },
-      { name: 'private_key', label: 'Private Key', optional: false, control_type: 'password', multiline: true }
+      { name: 'service_account_email',  label: 'Service Account Email', group: 'Service Account', optional: false },
+      { name: 'client_id',              label: 'Client ID',             group: 'Service Account', optional: false },
+      { name: 'private_key',            label: 'Private Key',           group: 'Service Account', optional: false, control_type: 'password', multiline: true },
+      { name: 'vector_search_endpoint', label: 'Vector Search Endpoint',group: 'Vector Search',   optional: true }
     ],
     # Enables the display of additional fields based on connection type
     extended_fields: lambda do |connection|
@@ -53,13 +54,13 @@
       end
     },
     base_uri: lambda do |connection|
-      "https://#{connection['region']}-aiplatform.googleapis.com/v1"
+      "https://#{connection['region']}-aiplatform.googleapis.com/"
     end
   },
   # Establish connection validity, should emit bool True if connection exists
   test: lambda do |connection|
-    get("/projects/#{connection['project']}/locations/#{connection['region']}/datasets").
-      params(pageSize: 1)
+    # Implement test_connection action logic here
+    get("/v1/projects/#{connection['project_id']}/locations/#{connection['region']}")
   end,
 
   # ---------------------------------------------------------------------------
@@ -166,28 +167,14 @@
   # ---------------------------------------------------------------------------
   # Pick Lists
   # ---------------------------------------------------------------------------
-  pick_lists: {
-    unique_pick_list_1: lambda do |connection, pick_list_params|
-      [] # array
-    end
-  },
+  pick_lists: {},
 
   # ---------------------------------------------------------------------------
   # Methods
   # ---------------------------------------------------------------------------
   methods: {
-    execute_request: lambda do |method:, url:, payload: nil, retries: 3|
-      retries.times do |attempt|
-        begin
-          case method.upcase
-          when 'GET' then return get(url)
-          when 'POST' then post(url, payload)
-          end
-        rescue => e
-          raise e if attempt >= retries -1
-            sleep(2 ** attempt)
-        end
-      end
+    http_request: lambda do |method, url, payload = nil, headers = {}, retry_config = {}|
+      retry_config = { max_attempts: 3, backoff: :exponential }.merge(retry_config)
     end
   },
 
