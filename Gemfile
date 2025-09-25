@@ -1,6 +1,5 @@
 source 'https://rubygems.org'
 gem 'workato-connector-sdk'
-gem 'ruby-graphviz'
 group :test do
   gem 'rspec', '~> 3.12'
   gem 'vcr', '~> 6.2'

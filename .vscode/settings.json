@@ -15,9 +15,5 @@
     "DEFAULT_CONNECTOR": "vertex-ai"
   },
   "task.autoDetect": "on",
-  "makefile.configureOnOpen": false,
-  "markdown.mermaid.enabled": true,
-  "markdown.mermaid.previewAutoUpdate": true,
-  "markdown.preview.openMarkdownLinks": "inPreview",
-  "livePreview.defaultPreviewPath": "/connector_analysis/vertex-ai/092425/call_graph_actions.html"
+  "makefile.configureOnOpen": false
 }

@@ -1,10 +1,6 @@
 {
   "name": "${localWorkspaceFolderBasename}",
   "image": "mcr.microsoft.com/devcontainers/ruby:3.3-bookworm",
-  "features": {
-    "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
-  },
   "mounts": [
     "source=${localWorkspaceFolderBasename}-gems,target=/usr/local/bundle,type=volume",
     "source=${localWorkspaceFolderBasename}-bashhistory,target=/commandhistory,type=volume"
@@ -13,35 +9,16 @@
   "postCreateCommand": "bash -c 'gem install bundler workato-connector-sdk && echo \"alias wtest=\\\"make test CONNECTOR=\\\"\" >> ~/.bashrc && echo \"alias wconsole=\\\"make console CONNECTOR=\\\"\" >> ~/.bashrc && echo \"alias wcheck=\\\"workato exec check connectors/\\\"\" >> ~/.bashrc && source ~/.bashrc'",
   "customizations": {
     "vscode": {
-      "extensions": [
-        "anthropic.claude-code",
-        "github.copilot",
-        "shopify.ruby-lsp",
-        "ms-vscode.live-server",
-        "bierner.markdown-mermaid"
-      ],
+      "extensions": ["anthropic.claude-code", "github.copilot", "shopify.ruby-lsp"],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash",
-        "editor.formatOnSave": false,
-        "markdown.mermaid.enabled": true,
-        "markdown.mermaid.previewAutoUpdate": true
+        "editor.formatOnSave": false
       }
     }
   },
-  "forwardPorts": [3000, 3001, 8080],
+  "forwardPorts": [3000, 3001, 4567, 9292, 5000, 8080],
   "remoteEnv": {
     "HISTFILE": "/commandhistory/.bash_history",
     "BUNDLE_APP_CONFIG": "/usr/local/bundle"
-  },
-  "portsAttributes": {
-    "3000": {
-      "label": "auto-fwd"
-    },
-    "3001": {
-      "label": "auto-fwd"
-    },
-    "8080": {
-      "label": "auto-fwd"
-    }
   }
 }
