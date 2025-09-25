@@ -1,0 +1,9 @@
+Metadata Field,Type,Source,Added To,Purpose
+correlation_id,string,Generated,All responses,Request tracing
+duration_ms,integer,Calculated,All responses,Performance monitoring
+success,boolean,Evaluated,All responses,Success indicator
+usage,object,API response,AI actions,Token counting
+safety_ratings,object,API response,AI actions,Content filtering
+action_required,string,Logic,All responses,Next step guidance
+confidence,number,API response,Classification,Review threshold
+pass_fail,boolean,Logic,All responses,Simple success check

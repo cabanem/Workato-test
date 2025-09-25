@@ -88,6 +88,9 @@ purpose: Add metadata
 
 All actions will process input in the same manner, using configuration elements to achieve specificity.
 
+Most actions follow a similar pattern:
+    `validate` &rarr; `build` &rarr; `execute` &rarr; `extract` &rarr; `enrich`
+
 1. Validate input
 
 ```ruby

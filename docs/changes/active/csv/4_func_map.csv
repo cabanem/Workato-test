@@ -1,0 +1,9 @@
+Core Function,Purpose,Input,Output,Used By Actions
+http_request,Execute API call,"method, url, payload",response + trace,All (18)
+build_payload,Create request body,"template, variables",formatted payload,AI actions (8)
+extract_response,Parse response,"data, path, format",extracted value,All (18)
+with_resilience,Error recovery,"operation, block",result or error,All (18)
+transform_data,Convert formats,"input, from, to",transformed data,14 actions
+validate,Check inputs,"data, schema",true or error,15 actions
+process_batch,Handle arrays,"items, size",aggregated results,4 actions
+enrich_response,Add metadata,"response, metadata",enriched response,All (18)
