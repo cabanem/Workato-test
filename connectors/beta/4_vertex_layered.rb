@@ -13,7 +13,8 @@
       # Google Cloud Configuration
       { name: 'project', label: 'Project ID', group: 'Google Cloud Platform', optional: false },
       { name: 'region',  label: 'Region',     group: 'Google Cloud Platform', optional: false, control_type: 'select', 
-        options: [ 
+        options: [
+          ['Global', 'global'],
           ['US central 1', 'us-central1'],
           ['US east 1', 'us-east1'],
           ['US east 4', 'us-east4'],
@@ -136,17 +137,43 @@
     },
     
     base_uri: lambda do |connection|
-      "https://#{connection['region']}-aiplatform.googleapis.com/#{connection['version'] || 'v1'}/"
+      version = (connection['version'].presence || 'v1').to_s
+      region  = (connection['region'].presence  || 'us-east1').to_s
+
+      host = (region == 'global') ? 'aiplatform.googleapis.com' : "#{region}-aiplatform.googleapis.com"
+      "https://#{host}/#{version}/"
     end
   },
   
   test: lambda do |connection|
-    model = 'gemini-1.5-flash'
-    url = "projects/#{connection['project']}/locations/#{connection['region']}/publishers/google/models/#{model}:generateContent"
-    post(url, { contents: [{ role: 'user', parts: [{ text: 'ping' }] }] })
-      .after_response { true }
+    project = connection['project']
+    region = connection['region']
+
+    # 1. Validate token + API enablement via global publisher catalog (absolute URL, independent of region, base URI)
+    call('list_publisher_models', connection) # raises on non 2xx
+
+    # 2. Validate regional host, prjoect access via cheap GET
+    parent = "projects/#{project}/locations/#{region}"
+    call('http_request',
+      connection,
+      method:   'GET',
+      url:      "#{parent}/endpoints",
+      headers:  call('build_headers', connection))
+
+    true
   rescue => e
-    error("Connection failed: #{e.message}")
+    msg = e.message
+
+    if msg.include?('(404)')
+      error("Connection failed (404). Regional endpoint or resource not found for region '#{region}'. "\
+            "Verify that the specified region is supported for this type of request. Details: #{msg}")
+    elsif msg.include?('(403)') || msg =~ /PERMISSION/i
+      error("Connection failed (403). Token is valid but lacks permission, OR the Vertex AI API may not be "\
+            "enabled for this project. Verify the roles and access available for this service account. "\
+            "Details: #{msg}")
+    else
+      error("Connection failed: #{msg}")
+    end
   end,
 
   # ============================================
