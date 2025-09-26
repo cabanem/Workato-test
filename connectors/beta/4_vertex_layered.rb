@@ -141,7 +141,7 @@
   },
   
   test: lambda do |connection|
-    model = 'gemini-1.5-flash',
+    model = 'gemini-1.5-flash'
     url = "projects/#{connection['project']}/locations/#{connection['region']}/publishers/google/models/#{model}:generateContent"
     post(url, { contents: [{ role: 'user', parts: [{ text: 'ping' }] }] })
       .after_response { true }
@@ -152,8 +152,77 @@
   # ============================================
   # ACTIONS
   # ============================================
+  # Listed alphabetically within each subsection.
   actions: {
-    # Primary Universal Action
+
+    # ------------------------------------------
+    # CORE
+    # ------------------------------------------
+    # Batch Operation Action
+    batch_operation: {
+      title: 'Batch AI Operation',
+      
+      config_fields: [
+        { name: 'behavior', label: 'Operation Type', control_type: 'select', pick_list: 'batchable_behaviors', optional: false },
+        { name: 'batch_strategy', label: 'Batch Strategy', control_type: 'select', default: 'count',
+          options: [['By Count', 'count'], ['By Token Limit', 'tokens']] }
+      ],
+      
+      input_fields: lambda do |object_definitions|
+        [
+          { name: 'items', type: 'array', of: 'object', properties: [
+              { name: 'text', label: 'Text', optional: false },
+              { name: 'task_type', label: 'Task Type', control_type: 'select', pick_list: 'embedding_tasks' }
+          ]},
+          { name: 'batch_size', type: 'integer', default: 10, hint: 'Items per batch' }
+        ]
+      end,
+      
+      execute: lambda do |connection, input, input_schema, output_schema, config_fields|
+        call('execute_batch_behavior', 
+          connection, 
+          config_fields['behavior'],
+          input['items'],
+          input['batch_size'],
+          config_fields['batch_strategy']
+        )
+      end,
+      output_fields: lambda do |_obj, _conn, _cfg|
+        [
+          { name: 'success', type: 'boolean' },
+          { name: 'results', type: 'array', of: 'object' }, # behavior-shaped items
+          { name: 'errors',  type: 'array', of: 'object', properties: [
+            { name: 'batch', type: 'array', of: 'object' },
+            { name: 'error' }
+          ]},
+          { name: 'total_processed', type: 'integer' },
+          { name: 'total_errors', type: 'integer' }
+        ]
+      end,
+      sample_output: lambda do |_conn, cfg|
+        if cfg['behavior'] == 'text.embed'
+          {
+            "success"=>true,
+            "results"=>[
+              { "embeddings"=>[[0.01,0.02],[0.03,0.04]] }
+            ],
+            "errors"=>[],
+            "total_processed"=>2,
+            "total_errors"=>0
+          }
+        else
+          {
+            "success"=>true,
+            "results"=>[],
+            "errors"=>[],
+            "total_processed"=>0,
+            "total_errors"=>0
+          }
+        end
+      end
+    },
+
+    # Universal Action
     vertex_operation: {
       title: 'Vertex AI Operation',
       
@@ -248,70 +317,55 @@
         end
       end
     },
-    
-    # Batch Operation Action
-    batch_operation: {
-      title: 'Batch AI Operation',
-      
+
+    # ------------------------------------------
+    # THIN WRAPPERS
+    # ------------------------------------------
+    generate_text: {
+      title: 'Generate Text',
+      description: 'Gemini text generation',
+
+      # Configuration
       config_fields: [
-        { name: 'behavior', label: 'Operation Type', control_type: 'select', pick_list: 'batchable_behaviors', optional: false },
-        { name: 'batch_strategy', label: 'Batch Strategy', control_type: 'select', default: 'count',
-          options: [['By Count', 'count'], ['By Token Limit', 'tokens']] }
+        { name: 'advanced_config', label: 'Show Advanced Configuration', control_type: 'checkbox', extends_schema: true, optional: true }
       ],
-      
-      input_fields: lambda do |object_definitions|
-        [
-          { name: 'items', type: 'array', of: 'object', properties: [
-              { name: 'text', label: 'Text', optional: false },
-              { name: 'task_type', label: 'Task Type', control_type: 'select', pick_list: 'embedding_tasks' }
-          ]},
-          { name: 'batch_size', type: 'integer', default: 10, hint: 'Items per batch' }
-        ]
+
+      # Input
+      input_fields: lambda do |_obj_defs, _connection, config_fields|
+        # Fetch only fields relevant to this action
+        base = call('get_behavior_input_fields', 'text.generate', config_fields['advanced_config'])
+        base 
       end,
-      
-      execute: lambda do |connection, input, input_schema, output_schema, config_fields|
-        call('execute_batch_behavior', 
-          connection, 
-          config_fields['behavior'],
-          input['items'],
-          input['batch_size'],
-          config_fields['batch_strategy']
+
+      # Output
+      output_fields: lambda do |_obj_defs, _connection, _cfg|
+        call('get_behavior_output_fields', 'text.generate').unshift(
+          { name: 'success', type: 'boolean' },
+          { name: 'timestamp', type: 'datetime' },
+          { name: 'metadata', type: 'object', properties: [{ name: 'operation' }, { name: 'model' }] },
+          { name: 'trace', type: 'object', properties: [
+            { name: 'correlation_id' }, { name: 'duration_ms', type: 'integer' }, { name: 'attempt', type: 'integer' } ]}
         )
       end,
-      output_fields: lambda do |_obj, _conn, _cfg|
-        [
-          { name: 'success', type: 'boolean' },
-          { name: 'results', type: 'array', of: 'object' }, # behavior-shaped items
-          { name: 'errors',  type: 'array', of: 'object', properties: [
-            { name: 'batch', type: 'array', of: 'object' },
-            { name: 'error' }
-          ]},
-          { name: 'total_processed', type: 'integer' },
-          { name: 'total_errors', type: 'integer' }
-        ]
+
+      # Execute
+      execute: lambda do |connection, input, _in_schema, _out_schema, config_fields|
+        user_cfg = call('extract_user_config', input, config_fields['advanced_config'])
+        safe_input = call('deep_copy', input)
+        call('execute_behavior', connection, 'text.generate', safe_input, user_cfg)
       end,
-      sample_output: lambda do |_conn, cfg|
-        if cfg['behavior'] == 'text.embed'
-          {
-            "success"=>true,
-            "results"=>[
-              { "embeddings"=>[[0.01,0.02],[0.03,0.04]] }
-            ],
-            "errors"=>[],
-            "total_processed"=>2,
-            "total_errors"=>0
-          }
-        else
-          {
-            "success"=>true,
-            "results"=>[],
-            "errors"=>[],
-            "total_processed"=>0,
-            "total_errors"=>0
-          }
-        end
+
+      # Sample output
+      sample_output: lambda do |_connection, _cfg|
+        {
+          "success" => true, "timestamp" => Time.now.utc.iso8601,
+          "metadata" => { "operation" => "text.generate", "model" => "gemini-1.5-flash-002" },
+          "trace" => { "correlation_id" => "abc", "duration_ms" => 42, "attempt" => 1 },
+          "result" => "Hello world."
+        }
       end
-    }
+    },
+    
   },
 
   # ============================================
@@ -394,18 +448,16 @@
     
     # Response Enrichment
     enrich_response: lambda do |response:, metadata: {}|
-      enriched = response.is_a?(Hash) ? response.dup : { 'result' => response }
-      
-      enriched['success'] = true
-      enriched['timestamp'] = Time.now.iso8601
-      enriched['metadata'] = metadata
-      
-      # Add trace if present
-      if response.is_a?(Hash) && response['_trace']
-        enriched['trace'] = response.delete('_trace')
-      end
-      
-      enriched
+      base  = response.is_a?(Hash) ? JSON.parse(JSON.dump(response)) : { 'result' => response }
+      trace = base.delete('_trace')
+      http  = base.delete('_http') # preserved, not exposed by default
+
+      base.merge(
+        'success'   => true,
+        'timestamp' => Time.now.iso8601,
+        'metadata'  => metadata,
+        'trace'     => trace
+      ).compact
     end,
 
     # Response Extraction
@@ -612,7 +664,10 @@
           end
         end
       end
-      
+
+      # -- Ensure selected model from ops config is visible to URL builder
+      local['model'] ||= config['model']
+
       # 3. Build payload
       payload = if config['payload']
         call('build_payload',
@@ -975,27 +1030,27 @@
 
     # Build endpoint URL
     build_endpoint_url: lambda do |connection, endpoint_config, input|
-      api_version = connection['version'].presence || 'v1'   # <- use configured version
+      api_version = connection['version'].presence || 'v1'
       base_url = "https://#{connection['region']}-aiplatform.googleapis.com/#{api_version}"
 
-      # Determine model path
-      model = input['model'] || 'gemini-1.5-flash'
-      model_mappings = {
-        'gemini-1.5-flash' => 'gemini-1.5-flash-002',
-        'gemini-1.5-pro' => 'gemini-1.5-pro-002',
-        'text-embedding-004' => 'text-embedding-004',
-        'textembedding-gecko' => 'textembedding-gecko@003'
-      }
+      # Assert preference to model on input (set by execution_pipeline c/o ops config
+      model = input['model'] || connection['default_model'] || 'gemini-1.5-flash'
+
+      # If short alias (no -NNN), resolve it to newest version dynamically
+      model_id = if model.match?(/-\d{3,}$/)
+                    model
+                else
+                  call('resolve_model_version', connection, model)
+                end
       
-      model_id = model_mappings[model] || model
       model_path = "projects/#{connection['project']}/locations/#{connection['region']}/publishers/google/models/#{model_id}"
-      
-      # Handle special endpoints
+
+      # If the user supplies a custom path, replace the the critical elements with those from the connection
       if endpoint_config['custom_path']
-        endpoint_config['custom_path']
-          .gsub('{project}', connection['project'])
-          .gsub('{region}', connection['region'])
-          .gsub('{endpoint}', connection['vector_search_endpoint'] || '')
+         endpoint_config['custom_path']
+          .gsub('{project}',  connection['project'])
+          .gsub('{region}',   connection['region'])
+          .gusb('{endpoint}', connection['vector_search_endpoint'] || '')
       else
         "#{base_url}/#{model_path}#{endpoint_config['path'] || ':generateContent'}"
       end
@@ -1141,7 +1196,7 @@
       if show_advanced
         fields += [
           { name: 'model_override', label: 'Override Model', control_type: 'select', 
-            pick_list: 'models_for_behavior', pick_list_params: { behavior: behavior }, optional: true },
+            pick_list: 'models_dynamic_for_behavior', pick_list_params: { behavior: behavior }, optional: true },
           { name: 'temperature', label: 'Temperature', type: 'number', hint: '0.0 to 1.0' },
           { name: 'max_tokens', label: 'Max Tokens', type: 'integer' },
           { name: 'cache_ttl', label: 'Cache TTL (seconds)', type: 'integer', default: 300 }
@@ -1180,6 +1235,48 @@
       end
     end,
 
+    # List Google publisher models (v1beta1) and cache the page(s)
+    list_publisher_models: lambda do |connection, publisher: 'google'|
+      # Uses the global aiplatform endpoint so it works regardless of region
+      cache_key = "vertex_pub_models_#{publisher}"
+      cached = workato.cache.get(cache_key)
+      break cached if cached
+
+      # Absolute URL to avoid base_uri region coupling
+      resp = get("https://aiplatform.googleapis.com/v1beta1/publishers/#{publisher}/models")
+              .headers(call('build_headers', connection))
+              .after_error_response(/.*/) { |code, body, _h, msg| error("#{msg} (#{code}): #{body}") }
+              .after_response { |code, body, _h| body || {} }
+
+      models = (resp['publisherModels'] || [])
+      # Cache for 1 hour — you can make this a connection field if you like
+      workato.cache.set(cache_key, models, 3600)
+      models
+    end,
+
+    # Resolve an alias to the latest version available
+    resolve_model_version: lambda do |connection, short|
+      return short if short.to_s.match?(/-\d{3,}$/) # already versioned (e.g., -002)
+      cache_key = "vertex_model_resolved_#{short}"
+      cached = workato.cache.get(cache_key)
+      break cached if cached
+
+      # Find all models that start with "#{short}-"
+      candidates = call('list_publisher_models', connection)
+                      .map { |m| (m['name'] || '').split('/').last } # e.g., 'gemini-1.5-pro-002'
+                      .select { |id| id.start_with?("#{short}-") }
+
+      error("No versioned model found for alias '#{short}'") if candidates.empty?
+
+      # Choose highest numeric suffix
+      latest = candidates.max_by do |id|
+        id[/-(\d+)$/, 1].to_i
+      end
+
+      workato.cache.set(cache_key, latest, 3600)
+      latest
+    end,
+
     # Model selection logic
     select_model: lambda do |behavior_def, config, input|
       # Explicit model in input takes precedence
@@ -1201,13 +1298,13 @@
   # PICK LISTS
   # ============================================
   pick_lists: {
-    gcp_regions: lambda do |connection|
+
+    all_models: lambda do |connection|
       [
-        ['US Central 1', 'us-central1'],
-        ['US East 1', 'us-east1'],
-        ['US East 4', 'us-east4'],
-        ['US West 1', 'us-west1'],
-        ['US West 4', 'us-west4']
+        ['Gemini 1.5 Flash', 'gemini-1.5-flash'],
+        ['Gemini 1.5 Pro', 'gemini-1.5-pro'],
+        ['Text Embedding 004', 'text-embedding-004'],
+        ['Text Embedding Gecko', 'textembedding-gecko']
       ]
     end,
     
@@ -1227,25 +1324,26 @@
       }
     end,
     
-    all_models: lambda do |connection|
+    embedding_tasks: lambda do |connection|
       [
-        ['Gemini 1.5 Flash', 'gemini-1.5-flash'],
-        ['Gemini 1.5 Pro', 'gemini-1.5-pro'],
-        ['Text Embedding 004', 'text-embedding-004'],
-        ['Text Embedding Gecko', 'textembedding-gecko']
+        ['Document Retrieval', 'RETRIEVAL_DOCUMENT'],
+        ['Query Retrieval', 'RETRIEVAL_QUERY'],
+        ['Semantic Similarity', 'SEMANTIC_SIMILARITY'],
+        ['Classification', 'CLASSIFICATION'],
+        ['Clustering', 'CLUSTERING']
       ]
     end,
-    
-    models_for_behavior: lambda do |connection, input = {}|
-      behavior = input['behavior']
-      defn = call('behavior_registry')[behavior]
-      next [] unless defn && defn[:supported_models]
 
-      defn[:supported_models].map do |model|
-        [model.split('-').map!(&:capitalize).join(' '), model]
-      end
+    gcp_regions: lambda do |connection|
+      [
+        ['US Central 1', 'us-central1'],
+        ['US East 1', 'us-east1'],
+        ['US East 4', 'us-east4'],
+        ['US West 1', 'us-west1'],
+        ['US West 4', 'us-west4']
+      ]
     end,
-    
+
     languages: lambda do |connection|
       [
         ['Auto-detect', 'auto'],
@@ -1261,15 +1359,35 @@
         ['Chinese (Traditional)', 'zh-TW']
       ]
     end,
-    
-    embedding_tasks: lambda do |connection|
-      [
-        ['Document Retrieval', 'RETRIEVAL_DOCUMENT'],
-        ['Query Retrieval', 'RETRIEVAL_QUERY'],
-        ['Semantic Similarity', 'SEMANTIC_SIMILARITY'],
-        ['Classification', 'CLASSIFICATION'],
-        ['Clustering', 'CLUSTERING']
-      ]
+
+    models_for_behavior: lambda do |connection, input = {}|
+      behavior = input['behavior']
+      defn = call('behavior_registry')[behavior]
+      next [] unless defn && defn[:supported_models]
+
+      defn[:supported_models].map do |model|
+        [model.split('-').map!(&:capitalize).join(' '), model]
+      end
+    end,
+
+    models_dynamic_for_behavior: lambda do |connection, input={}|
+      behavior = input['behavior'] || 'text.generate'
+      # Heuristic prefixes by capability
+      prefixes  = case behavior
+                  when 'text.embed' then ['gemini-embedding-', 'text-embedding-']
+                  else ['gemini-']
+                  end
+      models = call('list_publisher_models', connection)
+                  .map { |m|
+                    id = (m['name'] || '').split('/').last
+                    display = m['displayName'] || id
+                    [display, id]
+                  }
+                  .select { |label, id| prefixes.any? { |p| id.start_with?(p) } }
+                  .uniq
+      
+      # Sort newest first
+      models.sort_by { |_label, id| - (id[/-(\d+)$/, 1].to_i) }
     end,
 
     safety_levels: lambda do |_connection|
