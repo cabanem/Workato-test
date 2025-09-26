@@ -1033,10 +1033,10 @@
       api_version = connection['version'].presence || 'v1'
       base_url = "https://#{connection['region']}-aiplatform.googleapis.com/#{api_version}"
 
-      # Assert preference to model on input (set by execution_pipeline c/o ops config
+      # Prefer model on input (propogated by execution_pipeline); else use connection default
       model = input['model'] || connection['default_model'] || 'gemini-1.5-flash'
 
-      # If short alias (no -NNN), resolve it to newest version dynamically
+      # Resolve short alias to newest -NNN version using publisher catalog
       model_id = if model.match?(/-\d{3,}$/)
                     model
                 else
@@ -1050,7 +1050,7 @@
          endpoint_config['custom_path']
           .gsub('{project}',  connection['project'])
           .gsub('{region}',   connection['region'])
-          .gusb('{endpoint}', connection['vector_search_endpoint'] || '')
+          .gsub('{endpoint}', connection['vector_search_endpoint'] || '')
       else
         "#{base_url}/#{model_path}#{endpoint_config['path'] || ':generateContent'}"
       end
@@ -1235,63 +1235,69 @@
       end
     end,
 
-    # List Google publisher models (v1beta1) and cache the page(s)
+    # List Google publisher models (v1beta1) and cache 60m
     list_publisher_models: lambda do |connection, publisher: 'google'|
       # Uses the global aiplatform endpoint so it works regardless of region
       cache_key = "vertex_pub_models_#{publisher}"
       cached = workato.cache.get(cache_key)
-      break cached if cached
-
-      # Absolute URL to avoid base_uri region coupling
-      resp = get("https://aiplatform.googleapis.com/v1beta1/publishers/#{publisher}/models")
+      if  cached
+          cached
+      else
+        # absolute URL to avoid base_uri region coupling
+        resp = get("https://aiplatform.googleapis.com/v1beta1/publishers/#{publisher}/models")
               .headers(call('build_headers', connection))
               .after_error_response(/.*/) { |code, body, _h, msg| error("#{msg} (#{code}): #{body}") }
               .after_response { |code, body, _h| body || {} }
 
-      models = (resp['publisherModels'] || [])
-      # Cache for 1 hour — you can make this a connection field if you like
-      workato.cache.set(cache_key, models, 3600)
-      models
+        models = (resp['publisherModels'] || [])
+        workato.cache.set(cache_key, models, 3600) # cache x 60m
+        models
+      end
     end,
 
     # Resolve an alias to the latest version available
     resolve_model_version: lambda do |connection, short|
-      return short if short.to_s.match?(/-\d{3,}$/) # already versioned (e.g., -002)
+      # If versioned properly, keep it
+      return short if short.to_s.match?(/-\d{3,}$/)
+
       cache_key = "vertex_model_resolved_#{short}"
       cached = workato.cache.get(cache_key)
-      break cached if cached
+      if cached
+        cached
+      else
+        # Find all models that start with "#{short}-"
+        ids = call('list_publisher_models', connection)
+                        .map { |m| (m['name'] || '').split('/').last } # e.g., 'gemini-1.5-pro-002'
+                        .select { |id| id.start_with?("#{short}-") }
 
-      # Find all models that start with "#{short}-"
-      candidates = call('list_publisher_models', connection)
-                      .map { |m| (m['name'] || '').split('/').last } # e.g., 'gemini-1.5-pro-002'
-                      .select { |id| id.start_with?("#{short}-") }
-
-      error("No versioned model found for alias '#{short}'") if candidates.empty?
-
-      # Choose highest numeric suffix
-      latest = candidates.max_by do |id|
-        id[/-(\d+)$/, 1].to_i
+        error("No versioned model found for alias '#{short}'") if ids.empty?
+        
+        latest = ids.max_by { |id| id[/-(\d+)$/, 1].to_i } # highest numeric suffix
+        workato.cache.set(cache_key, latest, 3600)
+        latest
       end
-
-      workato.cache.set(cache_key, latest, 3600)
-      latest
     end,
 
     # Model selection logic
     select_model: lambda do |behavior_def, config, input|
-      # Explicit model in input takes precedence
-      return input['model'] if input['model']
-      
-      # Use configured default
-      model = config[:models][:default]
-      
-      # Ensure model supports the behavior
-      unless behavior_def[:supported_models].include?(model)
-        model = behavior_def[:supported_models].first
+      # 1) explicit model in input wins (respect override)
+      chosen = input['model']
+      return chosen if chosen.present?
+
+      # 2) otherwise take configured default (connection/user config)
+      chosen = config[:models][:default]
+
+      # 3) accept if either exact match OR alias root matches (strip -NNN)
+      aliases = Array(behavior_def[:supported_models]).compact
+      root = chosen.to_s.sub(/-\d+$/, '')
+      if aliases.include?(chosen) || aliases.include?(root)
+        chosen
+      else
+        # 4) last resort: first declared supported alias
+        aliases.first
       end
-      
-      model
     end,
+
   },
 
   # ============================================
@@ -1374,7 +1380,7 @@
       behavior = input['behavior'] || 'text.generate'
       # Heuristic prefixes by capability
       prefixes  = case behavior
-                  when 'text.embed' then ['gemini-embedding-', 'text-embedding-']
+                  when 'text.embed' then ['text-embedding-', 'textembedding-']
                   else ['gemini-']
                   end
       models = call('list_publisher_models', connection)
