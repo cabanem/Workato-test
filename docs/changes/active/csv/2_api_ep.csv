@@ -1,0 +1,10 @@
+Endpoint Type,Method,Base URL,Path Pattern,Actions Using
+Vertex Generate,POST,{region}-aiplatform.googleapis.com,/v1/projects/{p}/locations/{l}/publishers/google/models/{m}:generateContent,8
+Vertex Predict,POST,{region}-aiplatform.googleapis.com,/v1/projects/{p}/locations/{l}/publishers/google/models/{m}:predict,2
+Vector Search,POST,{custom_host},/v1/projects/{p}/locations/{l}/indexEndpoints/{e}:findNeighbors,1
+Vector Upsert,POST,{region}-aiplatform.googleapis.com,/v1/projects/{p}/locations/{l}/indexes/{i}:upsertDatapoints,1
+Drive Files,GET,www.googleapis.com,/drive/v3/files/{id},3
+Drive Export,GET,www.googleapis.com,/drive/v3/files/{id}/export,1
+Drive Download,GET,www.googleapis.com,/drive/v3/files/{id}?alt=media,1
+Drive List,GET,www.googleapis.com,/drive/v3/files,1
+Drive Changes,GET,www.googleapis.com,/drive/v3/changes,1

@@ -1,10 +1,6 @@
 {
   "name": "${localWorkspaceFolderBasename}",
   "image": "mcr.microsoft.com/devcontainers/ruby:3.3-bookworm",
-  "features": {
-    "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
-  },
   "mounts": [
     "source=${localWorkspaceFolderBasename}-gems,target=/usr/local/bundle,type=volume",
     "source=${localWorkspaceFolderBasename}-bashhistory,target=/commandhistory,type=volume"

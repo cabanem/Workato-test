@@ -1,0 +1,10 @@
+Action,Input Processing,Payload Building,Response Extraction,Output Processing
+translate_text,Escape backticks,Template interpolation,JSON parse → 'response',Add safety ratings
+summarize_text,None,Direct text,Plain text,Add metadata
+parse_text,Schema validation,Schema + text,Dynamic JSON,Match to schema
+classify,Categories → text,Low temperature,JSON with confidence,Threshold check
+analyze_text,Escape backticks,Question + text,JSON → 'response',Null if not found
+analyze_image,Base64 encode,Multimodal parts,Text or JSON,Add safety
+embeddings_batch,Split by 25,Instances array,Vector extraction,Aggregate batches
+find_neighbors,Validate host,Query structure,Distance → similarity,Sort by score
+fetch_drive,URL → ID,N/A (GET),Metadata + content,UTF-8 encoding

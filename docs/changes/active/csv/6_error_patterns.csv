@@ -1,0 +1,7 @@
+Error Type,HTTP Code,Retry Strategy,Backoff,Max Attempts,Fallback
+Rate Limit,429,Exponential,2^n sec,3,Sleep & retry
+Server Error,500-504,Exponential,2^n sec,3,Circuit breaker
+Auth Error,401-403,None,N/A,0,Fail fast
+Not Found,404,None,N/A,0,Return null
+Timeout,N/A,Linear,1 sec,3,Increase timeout
+Parse Error,N/A,None,N/A,0,Empty object

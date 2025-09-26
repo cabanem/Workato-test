@@ -1,0 +1,15 @@
+Action,Category,API Calls,Steps,Batch Support,Error Recovery
+send_messages,AI Text,1,8,No,Retry 3x
+translate_text,AI Text,1,12,No,Retry 3x
+summarize_text,AI Text,1,8,No,Retry 3x
+parse_text,AI Text,1,12,No,Retry 3x
+draft_email,AI Text,1,10,No,Retry 3x
+ai_classify,AI Text,1,12,No,Retry 3x
+analyze_text,AI Text,1,11,No,Retry 3x
+analyze_image,AI Multimodal,1,10,No,Retry 3x
+generate_embeddings,Embedding,n/25,7,Yes (25),Retry per batch
+generate_embedding_single,Embedding,1,10,No,Retry 3x
+find_neighbors,Vector,1,10,No,Retry 3x
+upsert_index_datapoints,Vector,1+n/100,7,Yes (100),Retry per batch
+test_connection,Utility,1-6,9,No,Continue on error
+get_prediction,Legacy,1,4,No,Retry 3x

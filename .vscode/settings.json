@@ -14,5 +14,6 @@
     "CONNECTOR_PATH": "${workspaceFolder}/connectors",
     "DEFAULT_CONNECTOR": "vertex-ai"
   },
-  "task.autoDetect": "on"
+  "task.autoDetect": "on",
+  "makefile.configureOnOpen": false
 }

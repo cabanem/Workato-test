@@ -108,6 +108,8 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
     rspec-support (3.13.6)
+    ruby-graphviz (1.2.5)
+      rexml
     ruby-progressbar (1.13.0)
     ruby_rncryptor (3.0.2)
     rubyzip (2.4.1)
@@ -160,6 +162,7 @@ DEPENDENCIES
   pry
   pry-byebug
   rspec (~> 3.12)
+  ruby-graphviz
   vcr (~> 6.2)
   webmock (~> 3.19)
   workato-connector-sdk

@@ -1,0 +1,314 @@
+[
+  {
+    "severity": "warning",
+    "category": "template_mismatch",
+    "message": "Action 'analyze_image' uses template :analyze. Did you mean :analyze_image?",
+    "where": "actions.analyze_image.execute"
+  },
+  {
+    "severity": "info",
+    "category": "undefined_method_reference",
+    "message": "Method 'init_test_results' is called but not defined under methods:",
+    "where": "global"
+  },
+  {
+    "severity": "info",
+    "category": "undefined_method_reference",
+    "message": "Method 'run_service_test' is called but not defined under methods:",
+    "where": "global"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'oauth_scopes' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'vertex_rpm_limits' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'maybe_parse_json' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'vertex_host' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'vertex_base_url' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'vertex_api_url' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'vertex_request' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'drive_request' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'is_rate_limit_error' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'extract_retry_after' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'calculate_retry_delay' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'handle_429_with_backoff' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'vertex_model_bucket' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'sort_model_options' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'to_model_options' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'create_model_label' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'cascade_model_discovery' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'get_static_model_list' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'fetch_fresh_publisher_models' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'fetch_publisher_models' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'error_handler' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'dynamic_model_picklist' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'picklist_for' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'static_model_options' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'build_conversation_payload' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'build_message_parts' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'build_classify_payload' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'payload_for_analyze_image' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'build_image_payload' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'build_embedding_payload' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'build_neighbors_payload' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'payload_for_find_neighbors' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'payload_for_text_embedding' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'usage_meta' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'standard_error_response' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'get_export_mime_type' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'classify_drive_change' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'probe_vertex_ai' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'sample_record_output' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'safety_ratings_output_sample' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'usage_output_sample' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'format_parse_sample' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'with_resilience' (delete). Prefer unified api_request wrapper.",
+    "where": "methods.with_resilience"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'api_request' (get, post, put, delete). Prefer unified api_request wrapper.",
+    "where": "methods.api_request"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'drive_request' (delete). Prefer unified api_request wrapper.",
+    "where": "methods.drive_request"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'get_circuit_state' (get). Prefer unified api_request wrapper.",
+    "where": "methods.get_circuit_state"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'fetch_publisher_models' (get). Prefer unified api_request wrapper.",
+    "where": "methods.fetch_publisher_models"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'validate_publisher_model!' (get). Prefer unified api_request wrapper.",
+    "where": "methods.validate_publisher_model!"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'execute:get_prediction' (post). Prefer unified api_request wrapper.",
+    "where": "methods.execute:get_prediction"
+  }
+]
