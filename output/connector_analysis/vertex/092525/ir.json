@@ -1,0 +1,399 @@
+{
+  "connector": {
+    "title": "Vertex AI",
+    "auth_modes": [
+      "custom"
+    ]
+  },
+  "actions": [
+    {
+      "name": "vertex_operation",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "input_schema",
+          "output_schema",
+          "config_fields"
+        ],
+        "calls": [
+
+        ],
+        "direct_http": [
+          "delete"
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "batch_operation",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "input_schema",
+          "output_schema",
+          "config_fields"
+        ],
+        "calls": [
+          "execute_batch_behavior"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    }
+  ],
+  "methods": [
+    {
+      "name": "http_request",
+      "lambda_params": [
+        "connection",
+        "method:",
+        "url:",
+        "payload: nil",
+        "headers: {}",
+        "retry_config: {}"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+        "get",
+        "post",
+        "put",
+        "delete"
+      ]
+    },
+    {
+      "name": "build_payload",
+      "lambda_params": [
+        "template:",
+        "variables:",
+        "format:"
+      ],
+      "calls": [
+        "apply_template"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "extract_response",
+      "lambda_params": [
+        "data:",
+        "path: nil",
+        "format: 'raw'"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "transform_data",
+      "lambda_params": [
+        "input:",
+        "from_format:",
+        "to_format:"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+        "get"
+      ]
+    },
+    {
+      "name": "validate_input",
+      "lambda_params": [
+        "data:",
+        "schema: []",
+        "constraints: []"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "with_resilience",
+      "lambda_params": [
+        "operation:",
+        "config: {}",
+        "&block"
+      ],
+      "calls": [
+        "check_rate_limit"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "enrich_response",
+      "lambda_params": [
+        "response:",
+        "metadata: {}"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+        "delete"
+      ]
+    },
+    {
+      "name": "execute_pipeline",
+      "lambda_params": [
+        "connection",
+        "operation",
+        "input",
+        "config"
+      ],
+      "calls": [
+        "validate_input"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "behavior_registry",
+      "lambda_params": [
+
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "configuration_registry",
+      "lambda_params": [
+        "connection",
+        "user_config"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "execute_behavior",
+      "lambda_params": [
+        "connection",
+        "behavior",
+        "input",
+        "user_config = {}"
+      ],
+      "calls": [
+        "behavior_registry"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "select_model",
+      "lambda_params": [
+        "behavior_def",
+        "config",
+        "input"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "build_endpoint_url",
+      "lambda_params": [
+        "connection",
+        "endpoint_config",
+        "input"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "build_headers",
+      "lambda_params": [
+        "connection"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "get_behavior_input_fields",
+      "lambda_params": [
+        "behavior",
+        "show_advanced"
+      ],
+      "calls": [
+        "behavior_registry"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "get_behavior_output_fields",
+      "lambda_params": [
+        "behavior"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "add_word_count",
+      "lambda_params": [
+        "response",
+        "input"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "check_rate_limit",
+      "lambda_params": [
+        "operation",
+        "limits"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+        "get"
+      ]
+    },
+    {
+      "name": "apply_template",
+      "lambda_params": [
+        "template",
+        "variables"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "execute_batch_behavior",
+      "lambda_params": [
+        "connection",
+        "behavior",
+        "items",
+        "batch_size",
+        "strategy"
+      ],
+      "calls": [
+        "execute_behavior"
+      ],
+      "direct_http": [
+
+      ]
+    }
+  ],
+  "object_definitions": [
+    {
+      "name": "generation_config",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "safety_settings",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    }
+  ],
+  "pick_lists": [
+    {
+      "name": "gcp_regions"
+    },
+    {
+      "name": "available_behaviors"
+    },
+    {
+      "name": "batchable_behaviors"
+    },
+    {
+      "name": "all_models"
+    },
+    {
+      "name": "models_for_behavior"
+    },
+    {
+      "name": "languages"
+    },
+    {
+      "name": "embedding_tasks"
+    }
+  ]
+}

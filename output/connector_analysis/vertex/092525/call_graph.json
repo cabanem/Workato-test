@@ -1,0 +1,109 @@
+{
+  "nodes": [
+    "execute:vertex_operation",
+    "HTTP:DELETE",
+    "execute:batch_operation",
+    "execute_batch_behavior",
+    "http_request",
+    "HTTP:GET",
+    "HTTP:POST",
+    "HTTP:PUT",
+    "build_payload",
+    "apply_template",
+    "extract_response",
+    "transform_data",
+    "validate_input",
+    "with_resilience",
+    "check_rate_limit",
+    "enrich_response",
+    "execute_pipeline",
+    "behavior_registry",
+    "configuration_registry",
+    "execute_behavior",
+    "select_model",
+    "build_endpoint_url",
+    "build_headers",
+    "get_behavior_input_fields",
+    "get_behavior_output_fields",
+    "add_word_count",
+    "top:test"
+  ],
+  "edges": [
+    {
+      "from": "execute:vertex_operation",
+      "to": "HTTP:DELETE"
+    },
+    {
+      "from": "execute:batch_operation",
+      "to": "execute_batch_behavior"
+    },
+    {
+      "from": "http_request",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "http_request",
+      "to": "HTTP:POST"
+    },
+    {
+      "from": "http_request",
+      "to": "HTTP:PUT"
+    },
+    {
+      "from": "http_request",
+      "to": "HTTP:DELETE"
+    },
+    {
+      "from": "build_payload",
+      "to": "apply_template"
+    },
+    {
+      "from": "transform_data",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "with_resilience",
+      "to": "check_rate_limit"
+    },
+    {
+      "from": "enrich_response",
+      "to": "HTTP:DELETE"
+    },
+    {
+      "from": "execute_pipeline",
+      "to": "validate_input"
+    },
+    {
+      "from": "execute_behavior",
+      "to": "behavior_registry"
+    },
+    {
+      "from": "get_behavior_input_fields",
+      "to": "behavior_registry"
+    },
+    {
+      "from": "check_rate_limit",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "execute_batch_behavior",
+      "to": "execute_behavior"
+    }
+  ],
+  "paths": {
+    "vertex_operation": [
+      [
+        "execute:vertex_operation",
+        "HTTP:DELETE"
+      ]
+    ],
+    "batch_operation": [
+      [
+        "execute:batch_operation",
+        "execute_batch_behavior",
+        "execute_behavior",
+        "behavior_registry"
+      ]
+    ]
+  }
+}

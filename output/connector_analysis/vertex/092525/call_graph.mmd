@@ -1,0 +1,103 @@
+flowchart TD
+  execute_vertex_operation([execute:vertex_operation])
+  HTTP_DELETE{{HTTP:DELETE}}
+  execute_batch_operation([execute:batch_operation])
+  execute_batch_behavior[execute_batch_behavior]
+  http_request[http_request]
+  HTTP_GET{{HTTP:GET}}
+  HTTP_POST{{HTTP:POST}}
+  HTTP_PUT{{HTTP:PUT}}
+  build_payload[build_payload]
+  apply_template[apply_template]
+  extract_response[extract_response]
+  transform_data[transform_data]
+  validate_input[validate_input]
+  with_resilience[with_resilience]
+  check_rate_limit[check_rate_limit]
+  enrich_response[enrich_response]
+  execute_pipeline[execute_pipeline]
+  behavior_registry[behavior_registry]
+  configuration_registry[configuration_registry]
+  execute_behavior[execute_behavior]
+  select_model[select_model]
+  build_endpoint_url[build_endpoint_url]
+  build_headers[build_headers]
+  get_behavior_input_fields[get_behavior_input_fields]
+  get_behavior_output_fields[get_behavior_output_fields]
+  add_word_count[add_word_count]
+  top_test[top:test]
+  execute_vertex_operation --> HTTP_DELETE
+  execute_batch_operation --> execute_batch_behavior
+  http_request --> HTTP_GET
+  http_request --> HTTP_POST
+  http_request --> HTTP_PUT
+  http_request --> HTTP_DELETE
+  build_payload --> apply_template
+  transform_data --> HTTP_GET
+  with_resilience --> check_rate_limit
+  enrich_response --> HTTP_DELETE
+  execute_pipeline --> validate_input
+  execute_behavior --> behavior_registry
+  get_behavior_input_fields --> behavior_registry
+  check_rate_limit --> HTTP_GET
+  execute_batch_behavior --> execute_behavior
+  classDef action fill:#E3F2FD,stroke:#1E88E5,stroke-width:1px;
+  classDef method fill:#E8F5E9,stroke:#2E7D32,stroke-width:1px;
+  classDef http   fill:#FFF3E0,stroke:#EF6C00,stroke-width:1px;
+  classDef hot stroke:#6A1B9A,stroke-width:3px;
+  classDef cycle stroke:#C62828,stroke-width:3px;
+  classDef unused fill:#ECECEC,color:#6B7280,stroke:#9CA3AF;
+  classDef undef stroke-dasharray:4 2,stroke:#EF4444;
+  class execute_vertex_operation action;
+  class execute_batch_operation action;
+  class execute_batch_behavior method;
+  class http_request method;
+  class build_payload method;
+  class apply_template method;
+  class extract_response method;
+  class transform_data method;
+  class validate_input method;
+  class with_resilience method;
+  class check_rate_limit method;
+  class enrich_response method;
+  class execute_pipeline method;
+  class behavior_registry method;
+  class configuration_registry method;
+  class execute_behavior method;
+  class select_model method;
+  class build_endpoint_url method;
+  class build_headers method;
+  class get_behavior_input_fields method;
+  class get_behavior_output_fields method;
+  class add_word_count method;
+  class top_test method;
+  class HTTP_DELETE http;
+  class HTTP_GET http;
+  class HTTP_POST http;
+  class HTTP_PUT http;
+  class execute_vertex_operation hot;
+  class HTTP_DELETE hot;
+  class execute_batch_operation hot;
+  class execute_batch_behavior hot;
+  class http_request hot,unused;
+  class HTTP_GET hot;
+  class HTTP_POST hot;
+  class HTTP_PUT hot;
+  class build_payload hot,unused;
+  class apply_template hot,unused;
+  class extract_response unused;
+  class transform_data hot,unused;
+  class validate_input hot,unused;
+  class with_resilience hot,unused;
+  class check_rate_limit hot,unused;
+  class enrich_response hot,unused;
+  class execute_pipeline hot,unused;
+  class behavior_registry hot;
+  class configuration_registry unused;
+  class execute_behavior hot;
+  class select_model unused;
+  class build_endpoint_url unused;
+  class build_headers unused;
+  class get_behavior_input_fields hot,unused;
+  class get_behavior_output_fields unused;
+  class add_word_count unused;
