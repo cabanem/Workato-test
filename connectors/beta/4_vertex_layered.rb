@@ -7,9 +7,17 @@
   connection: {
     fields: [
       # Google Cloud Configuration
-      { name: 'project', label: 'Project ID', optional: false },
-      { name: 'region', label: 'Region', control_type: 'select', pick_list: 'gcp_regions', optional: false },
-      
+      { name: 'project', label: 'Project ID', group: 'Google Cloud Platform', optional: false },
+      { name: 'region',  label: 'Region',     group: 'Google Cloud Platform', optional: false, control_type: 'select', 
+        options: [ 
+          ['US central 1', 'us-central1'],
+          ['US east 1', 'us-east1'],
+          ['US east 4', 'us-east4'],
+          ['US east 5', 'us-east5'],
+          ['US west 1', 'us-west1'],
+          ['US west 4', 'us-west4'],
+          ['US south 1', 'us-south1'],
+        ]},
       # Service Account Authentication
       { name: 'service_account_email', label: 'Service Account Email', optional: false },
       { name: 'client_id', label: 'Client ID', optional: false },
