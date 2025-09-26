@@ -17,11 +17,24 @@
           ['US west 1', 'us-west1'],
           ['US west 4', 'us-west4'],
           ['US south 1', 'us-south1'],
-        ]},
+        ],
+        hint: 'Vertex AI region for model execution.',
+        toggle_hint: 'Select from list',
+        toggle_field: {
+          name: 'region',
+          label: 'Region',
+          type: 'string',
+          control_type: 'text',
+          optional: false,
+          toggle_hint: 'Use custom value',
+          hint: "See Vertex AI locations docs for allowed regions."
+        }
+      },
+      { name: 'version', label: 'API version', group: 'Google Cloud Platform', optional: false, default: 'v1', hint: 'e.g. v1beta1' },
       # Service Account Authentication
-      { name: 'service_account_email', label: 'Service Account Email', optional: false },
-      { name: 'client_id', label: 'Client ID', optional: false },
-      { name: 'private_key', label: 'Private Key', control_type: 'password', multiline: true, optional: false },
+      { name: 'service_account_email', label: 'Service Account Email', group: 'Service Account', optional: false },
+      { name: 'client_id', label: 'Client ID', group: 'Service Account', optional: false },
+      { name: 'private_key', label: 'Private Key', group: 'Service Account', control_type: 'password', multiline: true, optional: false },
       
       # Optional Configurations
       { name: 'vector_search_endpoint', label: 'Vector Search Endpoint', optional: true, 
@@ -71,16 +84,17 @@
         headers("Authorization": "Bearer #{connection['access_token']}")
       end,
       
+      # Reaquire on 401
       refresh_on: [401]
     },
     
     base_uri: lambda do |connection|
-      "https://#{connection['region']}-aiplatform.googleapis.com/"
+      "https://#{connection['region']}-aiplatform.googleapis.com/#{connection['version'] || 'v1'}/"
     end
   },
   
   test: lambda do |connection|
-    get("v1/projects/#{connection['project']}/locations/#{connection['region']}")
+    get("projects/#{connection['project']}/locations/#{connection['region']}")
     true
   rescue => e
     error("Connection failed: #{e.message}")
