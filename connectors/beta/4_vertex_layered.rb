@@ -6,6 +6,15 @@
   # ============================================
   connection: {
     fields: [
+      { # - auth_type
+        name: 'auth_type', label: 'Authentication type', group: 'Authentication',
+        control_type: 'select', 
+        default: 'custom',
+        optional: false, 
+        extends_schema: true, 
+        hint: 'Select the authentication type for connecting to Google Vertex AI.',
+        options: [ ['Client credentials', 'custom'], %w[OAuth2 oauth2] ] 
+      },
       # Google Cloud Configuration
       { name: 'project', label: 'Project ID', group: 'Google Cloud Platform', optional: false },
       { name: 'region',  label: 'Region',     group: 'Google Cloud Platform', optional: false, control_type: 'select', 
@@ -31,14 +40,9 @@
         }
       },
       { name: 'version', label: 'API version', group: 'Google Cloud Platform', optional: false, default: 'v1', hint: 'e.g. v1beta1' },
-      # Service Account Authentication
-      { name: 'service_account_email', label: 'Service Account Email', group: 'Service Account', optional: false },
-      { name: 'client_id', label: 'Client ID', group: 'Service Account', optional: false },
-      { name: 'private_key', label: 'Private Key', group: 'Service Account', control_type: 'password', multiline: true, optional: false },
       
       # Optional Configurations
-      { name: 'vector_search_endpoint', label: 'Vector Search Endpoint', optional: true, 
-        hint: 'Required only for vector search operations' },
+      { name: 'vector_search_endpoint', label: 'Vector Search Endpoint', optional: true, hint: 'Required only for vector search operations' },
       
       # Default Behaviors
       { name: 'default_model', label: 'Default Model', control_type: 'select',
@@ -57,35 +61,86 @@
     ],
     
     authorization: {
-      type: 'custom_auth',
-      
-      acquire: lambda do |connection|
-        jwt_claim = {
-          'iat' => now.to_i,
-          'exp' => 1.hour.from_now.to_i,
-          'aud' => 'https://oauth2.googleapis.com/token',
-          'iss' => connection['service_account_email'],
-          'sub' => connection['service_account_email'],
-          'scope' => 'https://www.googleapis.com/auth/cloud-platform'
-        }
-        
-        private_key = connection['private_key'].gsub('\\n', "\n")
-        jwt_token = workato.jwt_encode(jwt_claim, private_key, 'RS256', kid: connection['client_id'])
-        
-        response = post('https://oauth2.googleapis.com/token',
-          grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-          assertion: jwt_token
-        ).request_format_www_form_urlencoded
-        
-        { access_token: response['access_token'] }
+      type: 'multi',
+      selected: lambda do |connection|
+        connection['auth_type'] || 'custom'
       end,
+      options: {
+        oauth2: {
+          type: 'oauth2',
+          fields: [
+            { name: 'client_id', label: 'Client ID', group: 'Service Account', optional: false },
+            { name: 'client_secret', label: 'Client Secret', group: 'OAuth 2.0', optional: false, control_type: 'password' }
+          ],
+          authorization_url: lambda do |connection|
+            scopes = [
+              'https://www.googleapis.com/auth/cloud-platform'
+            ].join(' ')
+            params = {
+              client_id: connection['client_id'], response_type: 'code', scope: scopes,
+              access_type: 'offline', include_granted_scopes: 'true', prompt: 'consent'
+            }.to_param
+            "https://accounts.google.com/o/oauth2/v2/auth?#{params}"
+          end,
+          acquire: lambda do |connection, auth_code|
+            response = post('https://oauth2.googleapis.com/token').
+                       payload(
+                         client_id: connection['client_id'],
+                         client_secret: connection['client_secret'],
+                         grant_type: 'authorization_code',
+                         code: auth_code,
+                         redirect_uri: 'https://www.workato.com/oauth/callback'
+                       ).request_format_www_form_urlencoded
+            [response, nil, nil]
+          end,
+          refresh: lambda do |connection, refresh_token|
+            post('https://oauth2.googleapis.com/token').
+              payload(
+                client_id: connection['client_id'],
+                client_secret: connection['client_secret'],
+                grant_type: 'refresh_token',
+                refresh_token: refresh_token
+              ).request_format_www_form_urlencoded
+          end,
+          apply: lambda do |_connection, access_token|
+            headers(Authorization: "Bearer #{access_token}")
+          end
+        },
+        custom: {
+          type: 'custom_auth',
+          fields: [
+            { name: 'service_account_email', label: 'Service Account Email', group: 'Service Account', optional: false },
+            { name: 'client_id', label: 'Client ID', group: 'Service Account', optional: false },
+            { name: 'private_key', label: 'Private Key', group: 'Service Account', optional: false, multiline: true, control_type: 'password' }
+          ],
+          acquire: lambda do |connection|
+            jwt_body_claim = {
+              'iat' => now.to_i,
+              'exp' => 1.hour.from_now.to_i,
+              'aud' => 'https://oauth2.googleapis.com/token',
+              'iss' => connection['service_account_email'],
+              'sub' => connection['service_account_email'],
+              'scope' => 'https://www.googleapis.com/auth/cloud-platform'
+            }
+            private_key = connection['private_key'].gsub('\\n', "\n")
+            jwt_token =
+              workato.jwt_encode(jwt_body_claim,
+                                 private_key, 'RS256',
+                                 kid: connection['client_id'])
 
-      apply: lambda do |connection|
-        headers("Authorization": "Bearer #{connection['access_token']}")
-      end,
-      
-      # Reaquire on 401
-      refresh_on: [401]
+            response = post('https://oauth2.googleapis.com/token',
+                            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                            assertion: jwt_token).
+                       request_format_www_form_urlencoded
+
+            { access_token: response['access_token'] }
+          end,
+          refresh_on: [401],
+          apply: lambda do |connection|
+            headers(Authorization: "Bearer #{connection['access_token']}")
+          end
+        }
+      }
     },
     
     base_uri: lambda do |connection|
