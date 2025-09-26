@@ -31,7 +31,7 @@
       { name: 'default_model', label: 'Default Model', control_type: 'select', 
         pick_list: 'all_models', optional: true },
       { name: 'optimization_mode', label: 'Optimization Mode', control_type: 'select',
-        pick_list: [['Balanced', 'balanced'], ['Cost', 'cost'], ['Performance', 'performance']],
+        options: [['Balanced', 'balanced'], ['Cost', 'cost'], ['Performance', 'performance']],
         default: 'balanced' },
       { name: 'enable_caching', label: 'Enable Response Caching', control_type: 'checkbox', default: true },
       { name: 'enable_logging', label: 'Enable Debug Logging', control_type: 'checkbox', default: false }
@@ -1013,11 +1013,6 @@
     
     # Get behavior output fields
     get_behavior_output_fields: lambda do |behavior|
-      base_fields = [
-        { name: 'success', type: 'boolean' },
-        { name: 'timestamp', type: 'datetime' }
-      ]
-      
       behavior_fields = case behavior
       when 'text.generate'
         [{ name: 'result', label: 'Generated Text' }]
@@ -1168,7 +1163,7 @@
       ]
     end,
     
-    models_for_behavior: lambda do |connection, behavior:|
+    models_for_behavior: lambda do |connection, input={}|
       behavior_def = call('behavior_registry')[behavior]
       return [] unless behavior_def
       
