@@ -260,29 +260,21 @@
       title: 'Batch AI Operation',
       
       config_fields: [
-        {
-          name: 'behavior',
-          label: 'Operation Type',
-          control_type: 'select',
-          pick_list: 'batchable_behaviors',
-          optional: false
-        },
-        {
-          name: 'batch_strategy',
-          label: 'Batch Strategy',
-          control_type: 'select',
-          options: [['By Count', 'count'], ['By Token Limit', 'tokens']],
-          default: 'count'
-        }
+        { name: 'behavior', label: 'Operation Type', control_type: 'select', pick_list: 'batchable_behaviors', optional: false },
+        { name: 'batch_strategy', label: 'Batch Strategy', control_type: 'select', default: 'count',
+          options: [['By Count', 'count'], ['By Token Limit', 'tokens']] }
       ],
       
       input_fields: lambda do |object_definitions|
         [
-          { name: 'items', type: 'array', of: 'object', properties: 
-            call('get_behavior_input_fields', 'text.embed', false)
-          },
+          { name: 'items', type: 'array', of: 'object', properties: [
+              { name: 'text', label: 'Text', optional: false },
+              { name: 'task_type', label: 'Task Type', control_type: 'select', pick_list: 'embedding_tasks' }
+          ]},
           { name: 'batch_size', type: 'integer', default: 10, hint: 'Items per batch' }
         ]
+        call('execute_behavior', connection, behavior, { 'texts' => batch.map { |i| i['text'] },
+                                                 'task_type' => batch.first['task_type'] })
       end,
       
       execute: lambda do |connection, input, input_schema, output_schema, config_fields|
@@ -348,21 +340,11 @@
         variables.each { |k, v| result = result.gsub("{#{k}}", v.to_s) }
         result
       when 'vertex_prompt'
-        contents = [{
-          'role' => 'user',
-          'parts' => [{ 'text' => call('apply_template', template, variables) }]
-        }]
-        
-        # Add system instruction if present
-        if variables['system']
-          contents.unshift({
-            'role' => 'model',
-            'parts' => [{ 'text' => variables['system'] }]
-          })
-        end
-        
-        {
-          'contents' => contents,
+        payload = {
+          'contents' => [{
+            'role' => 'user',
+            'parts' => [{ 'text' => call('apply_template', template, variables) }]
+          }],
           'generationConfig' => {
             'temperature' => variables['temperature'] || 0.7,
             'maxOutputTokens' => variables['max_tokens'] || 2048,
@@ -370,6 +352,19 @@
             'topK' => variables['top_k'] || 40
           }.compact
         }
+
+        # add systemInstruction only for 2.x models when present
+        model = variables['model'] || 'gemini-1.5-flash'
+        if variables['system'] && model.start_with?('gemini-2.')
+          payload['systemInstruction'] = { 'parts' => [{ 'text' => variables['system'] }] }
+        elsif variables['system']
+          # fallback: prepend to prompt for 1.5 models
+          payload['contents'][0]['parts'].unshift({ 'text' => variables['system'] + "\n\n" })
+        end
+
+        payload
+
+      # Embedding
       when 'embedding'
         {
           'instances' => variables['texts'].map { |text|
@@ -379,6 +374,7 @@
             }
           }
         }
+      # Multimodal
       when 'multimodal'
         parts = []
         parts << { 'text' => variables['text'] } if variables['text']
@@ -386,19 +382,16 @@
         if variables['images']
           variables['images'].each do |img|
             parts << {
-              'inline_data' => {
-                'mime_type' => img['mime_type'] || 'image/jpeg',
-                'data' => img['data']
+              'inLineData' => {
+              'mimeType' => img['mime_type'] || 'image/jpeg',
+              'data' => img['data']
               }
             }
           end
         end
         
         {
-          'contents' => [{
-            'role' => 'user',
-            'parts' => parts
-          }],
+          'contents' => [{ 'role' => 'user', 'parts' => parts }],
           'generationConfig' => call('build_generation_config', variables)
         }
       else
@@ -451,8 +444,9 @@
         return {} unless json_match
         
         JSON.parse(json_match[1] || json_match[0]) rescue {}
-      when 'embeddings'
-        data['predictions']&.map { |p| p['embeddings'] || p['values'] }&.compact || []
+      (data['predictions'] || []).map do |p|
+        p.dig('embeddings', 'values') || p['values'] # handle both shapes
+      end.compact
       else
         data
       end
@@ -480,7 +474,7 @@
             end
           
           # Add trace metadata and preserve it - don't mutate
-          body = resp.is_a?(Hash) ? resp.dup : { 'raw' => resp }
+          body = response.is_a?(Hash) ? resp.dup : { 'raw' => resp }
           body['_trace'] = {
             'correlation_id'  => headers['X-Correlation-Id'],
             'duration_ms'     => ((Time.now - start_time) * 1000).round,
@@ -992,8 +986,9 @@
 
     # Build endpoint URL
     build_endpoint_url: lambda do |connection, endpoint_config, input|
-      base_url = "https://#{connection['region']}-aiplatform.googleapis.com/v1"
-      
+      api_version = connection['version'].presence || 'v1'   # <- use configured version
+      base_url = "https://#{connection['region']}-aiplatform.googleapis.com/#{api_version}"
+
       # Determine model path
       model = input['model'] || 'gemini-1.5-flash'
       model_mappings = {
