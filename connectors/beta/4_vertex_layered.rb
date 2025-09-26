@@ -29,7 +29,7 @@
       
       # Default Behaviors
       { name: 'default_model', label: 'Default Model', control_type: 'select', 
-        pick_list: 'all_models', optional: true },
+        options: ['all_models'], optional: true },
       { name: 'optimization_mode', label: 'Optimization Mode', control_type: 'select',
         options: [['Balanced', 'balanced'], ['Cost', 'cost'], ['Performance', 'performance']],
         default: 'balanced' },
@@ -102,10 +102,7 @@
           name: 'advanced_config',
           label: 'Show Advanced Configuration',
           control_type: 'checkbox',
-          extends_schema: true,
-          toggle_visibility: {
-            'true' => ['model_override', 'temperature', 'max_tokens', 'cache_ttl']
-          }
+          extends_schema: true
         }
       ],
       
@@ -135,22 +132,13 @@
         base + behavior_fields
       end,
       
-      execute: lambda do |connection, input, input_schema, output_schema, config_fields|
-        behavior = config_fields['behavior']
-        
-        # Build user configuration from advanced settings
-        user_config = {}
-        if config_fields['advanced_config']
-          user_config = {
-            'model' => input.delete('model_override'),
-            'temperature' => input.delete('temperature'),
-            'max_tokens' => input.delete('max_tokens'),
-            'cache_ttl' => input.delete('cache_ttl')
-          }.compact
-        end
-        
-        # Execute through layered architecture
-        call('execute_behavior', connection, behavior, input, user_config)
+      execute: lambda do |connection, input, _in_schema, _out_schema, config_fields|
+        behavior     = config_fields['behavior']
+        user_config  = call('extract_user_config', input, config_fields['advanced_config'])
+        safe_input   = call('deep_copy', input) # do NOT mutate Workato’s input
+
+        # Leave advanced fields in safe_input; pipeline reads only what it needs
+        call('execute_behavior', connection, behavior, safe_input, user_config)
       end,
 
       sample_output: lambda do |_connection, config_fields|
@@ -275,38 +263,6 @@
     # LAYER 1: CORE METHODS (Foundation)
     # ============================================
     
-    # HTTP Request Execution
-    http_request: lambda do |connection, method:, url:, payload: nil, headers: {}, retry_config: {}|
-      retries = retry_config['max_retries'] || 3
-      backoff = retry_config['backoff'] || 1.0
-      
-      retries.times do |attempt|
-        begin
-          headers['X-Correlation-Id'] ||= "#{Time.now.to_i}-#{rand(1000)}"
-          start_time = Time.now
-          
-          response = case method.to_s.upcase
-          when 'GET' then get(url).headers(headers)
-          when 'POST' then post(url, payload).headers(headers)
-          when 'PUT' then put(url, payload).headers(headers)
-          when 'DELETE' then delete(url).headers(headers)
-          end
-          
-          # Add trace metadata
-          response['_trace'] = {
-            'correlation_id' => headers['X-Correlation-Id'],
-            'duration_ms' => ((Time.now - start_time) * 1000).round,
-            'attempt' => attempt + 1
-          }
-          
-          return response
-        rescue => e
-          raise e if attempt >= retries - 1
-          sleep(backoff * (2 ** attempt))
-        end
-      end
-    end,
-    
     # Payload Building
     build_payload: lambda do |template:, variables:, format:|
       case format
@@ -375,6 +331,22 @@
       end
     end,
     
+    # Response Enrichment
+    enrich_response: lambda do |response:, metadata: {}|
+      enriched = response.is_a?(Hash) ? response.dup : { 'result' => response }
+      
+      enriched['success'] = true
+      enriched['timestamp'] = Time.now.iso8601
+      enriched['metadata'] = metadata
+      
+      # Add trace if present
+      if response.is_a?(Hash) && response['_trace']
+        enriched['trace'] = response.delete('_trace')
+      end
+      
+      enriched
+    end,
+
     # Response Extraction
     extract_response: lambda do |data:, path: nil, format: 'raw'|
       case format
@@ -410,7 +382,44 @@
         data
       end
     end,
-    
+
+    # HTTP Request Execution
+    http_request: lambda do |connection, method:, url:, payload: nil, headers: {}, retry_config: {}|
+      retries = retry_config['max_retries'] || 3
+      backoff = retry_config['backoff'] || 1.0
+      
+      retries.times do |attempt|
+        begin
+          headers['X-Correlation-Id'] ||= "#{Time.now.to_i}-#{rand(1000)}"
+          start_time = Time.now
+          
+          response = 
+            case method.to_s.upcase
+            when 'GET'    then get(url).headers(headers)
+            when 'POST'   then post(url, payload).headers(headers)
+            when 'PUT'    then put(url, payload).headers(headers)
+            when 'DELETE' then delete(url).headers(headers)
+            # Guard for errors
+            else
+              error("Unsupported HTTP method: #{method}")
+            end
+          
+          # Add trace metadata and preserve it - don't mutate
+          body = resp.is_a?(Hash) ? resp.dup : { 'raw' => resp }
+          body['_trace'] = {
+            'correlation_id'  => headers['X-Correlation-Id'],
+            'duration_ms'     => ((Time.now - start_time) * 1000).round,
+            'attempt'         => attempt + 1
+          }
+          
+          return body
+        rescue => e
+          raise e if attempt >= retries - 1
+          sleep(backoff * (2 ** attempt))
+        end
+      end
+    end,
+
     # Data Transformation
     transform_data: lambda do |input:, from_format:, to_format:|
       case "#{from_format}_to_#{to_format}"
@@ -515,34 +524,22 @@
         end
       end
     end,
-    
-    # Response Enrichment
-    enrich_response: lambda do |response:, metadata: {}|
-      enriched = response.is_a?(Hash) ? response.dup : { 'result' => response }
-      
-      enriched['success'] = true
-      enriched['timestamp'] = Time.now.iso8601
-      enriched['metadata'] = metadata
-      
-      # Add trace if present
-      if response.is_a?(Hash) && response['_trace']
-        enriched['trace'] = response.delete('_trace')
-      end
-      
-      enriched
-    end,
+
     
     # ============================================
     # LAYER 2: UNIVERSAL PIPELINE
     # ============================================
     
     execute_pipeline: lambda do |connection, operation, input, config|
+      # Don't mutate the input
+      local = call('deep_copy', input)
+
       # 1. Validate
       if config['validate']
         call('validate_input',
-          data: input,
-          schema: config['validate']['schema'] || [],
-          constraints: config['validate']['constraints'] || []
+          data:         local,
+          schema:       config['validate']['schema'] || [],
+          constraints:  config['validate']['constraints'] || []
         )
       end
       
@@ -550,10 +547,10 @@
       if config['transform_input']
         config['transform_input'].each do |field, transform|
           if input[field]
-            input[field] = call('transform_data',
-              input: input[field],
-              from_format: transform['from'],
-              to_format: transform['to']
+            local[field] = call('transform_data',
+              input:        local[field],
+              from_format:  transform['from'],
+              to_format:    transform['to']
             )
           end
         end
@@ -562,37 +559,37 @@
       # 3. Build payload
       payload = if config['payload']
         call('build_payload',
-          template: config['payload']['template'] || '',
-          variables: input.merge('system' => config['payload']['system']),
-          format: config['payload']['format'] || 'direct'
+          template:   config['payload']['template'] || '',
+          variables:  local.merge('system' => config['payload']['system']),
+          format:     config['payload']['format'] || 'direct'
         )
       else
-        input
+        local
       end
       
       # 4. Build URL
-      endpoint = config['endpoint'] || {}
-      url = call('build_endpoint_url', connection, endpoint, input)
+      endpoint  = config['endpoint'] || {}
+      url       = call('build_endpoint_url', connection, endpoint, local)
       
       # 5. Execute with resilience
       response = call('with_resilience',
-        operation: operation,
-        config: config['resilience'] || {}
+        operation:  operation,
+        config:     config['resilience'] || {}
       ) do
         call('http_request',
           connection,
-          method: endpoint['method'] || 'POST',
-          url: url,
-          payload: payload,
-          headers: call('build_headers', connection)
+          method:   endpoint['method'] || 'POST',
+          url:      url,
+          payload:  payload,
+          headers:  call('build_headers', connection)
         )
       end
       
       # 6. Extract response
       extracted = if config['extract']
         call('extract_response',
-          data: response,
-          path: config['extract']['path'],
+          data:   response,
+          path:   config['extract']['path'],
           format: config['extract']['format'] || 'raw'
         )
       else
@@ -601,16 +598,13 @@
       
       # 7. Post-process
       if config['post_process']
-        extracted = call(config['post_process'], extracted, input)
+        extracted = call(config['post_process'], extracted, local)
       end
       
       # 8. Enrich
       call('enrich_response',
         response: extracted,
-        metadata: {
-          'operation' => operation,
-          'model' => config['model'] || input['model']
-        }
+        metadata: { 'operation' => operation, 'model' => config['model'] || local['model'] }
       )
     end,
     
@@ -897,22 +891,30 @@
     # HELPER METHODS
     # ============================================
     
-    # Model selection logic
-    select_model: lambda do |behavior_def, config, input|
-      # Explicit model in input takes precedence
-      return input['model'] if input['model']
-      
-      # Use configured default
-      model = config[:models][:default]
-      
-      # Ensure model supports the behavior
-      unless behavior_def[:supported_models].include?(model)
-        model = behavior_def[:supported_models].first
+    # Post-processing methods
+    add_word_count: lambda do |response, input|
+      if response.is_a?(String)
+        { 
+          'result' => response,
+          'word_count' => response.split.size
+        }
+      else
+        response['word_count'] = response['result'].to_s.split.size
+        response
       end
-      
-      model
     end,
     
+    # Template application
+    apply_template: lambda do |template, variables|
+      return template unless template && variables
+      
+      result = template.dup
+      variables.each do |key, value|
+        result = result.gsub("{#{key}}", value.to_s)
+      end
+      result
+    end,
+
     # Build endpoint URL
     build_endpoint_url: lambda do |connection, endpoint_config, input|
       base_url = "https://#{connection['region']}-aiplatform.googleapis.com/v1"
@@ -947,7 +949,76 @@
         'X-Goog-User-Project' => connection['project']
       }
     end,
+
+    # Rate limiting
+    check_rate_limit: lambda do |operation, limits|
+      cache_key = "rate_#{operation}_#{Time.now.to_i / 60}"
+      current = workato.cache.get(cache_key) || 0
+      
+      if current >= limits['rpm']
+        error("Rate limit exceeded for #{operation}. Please wait before retrying.")
+      end
+      
+      workato.cache.set(cache_key, current + 1, 60)
+    end,
+
+    coerce_kwargs: lambda do |*args, **kwargs| # ::TODO:: implement
+      if kwargs.empty? && args.last.is_a?(Hash)
+        h = args.pop
+        h = h.transform_keys { |k| k.respond_to?(:to_sym) ? k.to_sym : k }
+        kwargs = h
+      end
+      [args, kwargs]
+    end,
     
+    # Safely duplicate object
+    deep_copy: lambda { |obj| JSON.parse(JSON.dump(obj)) },
+
+    # Extract user configuration safely
+    extract_user_config: lambda do |input, cfg_enabled|
+      return {} unless cfg_enabled
+      {
+        'model'      => input['model_override'],
+        'temperature'=> input['temperature'],
+        'max_tokens' => input['max_tokens'],
+        'cache_ttl'  => input['cache_ttl']
+      }.compact
+    end,
+  
+    # Batch execution
+    execute_batch_behavior: lambda do |connection, behavior, items, batch_size, strategy|
+      results = []
+      errors = []
+      
+      # Process in batches
+      items.each_slice(batch_size) do |batch|
+        begin
+          # Execute batch based on strategy
+          batch_result = if behavior.include?('embed')
+            # Embeddings can be truly batched
+            call('execute_behavior', connection, behavior, { 'texts' => batch.map { |item| item['text'] } })
+          else
+            # Other operations need individual processing
+            batch.map do |item|
+              call('execute_behavior', connection, behavior, item)
+            end
+          end
+          
+          results.concat(Array.wrap(batch_result))
+        rescue => e
+          errors << { 'batch' => batch, 'error' => e.message }
+        end
+      end
+      
+      {
+        'success' => errors.empty?,
+        'results' => results,
+        'errors' => errors,
+        'total_processed' => results.size,
+        'total_errors' => errors.size
+      }
+    end,
+  
     # Get behavior input fields dynamically
     get_behavior_input_fields: lambda do |behavior, show_advanced|
       behavior_def = call('behavior_registry')[behavior]
@@ -1013,7 +1084,7 @@
     
     # Get behavior output fields
     get_behavior_output_fields: lambda do |behavior|
-      behavior_fields = case behavior
+      case behavior
       when 'text.generate'
         [{ name: 'result', label: 'Generated Text' }]
       when 'text.translate'
@@ -1032,92 +1103,29 @@
           { name: 'confidence', type: 'number' }
         ]
       when 'text.embed'
-        [
-          { name: 'embeddings', type: 'array', of: 'array' }
-        ]
+        [{ name: 'embeddings', type: 'array', of: 'array' }]
       when 'multimodal.analyze'
-        [
-          { name: 'result', label: 'Analysis' }
-        ]
+        [{ name: 'result', label: 'Analysis' }]
       else
         [{ name: 'result' }]
       end
-      
-      base_fields + behavior_fields + [
-        { name: 'metadata', type: 'object' },
-        { name: 'trace', type: 'object' }
-      ]
     end,
-    
-    # Post-processing methods
-    add_word_count: lambda do |response, input|
-      if response.is_a?(String)
-        { 
-          'result' => response,
-          'word_count' => response.split.size
-        }
-      else
-        response['word_count'] = response['result'].to_s.split.size
-        response
-      end
-    end,
-    
-    # Rate limiting
-    check_rate_limit: lambda do |operation, limits|
-      cache_key = "rate_#{operation}_#{Time.now.to_i / 60}"
-      current = workato.cache.get(cache_key) || 0
+
+    # Model selection logic
+    select_model: lambda do |behavior_def, config, input|
+      # Explicit model in input takes precedence
+      return input['model'] if input['model']
       
-      if current >= limits['rpm']
-        error("Rate limit exceeded for #{operation}. Please wait before retrying.")
+      # Use configured default
+      model = config[:models][:default]
+      
+      # Ensure model supports the behavior
+      unless behavior_def[:supported_models].include?(model)
+        model = behavior_def[:supported_models].first
       end
       
-      workato.cache.set(cache_key, current + 1, 60)
+      model
     end,
-    
-    # Template application
-    apply_template: lambda do |template, variables|
-      return template unless template && variables
-      
-      result = template.dup
-      variables.each do |key, value|
-        result = result.gsub("{#{key}}", value.to_s)
-      end
-      result
-    end,
-    
-    # Batch execution
-    execute_batch_behavior: lambda do |connection, behavior, items, batch_size, strategy|
-      results = []
-      errors = []
-      
-      # Process in batches
-      items.each_slice(batch_size) do |batch|
-        begin
-          # Execute batch based on strategy
-          batch_result = if behavior.include?('embed')
-            # Embeddings can be truly batched
-            call('execute_behavior', connection, behavior, { 'texts' => batch.map { |item| item['text'] } })
-          else
-            # Other operations need individual processing
-            batch.map do |item|
-              call('execute_behavior', connection, behavior, item)
-            end
-          end
-          
-          results.concat(Array.wrap(batch_result))
-        rescue => e
-          errors << { 'batch' => batch, 'error' => e.message }
-        end
-      end
-      
-      {
-        'success' => errors.empty?,
-        'results' => results,
-        'errors' => errors,
-        'total_processed' => results.size,
-        'total_errors' => errors.size
-      }
-    end
   },
 
   # ============================================
@@ -1130,11 +1138,7 @@
         ['US East 1', 'us-east1'],
         ['US East 4', 'us-east4'],
         ['US West 1', 'us-west1'],
-        ['US West 4', 'us-west4'],
-        ['Europe West 1', 'europe-west1'],
-        ['Europe West 4', 'europe-west4'],
-        ['Asia Northeast 1', 'asia-northeast1'],
-        ['Asia Southeast 1', 'asia-southeast1']
+        ['US West 4', 'us-west4']
       ]
     end,
     
@@ -1163,13 +1167,13 @@
       ]
     end,
     
-    models_for_behavior: lambda do |connection, input={}|
-      behavior_def = call('behavior_registry')[behavior]
-      return [] unless behavior_def
-      
-      behavior_def[:supported_models].map do |model|
-        label = model.split('-').map(&:capitalize).join(' ')
-        [label, model]
+    models_for_behavior: lambda do |connection, input = {}|
+      behavior = input['behavior']
+      defn = call('behavior_registry')[behavior]
+      next [] unless defn && defn[:supported_models]
+
+      defn[:supported_models].map do |model|
+        [model.split('-').map!(&:capitalize).join(' '), model]
       end
     end,
     
@@ -1197,7 +1201,17 @@
         ['Classification', 'CLASSIFICATION'],
         ['Clustering', 'CLUSTERING']
       ]
+    end,
+
+    safety_levels: lambda do |_connection|
+      [
+        ['Block none',   'BLOCK_NONE'],
+        ['Block low',    'BLOCK_LOW'],
+        ['Block medium', 'BLOCK_MEDIUM'],
+        ['Block high',   'BLOCK_HIGH']
+      ]
     end
+
   },
 
   # ============================================
