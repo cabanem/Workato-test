@@ -6,15 +6,10 @@
   # ============================================
   connection: {
     fields: [
-      { # - auth_type
-        name: 'auth_type', label: 'Authentication type', group: 'Authentication',
-        control_type: 'select', 
-        default: 'custom',
-        optional: false, 
-        extends_schema: true, 
-        hint: 'Select the authentication type for connecting to Google Vertex AI.',
-        options: [ ['Client credentials', 'custom'], %w[OAuth2 oauth2] ] 
-      },
+      # Authentication type
+      { name: 'auth_type', 
+        label: 'Authentication type', group: 'Authentication', control_type: 'select', default: 'custom', optional: false, extends_schema: true, 
+        hint: 'Select the authentication type for connecting to Google Vertex AI.', options: [ ['Client credentials', 'custom'], %w[OAuth2 oauth2] ]},
       # Google Cloud Configuration
       { name: 'project', label: 'Project ID', group: 'Google Cloud Platform', optional: false },
       { name: 'region',  label: 'Region',     group: 'Google Cloud Platform', optional: false, control_type: 'select', 
@@ -111,29 +106,26 @@
           fields: [
             { name: 'service_account_email', label: 'Service Account Email', group: 'Service Account', optional: false },
             { name: 'client_id', label: 'Client ID', group: 'Service Account', optional: false },
+            { name: 'private_key_id', label: 'Private Key ID', group: 'Service Account', optional: false },
             { name: 'private_key', label: 'Private Key', group: 'Service Account', optional: false, multiline: true, control_type: 'password' }
           ],
           acquire: lambda do |connection|
             jwt_body_claim = {
-              'iat' => now.to_i,
-              'exp' => 1.hour.from_now.to_i,
-              'aud' => 'https://oauth2.googleapis.com/token',
-              'iss' => connection['service_account_email'],
-              'sub' => connection['service_account_email'],
+              'iat'   => now.to_i,
+              'exp'   => 3600.seconds.from_now.to_i,
+              'aud'   => 'https://oauth2.googleapis.com/token',
+              'iss'   => connection['service_account_email'],
+              'sub'   => connection['service_account_email'],
               'scope' => 'https://www.googleapis.com/auth/cloud-platform'
             }
             private_key = connection['private_key'].gsub('\\n', "\n")
-            jwt_token =
-              workato.jwt_encode(jwt_body_claim,
-                                 private_key, 'RS256',
-                                 kid: connection['client_id'])
+            jwt_token   = workato.jwt_encode(jwt_body_claim, private_key, 'RS256', kid: connection['private_key_id'])
 
-            response = post('https://oauth2.googleapis.com/token',
+            response    = post('https://oauth2.googleapis.com/token',
                             grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-                            assertion: jwt_token).
-                       request_format_www_form_urlencoded
+                            assertion: jwt_token). request_format_www_form_urlencoded
 
-            { access_token: response['access_token'] }
+            { access_token: response['access_token'], expires_at: (Time.now + response['expires_in'].to_i).iso8601 }
           end,
           refresh_on: [401],
           apply: lambda do |connection|
@@ -149,8 +141,10 @@
   },
   
   test: lambda do |connection|
-    get("projects/#{connection['project']}/locations/#{connection['region']}")
-    true
+    model = 'gemini-1.5-flash',
+    url = "projects/#{connection['project']}/locations/#{connection['region']}/publishers/google/models/#{model}:generateContent"
+    post(url, { contents: [{ role: 'user', parts: [{ text: 'ping' }] }] })
+      .after_response { true }
   rescue => e
     error("Connection failed: #{e.message}")
   end,
@@ -273,8 +267,6 @@
           ]},
           { name: 'batch_size', type: 'integer', default: 10, hint: 'Items per batch' }
         ]
-        call('execute_behavior', connection, behavior, { 'texts' => batch.map { |i| i['text'] },
-                                                 'task_type' => batch.first['task_type'] })
       end,
       
       execute: lambda do |connection, input, input_schema, output_schema, config_fields|
@@ -333,35 +325,35 @@
     # Payload Building
     build_payload: lambda do |template:, variables:, format:|
       case format
+      
+      # Direct
       when 'direct'
         variables
+      
+      # Template
       when 'template'
         result = template.dup
         variables.each { |k, v| result = result.gsub("{#{k}}", v.to_s) }
         result
+      
+      # Vertex prompt
       when 'vertex_prompt'
         payload = {
           'contents' => [{
             'role' => 'user',
             'parts' => [{ 'text' => call('apply_template', template, variables) }]
           }],
-          'generationConfig' => {
-            'temperature' => variables['temperature'] || 0.7,
-            'maxOutputTokens' => variables['max_tokens'] || 2048,
-            'topP' => variables['top_p'] || 0.95,
-            'topK' => variables['top_k'] || 40
-          }.compact
-        }
+          'generationConfig' => call('build_generation_config', variables)
+        }.compact
 
-        # add systemInstruction only for 2.x models when present
-        model = variables['model'] || 'gemini-1.5-flash'
-        if variables['system'] && model.start_with?('gemini-2.')
+        # Always honor system instructions if provided (Vertex v1 supports this)
+        if variables['system'].present?
           payload['systemInstruction'] = { 'parts' => [{ 'text' => variables['system'] }] }
-        elsif variables['system']
-          # fallback: prepend to prompt for 1.5 models
-          payload['contents'][0]['parts'].unshift({ 'text' => variables['system'] + "\n\n" })
         end
 
+        # Optional governance knobs
+        payload['safetySettings'] = variables['safety_settings'] if variables['safety_settings']
+        payload['labels']         = variables['labels'] if variables['labels'] # for billing/reporting
         payload
 
       # Embedding
@@ -374,6 +366,7 @@
             }
           }
         }
+
       # Multimodal
       when 'multimodal'
         parts = []
@@ -418,73 +411,69 @@
     # Response Extraction
     extract_response: lambda do |data:, path: nil, format: 'raw'|
       case format
-      when 'raw'
-        data
+      # Raw data
+      when 'raw' then data
+      # Json field
       when 'json_field'
         return data unless path
-        result = data
-        path.split('.').each do |segment|
-          if segment.match?(/^\d+$/)
-            result = result[segment.to_i]
-          else
-            result = result[segment]
-          end
-          break unless result
-        end
-        result
+        path.split('.').reduce(data) { |acc, seg| acc.is_a?(Array) && seg =~ /^\d+$/ ? acc[seg.to_i] : (acc || {})[seg] }
+      # Vertex text
       when 'vertex_text'
-        data.dig('candidates', 0, 'content', 'parts', 0, 'text') || 
-        data.dig('predictions', 0, 'content')
+        parts = data.dig('candidates', 0, 'content', 'parts') || []
+        text  = parts.select { |p| p['text'] }.map { |p| p['text'] }.join
+        text.empty? ? data.dig('predictions', 0, 'content').to_s : text
+      # Vertex-flavored json
       when 'vertex_json'
-        text = data.dig('candidates', 0, 'content', 'parts', 0, 'text')
-        return {} unless text
-        
-        # Extract JSON from markdown code blocks if present
-        json_match = text.match(/```(?:json)?\n?(.*?)\n?```/m) || text.match(/\{.*\}/m)
-        return {} unless json_match
-        
-        JSON.parse(json_match[1] || json_match[0]) rescue {}
-      (data['predictions'] || []).map do |p|
-        p.dig('embeddings', 'values') || p['values'] # handle both shapes
-      end.compact
-      else
-        data
+        raw = (data.dig('candidates', 0, 'content', 'parts') || []).map { |p| p['text'] }.compact.join
+        return {} if raw.nil? || raw.empty?
+        m = raw.match(/```(?:json)?\s*(\{.*?\})\s*```/m) || raw.match(/\{.*\}/m)
+        m ? (JSON.parse(m[1] || m[0]) rescue {}) : {}
+      # Embeddings
+      when 'embeddings'
+        # text-embedding APIs return embeddings under predictions[].embeddings.values
+        arr = (data['predictions'] || []).map { |p| p.dig('embeddings', 'values') || p['values'] }.compact
+        arr
+      else data
       end
     end,
 
     # HTTP Request Execution
     http_request: lambda do |connection, method:, url:, payload: nil, headers: {}, retry_config: {}|
-      retries = retry_config['max_retries'] || 3
-      backoff = retry_config['backoff'] || 1.0
-      
-      retries.times do |attempt|
+      max_retries = (retry_config['max_retries'] || retry_config['max_attempts'] || 3).to_i
+      backoff     = (retry_config['backoff'] || 1.0).to_f
+
+      (1..max_retries).each do |attempt|
         begin
-          headers['X-Correlation-Id'] ||= "#{Time.now.to_i}-#{rand(1000)}"
-          start_time = Time.now
-          
-          response = 
-            case method.to_s.upcase
-            when 'GET'    then get(url).headers(headers)
-            when 'POST'   then post(url, payload).headers(headers)
-            when 'PUT'    then put(url, payload).headers(headers)
-            when 'DELETE' then delete(url).headers(headers)
-            # Guard for errors
-            else
-              error("Unsupported HTTP method: #{method}")
-            end
-          
-          # Add trace metadata and preserve it - don't mutate
-          body = response.is_a?(Hash) ? resp.dup : { 'raw' => resp }
-          body['_trace'] = {
-            'correlation_id'  => headers['X-Correlation-Id'],
-            'duration_ms'     => ((Time.now - start_time) * 1000).round,
-            'attempt'         => attempt + 1
-          }
-          
+          corr = headers['X-Correlation-Id'] ||= "#{Time.now.utc.to_i}-#{SecureRandom.hex(6)}"
+          started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+          req = case method.to_s.upcase
+                when 'GET'    then get(url)
+                when 'POST'   then post(url, payload)
+                when 'PUT'    then put(url, payload)
+                when 'DELETE' then delete(url)
+                else error("Unsupported HTTP method: #{method}")
+                end
+
+          response =
+            req.headers(headers)
+              .after_error_response(/.*/) { |code, body, rheaders, message|
+                # normalize errors for observability
+                error("#{message} (#{code}): #{body}")
+              }
+              .after_response { |code, body, rheaders|
+                # keep response body as hash and enrich with http metadata
+                body ||= {}
+                body['_http'] = { 'status' => code, 'headers' => rheaders }
+              }
+
+          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+          body = response.is_a?(Hash) ? response.dup : { 'raw' => response }
+          body['_trace'] = { 'correlation_id' => corr, 'duration_ms' => duration_ms, 'attempt' => attempt }
           return body
         rescue => e
-          raise e if attempt >= retries - 1
-          sleep(backoff * (2 ** attempt))
+          raise e if attempt >= max_retries
+          sleep(backoff * (2 ** (attempt - 1)))
         end
       end
     end,
@@ -594,7 +583,6 @@
       end
     end,
 
-    
     # ============================================
     # LAYER 2: UNIVERSAL PIPELINE
     # ============================================
@@ -647,10 +635,11 @@
       ) do
         call('http_request',
           connection,
-          method:   endpoint['method'] || 'POST',
-          url:      url,
-          payload:  payload,
-          headers:  call('build_headers', connection)
+          method:       endpoint['method'] || 'POST',
+          url:          url,
+          payload:      payload,
+          headers:      call('build_headers', connection),
+          retry_config: (config.dig('resilience', 'retry') || {})
         )
       end
       
@@ -1017,7 +1006,8 @@
         'temperature'     => vars['temperature'] || 0.7,
         'maxOutputTokens' => vars['max_tokens']  || 2048,
         'topP'            => vars['top_p']       || 0.95,
-        'topK'            => vars['top_k']       || 40
+        'topK'            => vars['top_k']       || 40,
+        'stopSequences'   => vars['stop_sequences']
       }.compact
     end,
 
