@@ -28,8 +28,14 @@
         hint: 'Required only for vector search operations' },
       
       # Default Behaviors
-      { name: 'default_model', label: 'Default Model', control_type: 'select', 
-        options: ['all_models'], optional: true },
+      { name: 'default_model', label: 'Default Model', control_type: 'select',
+        options: [
+          ['Gemini 1.5 Flash', 'gemini-1.5-flash'],
+          ['Gemini 1.5 Pro',   'gemini-1.5-pro'],
+          ['Text Embedding 004', 'text-embedding-004'],
+          ['Text Embedding Gecko', 'textembedding-gecko']
+        ],
+        optional: true },
       { name: 'optimization_mode', label: 'Optimization Mode', control_type: 'select',
         options: [['Balanced', 'balanced'], ['Cost', 'cost'], ['Performance', 'performance']],
         default: 'balanced' },
@@ -60,12 +66,12 @@
         
         { access_token: response['access_token'] }
       end,
-      
-      refresh_on: [401],
-      
+
       apply: lambda do |connection|
-        headers(Authorization: "Bearer #{connection['access_token']}")
-      end
+        headers("Authorization": "Bearer #{connection['access_token']}")
+      end,
+      
+      refresh_on: [401]
     },
     
     base_uri: lambda do |connection|
@@ -196,7 +202,7 @@
           name: 'batch_strategy',
           label: 'Batch Strategy',
           control_type: 'select',
-          pick_list: [['By Count', 'count'], ['By Token Limit', 'tokens']],
+          options: [['By Count', 'count'], ['By Token Limit', 'tokens']],
           default: 'count'
         }
       ],
@@ -546,7 +552,7 @@
       # 2. Transform input
       if config['transform_input']
         config['transform_input'].each do |field, transform|
-          if input[field]
+          if local[field]
             local[field] = call('transform_data',
               input:        local[field],
               from_format:  transform['from'],
@@ -942,6 +948,15 @@
       end
     end,
     
+    build_generation_config: lambda do |vars|
+      {
+        'temperature'     => vars['temperature'] || 0.7,
+        'maxOutputTokens' => vars['max_tokens']  || 2048,
+        'topP'            => vars['top_p']       || 0.95,
+        'topK'            => vars['top_k']       || 40
+      }.compact
+    end,
+
     # Build request headers
     build_headers: lambda do |connection|
       {
