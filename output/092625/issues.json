@@ -1,0 +1,170 @@
+[
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'build_payload' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'enrich_response' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'extract_response' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'transform_data' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'validate_input' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'with_resilience' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'execute_pipeline' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'configuration_registry' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'add_upsert_ack' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'add_word_count' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'apply_template' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'build_endpoint_url' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'build_generation_config' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'check_rate_limit' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'coerce_kwargs' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'get_behavior_input_fields' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'get_behavior_output_fields' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'normalize_find_neighbors' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'qualify_resource' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'resolve_model_version' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'select_model' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "info",
+    "category": "unused_method",
+    "message": "Method 'vector_search_base' is not reachable from any action/test entrypoints",
+    "where": "methods"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'enrich_response' (delete). Prefer unified api_request wrapper.",
+    "where": "methods.enrich_response"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'http_request' (get, post, put, delete). Prefer unified api_request wrapper.",
+    "where": "methods.http_request"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'transform_data' (get). Prefer unified api_request wrapper.",
+    "where": "methods.transform_data"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'check_rate_limit' (get). Prefer unified api_request wrapper.",
+    "where": "methods.check_rate_limit"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'list_publisher_models' (get). Prefer unified api_request wrapper.",
+    "where": "methods.list_publisher_models"
+  },
+  {
+    "severity": "warning",
+    "category": "direct_http",
+    "message": "Direct HTTP calls detected in 'resolve_model_version' (get). Prefer unified api_request wrapper.",
+    "where": "methods.resolve_model_version"
+  }
+]

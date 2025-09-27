@@ -1,0 +1,192 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Connector Call Graph</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;margin:0;background:#fafafa}
+    header{padding:16px 20px;border-bottom:1px solid #e5e7eb;background:#fff;position:sticky;top:0}
+    main{padding:16px}
+    pre.mermaid{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;overflow:auto}
+    .legend{display:flex;gap:8px;align-items:center;margin:12px 0 20px}
+    .chip{border-radius:10px;padding:2px 8px;border:1px solid #e5e7eb}
+    .chip.action{background:#E3F2FD;border-color:#1E88E5}
+    .chip.method{background:#E8F5E9;border-color:#2E7D32}
+    .chip.http{background:#FFF3E0;border-color:#EF6C00}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, securityLevel: 'loose', theme: 'default' });</script>
+</head>
+<body>
+  <header><h1 style="margin:0;font-size:18px">Connector Call Graph</h1></header>
+  <main>
+    <div class="legend">
+      <span class="chip action">Action entrypoint</span>
+      <span class="chip method">Method</span>
+      <span class="chip http">Direct HTTP</span>
+    </div>
+    <pre class="mermaid">flowchart TD
+  execute_batch_operation([execute:batch_operation])
+  execute_batch_behavior[execute_batch_behavior]
+  execute_vertex_operation([execute:vertex_operation])
+  extract_user_config[extract_user_config]
+  deep_copy[deep_copy]
+  execute_behavior[execute_behavior]
+  execute_find_neighbors([execute:find_neighbors])
+  execute_generate_embeddings([execute:generate_embeddings])
+  execute_generate_text([execute:generate_text])
+  execute_upsert_index_datapoints([execute:upsert_index_datapoints])
+  build_payload[build_payload]
+  apply_template[apply_template]
+  build_generation_config[build_generation_config]
+  enrich_response[enrich_response]
+  HTTP_DELETE{{HTTP:DELETE}}
+  extract_response[extract_response]
+  http_request[http_request]
+  HTTP_GET{{HTTP:GET}}
+  HTTP_POST{{HTTP:POST}}
+  HTTP_PUT{{HTTP:PUT}}
+  transform_data[transform_data]
+  validate_input[validate_input]
+  with_resilience[with_resilience]
+  check_rate_limit[check_rate_limit]
+  execute_pipeline[execute_pipeline]
+  behavior_registry[behavior_registry]
+  configuration_registry[configuration_registry]
+  add_upsert_ack[add_upsert_ack]
+  add_word_count[add_word_count]
+  build_endpoint_url[build_endpoint_url]
+  qualify_resource[qualify_resource]
+  vector_search_base[vector_search_base]
+  resolve_model_version[resolve_model_version]
+  build_headers[build_headers]
+  coerce_kwargs[coerce_kwargs]
+  get_behavior_input_fields[get_behavior_input_fields]
+  get_behavior_output_fields[get_behavior_output_fields]
+  list_publisher_models[list_publisher_models]
+  normalize_find_neighbors[normalize_find_neighbors]
+  select_model[select_model]
+  top_test[top:test]
+  execute_batch_operation --> execute_batch_behavior
+  execute_vertex_operation --> extract_user_config
+  execute_vertex_operation --> deep_copy
+  execute_vertex_operation --> execute_behavior
+  execute_find_neighbors --> execute_behavior
+  execute_find_neighbors --> deep_copy
+  execute_generate_embeddings --> extract_user_config
+  execute_generate_embeddings --> deep_copy
+  execute_generate_embeddings --> execute_behavior
+  execute_generate_text --> extract_user_config
+  execute_generate_text --> deep_copy
+  execute_generate_text --> execute_behavior
+  execute_upsert_index_datapoints --> execute_behavior
+  execute_upsert_index_datapoints --> deep_copy
+  build_payload --> apply_template
+  build_payload --> build_generation_config
+  enrich_response --> HTTP_DELETE
+  http_request --> HTTP_GET
+  http_request --> HTTP_POST
+  http_request --> HTTP_PUT
+  http_request --> HTTP_DELETE
+  transform_data --> HTTP_GET
+  with_resilience --> check_rate_limit
+  execute_pipeline --> deep_copy
+  execute_pipeline --> validate_input
+  execute_behavior --> behavior_registry
+  build_endpoint_url --> qualify_resource
+  build_endpoint_url --> vector_search_base
+  build_endpoint_url --> resolve_model_version
+  check_rate_limit --> HTTP_GET
+  execute_batch_behavior --> execute_behavior
+  get_behavior_input_fields --> behavior_registry
+  list_publisher_models --> build_headers
+  list_publisher_models --> HTTP_GET
+  normalize_find_neighbors --> transform_data
+  resolve_model_version --> list_publisher_models
+  resolve_model_version --> HTTP_GET
+  top_test --> list_publisher_models
+  top_test --> http_request
+  top_test --> build_headers
+  classDef action fill:#E3F2FD,stroke:#1E88E5,stroke-width:1px;
+  classDef method fill:#E8F5E9,stroke:#2E7D32,stroke-width:1px;
+  classDef http   fill:#FFF3E0,stroke:#EF6C00,stroke-width:1px;
+  classDef hot stroke:#6A1B9A,stroke-width:3px;
+  classDef cycle stroke:#C62828,stroke-width:3px;
+  classDef unused fill:#ECECEC,color:#6B7280,stroke:#9CA3AF;
+  classDef undef stroke-dasharray:4 2,stroke:#EF4444;
+  class execute_batch_operation action;
+  class execute_vertex_operation action;
+  class execute_find_neighbors action;
+  class execute_generate_embeddings action;
+  class execute_generate_text action;
+  class execute_upsert_index_datapoints action;
+  class execute_batch_behavior method;
+  class extract_user_config method;
+  class deep_copy method;
+  class execute_behavior method;
+  class build_payload method;
+  class apply_template method;
+  class build_generation_config method;
+  class enrich_response method;
+  class extract_response method;
+  class http_request method;
+  class transform_data method;
+  class validate_input method;
+  class with_resilience method;
+  class check_rate_limit method;
+  class execute_pipeline method;
+  class behavior_registry method;
+  class configuration_registry method;
+  class add_upsert_ack method;
+  class add_word_count method;
+  class build_endpoint_url method;
+  class qualify_resource method;
+  class vector_search_base method;
+  class resolve_model_version method;
+  class build_headers method;
+  class coerce_kwargs method;
+  class get_behavior_input_fields method;
+  class get_behavior_output_fields method;
+  class list_publisher_models method;
+  class normalize_find_neighbors method;
+  class select_model method;
+  class top_test method;
+  class HTTP_DELETE http;
+  class HTTP_GET http;
+  class HTTP_POST http;
+  class HTTP_PUT http;
+  class execute_vertex_operation hot;
+  class extract_user_config hot;
+  class deep_copy hot;
+  class execute_behavior hot;
+  class execute_generate_embeddings hot;
+  class execute_generate_text hot;
+  class build_payload unused;
+  class apply_template unused;
+  class build_generation_config unused;
+  class enrich_response unused;
+  class extract_response unused;
+  class http_request hot;
+  class HTTP_GET hot;
+  class transform_data unused;
+  class validate_input unused;
+  class with_resilience unused;
+  class check_rate_limit unused;
+  class execute_pipeline unused;
+  class configuration_registry unused;
+  class add_upsert_ack unused;
+  class add_word_count unused;
+  class build_endpoint_url hot,unused;
+  class qualify_resource unused;
+  class vector_search_base unused;
+  class resolve_model_version unused;
+  class coerce_kwargs unused;
+  class get_behavior_input_fields unused;
+  class get_behavior_output_fields unused;
+  class normalize_find_neighbors unused;
+  class select_model unused;
+  class top_test hot;</pre>
+  </main>
+</body>
+</html>

@@ -753,30 +753,28 @@
     
     # Error Recovery
     with_resilience: lambda do |operation:, config: {}, &block|
-      # Rate limiting
+      # Rate limiting (per-job)
       if config['rate_limit']
         call('check_rate_limit', operation, config['rate_limit'])
       end
       
       # Circuit breaker
-      circuit_key = "circuit_#{operation}"
-      circuit_state = workato.cache.get(circuit_key) || { 'failures' => 0 }
+      circuit_key   = "circuit_#{operation}"
+      circuit_state = call('memo_get', circuit_key) || { 'failures' => 0 }
       
-      if circuit_state['failures'] >= 5
-        error("Circuit breaker open for #{operation}. Too many recent failures.")
-      end
-      
+      error("Circuit breaker open for #{operation}. Too many recent failures.") if circuit_state['failures'] >= 5
+
       begin
         result = block.call
         
         # Reset circuit on success
-        workato.cache.set(circuit_key, { 'failures' => 0 }, 300)
+        call('memo_put', circuit_key, { 'failures' => 0 }, 300)
         result
         
       rescue => e
         # Update circuit breaker
         circuit_state['failures'] += 1
-        workato.cache.set(circuit_key, circuit_state, 300)
+        call('memo_put', circuit_key, circuit_state, 300)
         
         # Determine if retryable
         if e.message.match?(/rate limit|quota/i)
@@ -1160,24 +1158,16 @@
       # Build operation configuration
       operation_config = behavior_def[:config_template].deep_dup || {}
       
-      # Apply defaults
+      # Apply defaults and write to copy
       if behavior_def[:defaults]
         behavior_def[:defaults].each do |key, value|
           input[key] ||= value
         end
       end
-      
-      # Apply user configuration
-      if config[:generation]
-        input.merge!(config[:generation])
-      end
+      input.merge!(config[:generation]) if config[:generation]
       
       # Select model
-      operation_config['model'] = call('select_model', 
-        behavior_def, 
-        config, 
-        input
-      )
+      operation_config['model'] = call('select_model',behavior_def, config, input)
       
       # Add resilience config
       operation_config['resilience'] = config[:execution]
@@ -1185,16 +1175,17 @@
       # Cache if enabled
       if config[:features][:caching][:enabled]
         cache_key = "vertex_#{behavior}_#{input.to_json.hash}"
-        cached = workato.cache.get(cache_key)
-        return cached if cached
+        if (hit = call('memo_get', cache_key))
+          return hit
+        end
       end
       
       # Execute through pipeline
       result = call('execute_pipeline', connection, behavior, input, operation_config)
       
-      # Cache result
+      # 'Cache' result
       if config[:features][:caching][:enabled]
-        workato.cache.set(cache_key, result, config[:features][:caching][:ttl])
+        call('memo_put', cache_key, result, config[:features][:caching][:ttl] || 300)
       end
       
       result
@@ -1222,8 +1213,10 @@
           'word_count' => response.split.size
         }
       else
-        response['word_count'] = response['result'].to_s.split.size
-        response
+        {
+          'result' => response,
+          'word_count' => response.to_s.split.size
+        }
       end
     end,
     
@@ -1255,7 +1248,7 @@
         base  = call('vector_search_base', connection, input)
         ie    = call('qualify_resource', connection, 'index_endpoint',
                       input['index_endpoint'] || endpoint_config['index_endpoint'])
-        "#{base}/#{ie}#{endpointconfig['path']}" # e.g., ':findNeighbors'
+        "#{base}/#{ie}#{endpoint_config['path']}" # e.g., ':findNeighbors'
 
       else
         # model/publisher logic and custom path
@@ -1302,14 +1295,10 @@
 
     # Rate limiting
     check_rate_limit: lambda do |operation, limits|
-      cache_key = "rate_#{operation}_#{Time.now.to_i / 60}"
-      current = workato.cache.get(cache_key) || 0
-      
-      if current >= limits['rpm']
-        error("Rate limit exceeded for #{operation}. Please wait before retrying.")
-      end
-      
-      workato.cache.set(cache_key, current + 1, 60)
+      key   = "rate_#{operation}_#{Time.now.to_i / 60}"
+      count = call('memo_put', ache_key) || 0
+      error("Rate limit exceeded for #{operation}. Please wait before retrying.") if count >= limits['rpm']
+      call('memo_put', key, count + 1, 60)
     end,
 
     coerce_kwargs: lambda do |*args, **kwargs| # ::TODO:: implement
@@ -1403,7 +1392,7 @@
         ]
       when 'text.embed'
         [
-          { name: 'texts', label: 'Texts to Embed', type: 'array', of: 'string' },
+          { name: 'texts', label: 'Texts to Embed', type: 'array', of: 'string', optional: false },
           { name: 'task_type', label: 'Task Type', control_type: 'select', pick_list: 'embedding_tasks' }
         ]
       when 'vector.upsert_datapoints'
@@ -1456,11 +1445,11 @@
       # Add advanced fields if requested
       if show_advanced
         fields += [
-          { name: 'model_override', label: 'Override Model', control_type: 'select', 
+          { name: 'model_override', label: 'Override Model', control_type: 'select', group: 'Advanced',
             pick_list: 'models_dynamic_for_behavior', pick_list_params: { behavior: behavior }, optional: true },
-          { name: 'temperature', label: 'Temperature', type: 'number', hint: '0.0 to 1.0' },
-          { name: 'max_tokens', label: 'Max Tokens', type: 'integer' },
-          { name: 'cache_ttl', label: 'Cache TTL (seconds)', type: 'integer', default: 300 }
+          { name: 'temperature', label: 'Temperature', type: 'number', group: 'Advanced', hint: '0.0 to 1.0' },
+          { name: 'max_tokens', label: 'Max Tokens', type: 'integer', group: 'Advanced' },
+          { name: 'cache_ttl', label: 'Cache TTL (seconds)', type: 'integer', group: 'Advanced',default: 300 }
         ]
       end
       
@@ -1511,24 +1500,37 @@
       end
     end,
 
-    # List Google publisher models (v1beta1) and cache 60m
+    # List Google publisher models (v1beta1)
     list_publisher_models: lambda do |connection, publisher: 'google'|
       # Uses the global aiplatform endpoint so it works regardless of region
-      cache_key = "vertex_pub_models_#{publisher}"
-      cached = workato.cache.get(cache_key)
-      if  cached
-          cached
-      else
-        # absolute URL to avoid base_uri region coupling
-        resp = get("https://aiplatform.googleapis.com/v1beta1/publishers/#{publisher}/models")
-              .headers(call('build_headers', connection))
-              .after_error_response(/.*/) { |code, body, _h, msg| error("#{msg} (#{code}): #{body}") }
-              .after_response { |code, body, _h| body || {} }
+      cache_key = "pub_models:#{publisher}"
+      cached = call('memo_get', cache_key)
+      return cached if cached
 
-        models = (resp['publisherModels'] || [])
-        workato.cache.set(cache_key, models, 3600) # cache x 60m
-        models
-      end
+      # absolute URL to avoid base_uri region coupling
+      resp = get("https://aiplatform.googleapis.com/v1beta1/publishers/#{publisher}/models")
+            .headers(call('build_headers', connection))
+            .after_error_response(/.*/) { |code, body, _h, msg| error("#{msg} (#{code}): #{body}") }
+            .after_response { |code, body, _h| body || {} }
+
+      models = (resp['publisherModels'] || [])
+      call('memo_put', ache_key, models, 3600) # cache x 60m
+      models
+    end,
+
+    memo_store: lambda { @__memo ||= {} },
+
+    memo_get: lambda do |key|
+      item = call('memo_store')[key]
+      return nil unless item
+      exp = item['exp']
+      return nil if exp && Time.now.to_i > exp
+      item['val']
+    end,
+
+    memo_put: lambda do |key, val, ttl=nil|
+      call('memo_store')[key] = { 'val' => val, 'exp' => (ttl ? Time.now.to_i + ttl.to_i : nil) }
+      val
     end,
 
     # Normalize FindNeighbors response into a stable, recipe-friendly shape
@@ -1569,22 +1571,20 @@
       # If versioned properly, keep it
       return short if short.to_s.match?(/-\d{3,}$/)
 
-      cache_key = "vertex_model_resolved_#{short}"
-      cached = workato.cache.get(cache_key)
-      if cached
-        cached
-      else
-        # Find all models that start with "#{short}-"
-        ids = call('list_publisher_models', connection)
-                        .map { |m| (m['name'] || '').split('/').last } # e.g., 'gemini-1.5-pro-002'
-                        .select { |id| id.start_with?("#{short}-") }
+      cache_key = "model_resolve:#{short}"
+      cached = call('memo_get', cache_key)
+      return cached if cached
 
-        error("No versioned model found for alias '#{short}'") if ids.empty?
+      # Find all models that start with "#{short}-"
+      ids = call('list_publisher_models', connection)
+              .map { |m| (m['name'] || '').split('/').last }
+              .select { |id| id.start_with?("#{short}-") }
+
+      error("No versioned model found for alias '#{short}'") if ids.empty?
         
-        latest = ids.max_by { |id| id[/-(\d+)$/, 1].to_i } # highest numeric suffix
-        workato.cache.set(cache_key, latest, 3600)
-        latest
-      end
+      latest = ids.max_by { |id| id[/-(\d+)$/, 1].to_i } # highest numeric suffix
+      call('memo_put', cache_key, latest, 3600)
+      latest
     end,
 
     # Model selection logic

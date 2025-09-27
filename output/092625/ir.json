@@ -1,0 +1,679 @@
+{
+  "connector": {
+    "title": "Vertex AI",
+    "auth_modes": [
+      "oauth2",
+      "custom"
+    ]
+  },
+  "actions": [
+    {
+      "name": "batch_operation",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "input_schema",
+          "output_schema",
+          "config_fields"
+        ],
+        "calls": [
+          "execute_batch_behavior"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "vertex_operation",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_in_schema",
+          "_out_schema",
+          "config_fields"
+        ],
+        "calls": [
+          "extract_user_config",
+          "deep_copy",
+          "execute_behavior"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "find_neighbors",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_in_schema",
+          "_out_schema",
+          "_cfg"
+        ],
+        "calls": [
+          "execute_behavior",
+          "deep_copy"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "generate_embeddings",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_in_schema",
+          "_out_schema",
+          "config_fields"
+        ],
+        "calls": [
+          "extract_user_config",
+          "deep_copy",
+          "execute_behavior"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "generate_text",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_in_schema",
+          "_out_schema",
+          "config_fields"
+        ],
+        "calls": [
+          "extract_user_config",
+          "deep_copy",
+          "execute_behavior"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    },
+    {
+      "name": "upsert_index_datapoints",
+      "picklists_used": [
+
+      ],
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "lambda_params": [
+          "connection",
+          "input",
+          "_in_schema",
+          "_out_schema",
+          "_cfg"
+        ],
+        "calls": [
+          "execute_behavior",
+          "deep_copy"
+        ],
+        "direct_http": [
+
+        ],
+        "template_symbol": null,
+        "kwargs": {
+          "template": null,
+          "verb": null,
+          "extract": null
+        }
+      }
+    }
+  ],
+  "methods": [
+    {
+      "name": "build_payload",
+      "lambda_params": [
+        "template:",
+        "variables:",
+        "format:"
+      ],
+      "calls": [
+        "apply_template",
+        "build_generation_config"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "enrich_response",
+      "lambda_params": [
+        "response:",
+        "metadata: {}"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+        "delete"
+      ]
+    },
+    {
+      "name": "extract_response",
+      "lambda_params": [
+        "data:",
+        "path: nil",
+        "format: 'raw'"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "http_request",
+      "lambda_params": [
+        "connection",
+        "method:",
+        "url:",
+        "payload: nil",
+        "headers: {}",
+        "retry_config: {}"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+        "get",
+        "post",
+        "put",
+        "delete"
+      ]
+    },
+    {
+      "name": "transform_data",
+      "lambda_params": [
+        "input:",
+        "from_format:",
+        "to_format:"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+        "get"
+      ]
+    },
+    {
+      "name": "validate_input",
+      "lambda_params": [
+        "data:",
+        "schema: []",
+        "constraints: []"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "with_resilience",
+      "lambda_params": [
+        "operation:",
+        "config: {}",
+        "&block"
+      ],
+      "calls": [
+        "check_rate_limit"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "execute_pipeline",
+      "lambda_params": [
+        "connection",
+        "operation",
+        "input",
+        "config"
+      ],
+      "calls": [
+        "deep_copy",
+        "validate_input"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "behavior_registry",
+      "lambda_params": [
+
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "configuration_registry",
+      "lambda_params": [
+        "connection",
+        "user_config"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "execute_behavior",
+      "lambda_params": [
+        "connection",
+        "behavior",
+        "input",
+        "user_config = {}"
+      ],
+      "calls": [
+        "behavior_registry"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "add_upsert_ack",
+      "lambda_params": [
+        "response",
+        "input"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "add_word_count",
+      "lambda_params": [
+        "response",
+        "input"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "apply_template",
+      "lambda_params": [
+        "template",
+        "variables"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "build_endpoint_url",
+      "lambda_params": [
+        "connection",
+        "endpoint_config",
+        "input"
+      ],
+      "calls": [
+        "qualify_resource",
+        "vector_search_base",
+        "resolve_model_version"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "build_generation_config",
+      "lambda_params": [
+        "vars"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "build_headers",
+      "lambda_params": [
+        "connection"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "check_rate_limit",
+      "lambda_params": [
+        "operation",
+        "limits"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+        "get"
+      ]
+    },
+    {
+      "name": "coerce_kwargs",
+      "lambda_params": [
+        "*args",
+        "**kwargs"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "deep_copy",
+      "lambda_params": [
+        "obj"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "extract_user_config",
+      "lambda_params": [
+        "input",
+        "cfg_enabled"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "execute_batch_behavior",
+      "lambda_params": [
+        "connection",
+        "behavior",
+        "items",
+        "batch_size",
+        "strategy"
+      ],
+      "calls": [
+        "execute_behavior"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "get_behavior_input_fields",
+      "lambda_params": [
+        "behavior",
+        "show_advanced"
+      ],
+      "calls": [
+        "behavior_registry"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "get_behavior_output_fields",
+      "lambda_params": [
+        "behavior"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "list_publisher_models",
+      "lambda_params": [
+        "connection",
+        "publisher: 'google'"
+      ],
+      "calls": [
+        "build_headers"
+      ],
+      "direct_http": [
+        "get"
+      ]
+    },
+    {
+      "name": "normalize_find_neighbors",
+      "lambda_params": [
+        "resp",
+        "_input"
+      ],
+      "calls": [
+        "transform_data"
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "qualify_resource",
+      "lambda_params": [
+        "connection",
+        "type",
+        "value"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "resolve_model_version",
+      "lambda_params": [
+        "connection",
+        "short"
+      ],
+      "calls": [
+        "list_publisher_models"
+      ],
+      "direct_http": [
+        "get"
+      ]
+    },
+    {
+      "name": "select_model",
+      "lambda_params": [
+        "behavior_def",
+        "config",
+        "input"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    },
+    {
+      "name": "vector_search_base",
+      "lambda_params": [
+        "connection",
+        "input"
+      ],
+      "calls": [
+
+      ],
+      "direct_http": [
+
+      ]
+    }
+  ],
+  "object_definitions": [
+    {
+      "name": "generation_config",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    },
+    {
+      "name": "safety_settings",
+      "picklists_used": [
+
+      ],
+      "object_defs_referenced": [
+
+      ]
+    }
+  ],
+  "pick_lists": [
+    {
+      "name": "all_models"
+    },
+    {
+      "name": "available_behaviors"
+    },
+    {
+      "name": "batchable_behaviors"
+    },
+    {
+      "name": "embedding_tasks"
+    },
+    {
+      "name": "gcp_regions"
+    },
+    {
+      "name": "languages"
+    },
+    {
+      "name": "models_for_behavior"
+    },
+    {
+      "name": "models_dynamic_for_behavior"
+    },
+    {
+      "name": "safety_levels"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>find_neighbors — Call Graph</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;margin:0;background:#fafafa}
+    header{padding:16px 20px;border-bottom:1px solid #e5e7eb;background:#fff;position:sticky;top:0}
+    main{padding:16px}
+    pre.mermaid{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;overflow:auto}
+    .legend{display:flex;gap:8px;align-items:center;margin:12px 0 20px}
+    .chip{border-radius:10px;padding:2px 8px;border:1px solid #e5e7eb}
+    .chip.action{background:#E3F2FD;border-color:#1E88E5}
+    .chip.method{background:#E8F5E9;border-color:#2E7D32}
+    .chip.http{background:#FFF3E0;border-color:#EF6C00}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, securityLevel: 'loose', theme: 'default' });</script>
+</head>
+<body>
+  <header>
+    <h1 style="margin:0;font-size:18px">Action: find_neighbors</h1>
+  </header>
+  <main>
+    <div class="legend">
+      <span class="chip action">Action entrypoint</span>
+      <span class="chip method">Method</span>
+      <span class="chip http">Direct HTTP</span>
+    </div>
+    <pre class="mermaid">flowchart TD
+  execute_find_neighbors([execute:find_neighbors])
+  execute_behavior[execute_behavior]
+  behavior_registry[behavior_registry]
+  deep_copy[deep_copy]
+  execute_find_neighbors --> execute_behavior
+  execute_find_neighbors --> deep_copy
+  execute_behavior --> behavior_registry
+  classDef action fill:#E3F2FD,stroke:#1E88E5,stroke-width:1px;
+  classDef method fill:#E8F5E9,stroke:#2E7D32,stroke-width:1px;
+  classDef http   fill:#FFF3E0,stroke:#EF6C00,stroke-width:1px;
+  classDef hot stroke:#6A1B9A,stroke-width:3px;
+  classDef cycle stroke:#C62828,stroke-width:3px;
+  classDef unused fill:#ECECEC,color:#6B7280,stroke:#9CA3AF;
+  classDef undef stroke-dasharray:4 2,stroke:#EF4444;
+  class execute_find_neighbors action;
+  class execute_behavior method;
+  class behavior_registry method;
+  class deep_copy method;
+  class deep_copy hot;
+  class execute_behavior hot;</pre>
+  </main>
+</body>
+</html>

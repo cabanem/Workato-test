@@ -1,0 +1,284 @@
+{
+  "nodes": [
+    "execute:batch_operation",
+    "execute_batch_behavior",
+    "execute:vertex_operation",
+    "extract_user_config",
+    "deep_copy",
+    "execute_behavior",
+    "execute:find_neighbors",
+    "execute:generate_embeddings",
+    "execute:generate_text",
+    "execute:upsert_index_datapoints",
+    "build_payload",
+    "apply_template",
+    "build_generation_config",
+    "enrich_response",
+    "HTTP:DELETE",
+    "extract_response",
+    "http_request",
+    "HTTP:GET",
+    "HTTP:POST",
+    "HTTP:PUT",
+    "transform_data",
+    "validate_input",
+    "with_resilience",
+    "check_rate_limit",
+    "execute_pipeline",
+    "behavior_registry",
+    "configuration_registry",
+    "add_upsert_ack",
+    "add_word_count",
+    "build_endpoint_url",
+    "qualify_resource",
+    "vector_search_base",
+    "resolve_model_version",
+    "build_headers",
+    "coerce_kwargs",
+    "get_behavior_input_fields",
+    "get_behavior_output_fields",
+    "list_publisher_models",
+    "normalize_find_neighbors",
+    "select_model",
+    "top:test"
+  ],
+  "edges": [
+    {
+      "from": "execute:batch_operation",
+      "to": "execute_batch_behavior"
+    },
+    {
+      "from": "execute:vertex_operation",
+      "to": "extract_user_config"
+    },
+    {
+      "from": "execute:vertex_operation",
+      "to": "deep_copy"
+    },
+    {
+      "from": "execute:vertex_operation",
+      "to": "execute_behavior"
+    },
+    {
+      "from": "execute:find_neighbors",
+      "to": "execute_behavior"
+    },
+    {
+      "from": "execute:find_neighbors",
+      "to": "deep_copy"
+    },
+    {
+      "from": "execute:generate_embeddings",
+      "to": "extract_user_config"
+    },
+    {
+      "from": "execute:generate_embeddings",
+      "to": "deep_copy"
+    },
+    {
+      "from": "execute:generate_embeddings",
+      "to": "execute_behavior"
+    },
+    {
+      "from": "execute:generate_text",
+      "to": "extract_user_config"
+    },
+    {
+      "from": "execute:generate_text",
+      "to": "deep_copy"
+    },
+    {
+      "from": "execute:generate_text",
+      "to": "execute_behavior"
+    },
+    {
+      "from": "execute:upsert_index_datapoints",
+      "to": "execute_behavior"
+    },
+    {
+      "from": "execute:upsert_index_datapoints",
+      "to": "deep_copy"
+    },
+    {
+      "from": "build_payload",
+      "to": "apply_template"
+    },
+    {
+      "from": "build_payload",
+      "to": "build_generation_config"
+    },
+    {
+      "from": "enrich_response",
+      "to": "HTTP:DELETE"
+    },
+    {
+      "from": "http_request",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "http_request",
+      "to": "HTTP:POST"
+    },
+    {
+      "from": "http_request",
+      "to": "HTTP:PUT"
+    },
+    {
+      "from": "http_request",
+      "to": "HTTP:DELETE"
+    },
+    {
+      "from": "transform_data",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "with_resilience",
+      "to": "check_rate_limit"
+    },
+    {
+      "from": "execute_pipeline",
+      "to": "deep_copy"
+    },
+    {
+      "from": "execute_pipeline",
+      "to": "validate_input"
+    },
+    {
+      "from": "execute_behavior",
+      "to": "behavior_registry"
+    },
+    {
+      "from": "build_endpoint_url",
+      "to": "qualify_resource"
+    },
+    {
+      "from": "build_endpoint_url",
+      "to": "vector_search_base"
+    },
+    {
+      "from": "build_endpoint_url",
+      "to": "resolve_model_version"
+    },
+    {
+      "from": "check_rate_limit",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "execute_batch_behavior",
+      "to": "execute_behavior"
+    },
+    {
+      "from": "get_behavior_input_fields",
+      "to": "behavior_registry"
+    },
+    {
+      "from": "list_publisher_models",
+      "to": "build_headers"
+    },
+    {
+      "from": "list_publisher_models",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "normalize_find_neighbors",
+      "to": "transform_data"
+    },
+    {
+      "from": "resolve_model_version",
+      "to": "list_publisher_models"
+    },
+    {
+      "from": "resolve_model_version",
+      "to": "HTTP:GET"
+    },
+    {
+      "from": "top:test",
+      "to": "list_publisher_models"
+    },
+    {
+      "from": "top:test",
+      "to": "http_request"
+    },
+    {
+      "from": "top:test",
+      "to": "build_headers"
+    }
+  ],
+  "paths": {
+    "batch_operation": [
+      [
+        "execute:batch_operation",
+        "execute_batch_behavior",
+        "execute_behavior",
+        "behavior_registry"
+      ]
+    ],
+    "vertex_operation": [
+      [
+        "execute:vertex_operation",
+        "extract_user_config"
+      ],
+      [
+        "execute:vertex_operation",
+        "deep_copy"
+      ],
+      [
+        "execute:vertex_operation",
+        "execute_behavior",
+        "behavior_registry"
+      ]
+    ],
+    "find_neighbors": [
+      [
+        "execute:find_neighbors",
+        "execute_behavior",
+        "behavior_registry"
+      ],
+      [
+        "execute:find_neighbors",
+        "deep_copy"
+      ]
+    ],
+    "generate_embeddings": [
+      [
+        "execute:generate_embeddings",
+        "extract_user_config"
+      ],
+      [
+        "execute:generate_embeddings",
+        "deep_copy"
+      ],
+      [
+        "execute:generate_embeddings",
+        "execute_behavior",
+        "behavior_registry"
+      ]
+    ],
+    "generate_text": [
+      [
+        "execute:generate_text",
+        "extract_user_config"
+      ],
+      [
+        "execute:generate_text",
+        "deep_copy"
+      ],
+      [
+        "execute:generate_text",
+        "execute_behavior",
+        "behavior_registry"
+      ]
+    ],
+    "upsert_index_datapoints": [
+      [
+        "execute:upsert_index_datapoints",
+        "execute_behavior",
+        "behavior_registry"
+      ],
+      [
+        "execute:upsert_index_datapoints",
+        "deep_copy"
+      ]
+    ]
+  }
+}

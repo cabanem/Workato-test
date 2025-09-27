@@ -1,0 +1,434 @@
+{
+  "connector": {
+    "title": "Vertex AI",
+    "auth_modes": [
+      "oauth2",
+      "custom"
+    ]
+  },
+  "actions": [
+    {
+      "name": "batch_operation",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "method": "execute_batch_behavior",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "execute_batch_behavior → execute_behavior → behavior_registry"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "vertex_operation",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "method": "extract_user_config",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "extract_user_config",
+          "deep_copy",
+          "execute_behavior → behavior_registry"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "find_neighbors",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "method": "execute_behavior",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "execute_behavior → behavior_registry",
+          "deep_copy"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "generate_embeddings",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "method": "extract_user_config",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "extract_user_config",
+          "deep_copy",
+          "execute_behavior → behavior_registry"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "generate_text",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "method": "extract_user_config",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "extract_user_config",
+          "deep_copy",
+          "execute_behavior → behavior_registry"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    },
+    {
+      "name": "upsert_index_datapoints",
+      "input_object_defs": [
+
+      ],
+      "output_object_defs": [
+
+      ],
+      "execute": {
+        "method": "execute_behavior",
+        "params": {
+          "template": null
+        },
+        "transitive_calls": [
+          "execute_behavior → behavior_registry",
+          "deep_copy"
+        ]
+      },
+      "picklists_used": [
+
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "name": "build_payload",
+      "calls": [
+        "apply_template",
+        "build_generation_config"
+      ]
+    },
+    {
+      "name": "enrich_response",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "extract_response",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "http_request",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "transform_data",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "validate_input",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "with_resilience",
+      "calls": [
+        "check_rate_limit"
+      ]
+    },
+    {
+      "name": "execute_pipeline",
+      "calls": [
+        "deep_copy",
+        "validate_input"
+      ]
+    },
+    {
+      "name": "behavior_registry",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "configuration_registry",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "execute_behavior",
+      "calls": [
+        "behavior_registry"
+      ]
+    },
+    {
+      "name": "add_upsert_ack",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "add_word_count",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "apply_template",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "build_endpoint_url",
+      "calls": [
+        "qualify_resource",
+        "vector_search_base",
+        "resolve_model_version"
+      ]
+    },
+    {
+      "name": "build_generation_config",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "build_headers",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "check_rate_limit",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "coerce_kwargs",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "deep_copy",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "extract_user_config",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "execute_batch_behavior",
+      "calls": [
+        "execute_behavior"
+      ]
+    },
+    {
+      "name": "get_behavior_input_fields",
+      "calls": [
+        "behavior_registry"
+      ]
+    },
+    {
+      "name": "get_behavior_output_fields",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "list_publisher_models",
+      "calls": [
+        "build_headers"
+      ]
+    },
+    {
+      "name": "normalize_find_neighbors",
+      "calls": [
+        "transform_data"
+      ]
+    },
+    {
+      "name": "qualify_resource",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "resolve_model_version",
+      "calls": [
+        "list_publisher_models"
+      ]
+    },
+    {
+      "name": "select_model",
+      "calls": [
+
+      ]
+    },
+    {
+      "name": "vector_search_base",
+      "calls": [
+
+      ]
+    }
+  ],
+  "object_definitions": [
+    {
+      "name": "generation_config",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+
+      ]
+    },
+    {
+      "name": "safety_settings",
+      "used_by_actions": [
+
+      ],
+      "used_by_objects": [
+
+      ]
+    }
+  ],
+  "pick_lists": [
+    {
+      "name": "all_models",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    },
+    {
+      "name": "available_behaviors",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    },
+    {
+      "name": "batchable_behaviors",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    },
+    {
+      "name": "embedding_tasks",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    },
+    {
+      "name": "gcp_regions",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    },
+    {
+      "name": "languages",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    },
+    {
+      "name": "models_for_behavior",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    },
+    {
+      "name": "models_dynamic_for_behavior",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    },
+    {
+      "name": "safety_levels",
+      "used_by_objects": [
+
+      ],
+      "used_by_actions": [
+
+      ]
+    }
+  ]
+}
