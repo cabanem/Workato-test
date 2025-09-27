@@ -7,9 +7,9 @@
   connection: {
     fields: [
       # Authentication type
-      { name: 'auth_type', 
-        label: 'Authentication type', group: 'Authentication', control_type: 'select', default: 'custom', optional: false, extends_schema: true, 
-        hint: 'Select the authentication type for connecting to Google Vertex AI.', options: [ ['Client credentials', 'custom'], %w[OAuth2 oauth2] ]},
+      { name: 'auth_type', label: 'Authentication type', group: 'Authentication', control_type: 'select', default: 'custom',
+        optional: false, extends_schema: true, hint: 'Select the authentication type for connecting to Google Vertex AI.',
+        options: [ ['Service account (JWT)', 'custom'], ['OAuth 2.0 (Auth code)', 'oauth2'] ]},
       # Google Cloud Configuration
       { name: 'project', label: 'Project ID', group: 'Google Cloud Platform', optional: false },
       { name: 'region',  label: 'Region',     group: 'Google Cloud Platform', optional: false, control_type: 'select', 
@@ -61,43 +61,98 @@
       selected: lambda do |connection|
         connection['auth_type'] || 'custom'
       end,
+      identity: lambda do |connection|
+        selected = connection['auth_type'] || 'custom'
+
+        if selected == 'oauth2'
+          # Uses OAuth2 access token added by `apply` to call Google’s standard UserInfo endpoint
+          begin
+            info = get('https://openidconnect.googleapis.com/v1/userinfo')
+                    .after_error_response(/.*/) { |code, _body, _h, msg| error("Failed to fetch user info (#{code}): #{msg}") }
+                    .after_response { |_code, body, _h| body || {} }
+
+            email = info['email'] || '(no email)'
+            name  = info['name']
+            sub   = info['sub']
+            [name, email, sub].compact.join(' / ')
+          rescue
+            'OAuth2 (Google) – identity unavailable'
+          end
+        else
+          # Service account (JWT)
+          connection['service_account_email']
+        end
+      end,
       options: {
         oauth2: {
           type: 'oauth2',
           fields: [
-            { name: 'client_id', label: 'Client ID', group: 'Service Account', optional: false },
-            { name: 'client_secret', label: 'Client Secret', group: 'OAuth 2.0', optional: false, control_type: 'password' }
+            { name: 'client_id', label: 'Client ID', group: 'OAuth 2.0', optional: false },
+            { name: 'client_secret', label: 'Client Secret', group: 'OAuth 2.0', optional: false, control_type: 'password' },
+            { name: 'oauth_refresh_token_ttl', label: 'Refresh token TTL (seconds)', group: 'OAuth 2.0', type: 'integer', optional: true,
+              hint: 'Used only if Google does not return refresh_token_expires_in; enables background refresh.' }
           ],
+          # AUTH URL
           authorization_url: lambda do |connection|
             scopes = [
-              'https://www.googleapis.com/auth/cloud-platform'
+              'https://www.googleapis.com/auth/cloud-platform',
+              'openid', 'email', 'profile' # needed for /userinfo claims
             ].join(' ')
+
             params = {
-              client_id: connection['client_id'], response_type: 'code', scope: scopes,
-              access_type: 'offline', include_granted_scopes: 'true', prompt: 'consent'
+              client_id: connection['client_id'],
+              response_type: 'code',
+              scope: scopes,
+              access_type: 'offline',
+              include_granted_scopes: 'true',
+              prompt: 'consent'
             }.to_param
+
             "https://accounts.google.com/o/oauth2/v2/auth?#{params}"
           end,
+          # ACQUIRE
           acquire: lambda do |connection, auth_code|
             response = post('https://oauth2.googleapis.com/token').
-                       payload(
-                         client_id: connection['client_id'],
-                         client_secret: connection['client_secret'],
-                         grant_type: 'authorization_code',
-                         code: auth_code,
-                         redirect_uri: 'https://www.workato.com/oauth/callback'
-                       ).request_format_www_form_urlencoded
-            [response, nil, nil]
+                        payload(
+                          client_id: connection['client_id'],
+                          client_secret: connection['client_secret'],
+                          grant_type: 'authorization_code',
+                          code: auth_code,
+                          redirect_uri: 'https://www.workato.com/oauth/callback'
+                        ).request_format_www_form_urlencoded
+
+            # Pick Google’s TTL if present; else use user-configured fallback when provided
+            ttl = response['refresh_token_expires_in'] || connection['oauth_refresh_token_ttl']
+
+            [
+              {
+                access_token: response['access_token'],
+                refresh_token: response['refresh_token'],
+                refresh_token_expires_in: ttl # may be nil if neither is present; that’s OK
+              },
+              nil,               # owner id (optional)
+              {}                 # extra connection state (optional)
+            ]
           end,
+          # REFRESH
           refresh: lambda do |connection, refresh_token|
-            post('https://oauth2.googleapis.com/token').
-              payload(
-                client_id: connection['client_id'],
-                client_secret: connection['client_secret'],
-                grant_type: 'refresh_token',
-                refresh_token: refresh_token
-              ).request_format_www_form_urlencoded
+            response = post('https://oauth2.googleapis.com/token').
+                        payload(
+                          client_id: connection['client_id'],
+                          client_secret: connection['client_secret'],
+                          grant_type: 'refresh_token',
+                          refresh_token: refresh_token
+                        ).request_format_www_form_urlencoded
+
+            {
+              access_token: response['access_token'],
+              # Google sometimes rotates refresh tokens; include if present
+              refresh_token: response['refresh_token'],
+              # Prefer Google’s TTL, else use the user-configured fallback if present
+              refresh_token_expires_in: response['refresh_token_expires_in'] || connection['oauth_refresh_token_ttl']
+            }.compact
           end,
+          # APPLY
           apply: lambda do |_connection, access_token|
             headers(Authorization: "Bearer #{access_token}")
           end
@@ -111,15 +166,16 @@
             { name: 'private_key', label: 'Private Key', group: 'Service Account', optional: false, multiline: true, control_type: 'password' }
           ],
           acquire: lambda do |connection|
+            issued_at = Time.now.to_i
             jwt_body_claim = {
-              'iat'   => now.to_i,
-              'exp'   => 3600.seconds.from_now.to_i,
+              'iat'   => issued_at,
+              'exp'   => issued_at + 3600, # 60 minutes
               'aud'   => 'https://oauth2.googleapis.com/token',
               'iss'   => connection['service_account_email'],
-              'sub'   => connection['service_account_email'],
+              #'sub'   => connection['service_account_email'], # only required for domain-wide delegation
               'scope' => 'https://www.googleapis.com/auth/cloud-platform'
             }
-            private_key = connection['private_key'].gsub('\\n', "\n")
+            private_key = connection['private_key'].to_s.gsub('\\n', "\n")
             jwt_token   = workato.jwt_encode(jwt_body_claim, private_key, 'RS256', kid: connection['private_key_id'])
 
             response    = post('https://oauth2.googleapis.com/token',
@@ -138,7 +194,7 @@
     
     base_uri: lambda do |connection|
       version = (connection['version'].presence || 'v1').to_s
-      region  = (connection['region'].presence  || 'us-east1').to_s
+      region  = (connection['region'].presence  || 'us-east4').to_s
 
       host = (region == 'global') ? 'aiplatform.googleapis.com' : "#{region}-aiplatform.googleapis.com"
       "https://#{host}/#{version}/"
@@ -1296,7 +1352,7 @@
     # Rate limiting
     check_rate_limit: lambda do |operation, limits|
       key   = "rate_#{operation}_#{Time.now.to_i / 60}"
-      count = call('memo_put', ache_key) || 0
+      count = call('memo_get', key) || 0
       error("Rate limit exceeded for #{operation}. Please wait before retrying.") if count >= limits['rpm']
       call('memo_put', key, count + 1, 60)
     end,
@@ -1504,17 +1560,18 @@
     list_publisher_models: lambda do |connection, publisher: 'google'|
       # Uses the global aiplatform endpoint so it works regardless of region
       cache_key = "pub_models:#{publisher}"
-      cached = call('memo_get', cache_key)
-      return cached if cached
+      if (cached = call('memo_get', cache_key))
+        return cached
+      end
 
       # absolute URL to avoid base_uri region coupling
       resp = get("https://aiplatform.googleapis.com/v1beta1/publishers/#{publisher}/models")
-            .headers(call('build_headers', connection))
-            .after_error_response(/.*/) { |code, body, _h, msg| error("#{msg} (#{code}): #{body}") }
-            .after_response { |code, body, _h| body || {} }
+              .headers(call('build_headers', connection))
+              .after_error_response(/.*/) { |code, body, _h, msg| error("#{msg} (#{code}): #{body}") }
+              .after_response { |_code, body, _h| body || {} }
 
       models = (resp['publisherModels'] || [])
-      call('memo_put', ache_key, models, 3600) # cache x 60m
+      call('memo_put', cache_key, models, 3600) # 60m
       models
     end,
 
