@@ -708,7 +708,8 @@
 
       (1..max_retries).each do |attempt|
         begin
-          corr = headers['X-Correlation-Id'] ||= "#{Time.now.utc.to_i}-#{SecureRandom.hex(6)}"
+          hdrs = (headers || {}).dup
+          corr = hdrs['X-Correlation-Id'] ||= "#{Time.now.utc.to_i}-#{SecureRandom.hex(6)}"
           started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
           req = case method.to_s.upcase
@@ -720,7 +721,7 @@
                 end
 
           response =
-            req.headers(headers)
+            req.headers(hdrs)
               .after_error_response(/.*/) { |code, body, rheaders, message|
                 # normalize errors for observability
                 error("#{message} (#{code}): #{body}")
@@ -808,33 +809,39 @@
     end,
     
     # Error Recovery
-    with_resilience: lambda do |operation:, config: {}, &block|
+    with_resilience: lambda do |operation:, config: {}, task: {}, connection: nil|
       # Rate limiting (per-job)
       if config['rate_limit']
         call('check_rate_limit', operation, config['rate_limit'])
       end
-      
-      # Circuit breaker
+
       circuit_key   = "circuit_#{operation}"
       circuit_state = call('memo_get', circuit_key) || { 'failures' => 0 }
-      
       error("Circuit breaker open for #{operation}. Too many recent failures.") if circuit_state['failures'] >= 5
 
       begin
-        result = block.call
-        
+        # Validate task envelope
+        error('with_resilience requires a task hash with url/method') unless task.is_a?(Hash) && task['url']
+
+        result = call('http_request',
+          connection,
+          method:       (task['method'] || 'GET'),
+          url:          task['url'],
+          payload:      task['payload'],
+          headers:      (task['headers'] || {}),
+          retry_config: (task['retry_config'] || {})
+        )
+
         # Reset circuit on success
         call('memo_put', circuit_key, { 'failures' => 0 }, 300)
         result
-        
+
       rescue => e
-        # Update circuit breaker
         circuit_state['failures'] += 1
         call('memo_put', circuit_key, circuit_state, 300)
-        
-        # Determine if retryable
+
         if e.message.match?(/rate limit|quota/i)
-          sleep(60)
+          sleep(60)          # keep simple; consider multi‑step + reinvoke_after later
           retry
         elsif e.message.match?(/timeout|unavailable/i) && circuit_state['failures'] < 3
           sleep(5)
@@ -896,7 +903,15 @@
       # 5. Execute with resilience
       response = call('with_resilience',
         operation:  operation,
-        config:     config['resilience'] || {}
+        config:     (config['resilience'] || {}),
+        task: {
+          'method'       => endpoint['method'] || 'POST',
+          'url'          => url,
+          'payload'      => payload,
+          'headers'      => call('build_headers', connection),
+          'retry_config' => (config.dig('resilience', 'retry') || {})
+        },
+        connection: connection
       ) do
         call('http_request',
           connection,
@@ -1202,48 +1217,45 @@
     
     # Main execution method combining all layers
     execute_behavior: lambda do |connection, behavior, input, user_config = {}|
-      # Get behavior definition
-      behavior_def = call('behavior_registry')[behavior]
-      unless behavior_def
-        error("Unknown behavior: #{behavior}")
-      end
-      
-      # Get user configuration
-      config = call('configuration_registry', connection, user_config)
-      
-      # Build operation configuration
-      operation_config = behavior_def[:config_template].deep_dup || {}
-      
-      # Apply defaults and write to copy
+      behavior_def = call('behavior_registry')[behavior] or error("Unknown behavior: #{behavior}")
+
+      # Work on a local copy only
+      local_input = call('deep_copy', input)
+
+      # Apply defaults without side effects
       if behavior_def[:defaults]
-        behavior_def[:defaults].each do |key, value|
-          input[key] ||= value
+        behavior_def[:defaults].each do |k, v|
+          local_input[k] = local_input.key?(k) ? local_input[k] : v
         end
       end
-      input.merge!(config[:generation]) if config[:generation]
-      
-      # Select model
-      operation_config['model'] = call('select_model',behavior_def, config, input)
-      
-      # Add resilience config
-      operation_config['resilience'] = config[:execution]
-      
-      # Cache if enabled
-      if config[:features][:caching][:enabled]
-        cache_key = "vertex_#{behavior}_#{input.to_json.hash}"
+
+      cfg = call('configuration_registry', connection, user_config)
+
+      # Build op config from template (avoid rails-only deep_dup)
+      operation_config = JSON.parse(JSON.dump(behavior_def[:config_template] || {}))
+
+      # Bring generation settings into the local input (don’t mutate cfg)
+      if cfg[:generation]
+        cfg[:generation].each { |k, v| local_input[k] = v unless v.nil? }
+      end
+
+      operation_config['model']     = call('select_model', behavior_def, cfg, local_input)
+      operation_config['resilience'] = cfg[:execution]
+
+      # Caching key is derived from local_input
+      if cfg[:features][:caching][:enabled]
+        cache_key = "vertex_#{behavior}_#{local_input.to_json.hash}"
         if (hit = call('memo_get', cache_key))
           return hit
         end
       end
-      
-      # Execute through pipeline
-      result = call('execute_pipeline', connection, behavior, input, operation_config)
-      
-      # 'Cache' result
-      if config[:features][:caching][:enabled]
-        call('memo_put', cache_key, result, config[:features][:caching][:ttl] || 300)
+
+      result = call('execute_pipeline', connection, behavior, local_input, operation_config)
+
+      if cfg[:features][:caching][:enabled]
+        call('memo_put', cache_key, result, cfg[:features][:caching][:ttl] || 300)
       end
-      
+
       result
     end,
     
@@ -1422,9 +1434,15 @@
       # Map behavior to input fields
       fields = case behavior
       when 'text.generate'
-        [
+        fields = [
           { name: 'prompt', label: 'Prompt', control_type: 'text-area', optional: false }
         ]
+        if show_advanced
+          fields += [
+            { name: 'system', label: 'System instruction', control_type: 'text-area', optional: true, group: 'Advanced',
+              hint: 'Optional system prompt to guide the model' }
+          ]
+        end
       when 'text.translate'
         [
           { name: 'text', label: 'Text to Translate', control_type: 'text-area', optional: false },
