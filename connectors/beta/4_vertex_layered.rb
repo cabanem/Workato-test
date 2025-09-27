@@ -243,7 +243,7 @@
     # ------------------------------------------
     # Batch Operation Action
     batch_operation: {
-      title: 'Batch AI Operation',
+      title: 'UNIVERSAL - Batch AI Operation',
       # CONFIG
       config_fields: [
         { name: 'behavior', label: 'Operation Type', control_type: 'select', pick_list: 'batchable_behaviors', optional: false },
@@ -309,7 +309,7 @@
 
     # Universal Action
     vertex_operation: {
-      title: 'Vertex AI Operation',
+      title: 'UNIVERSAL - Vertex AI Operation',
       # CONFIG
       config_fields: [
         {
@@ -401,8 +401,56 @@
     # THIN WRAPPERS
     # ------------------------------------------
     
+    classify_text: {
+      title: 'AI - Classify Text',
+      description: 'Classify text into one of the provided categories',
+
+      # CONFIG
+      config_fields: [
+        { name: 'advanced_config', label: 'Show Advanced Configuration',
+          control_type: 'checkbox', extends_schema: true, optional: true, default: false }
+      ],
+
+      # INPUT
+      input_fields: lambda do |_obj_defs, _connection, config_fields|
+        cfg = config_fields.is_a?(Hash) ? config_fields : {}
+        call('get_behavior_input_fields', 'text.classify', cfg['advanced_config'])
+      end,
+
+      # OUTPUT
+      output_fields: lambda do |_obj_defs, _connection, _cfg|
+        call('get_behavior_output_fields', 'text.classify').unshift(
+          { name: 'success', type: 'boolean' },
+          { name: 'timestamp', type: 'datetime' },
+          { name: 'metadata', type: 'object', properties: [{ name: 'operation' }, { name: 'model' }] },
+          { name: 'trace', type: 'object', properties: [
+            { name: 'correlation_id' }, { name: 'duration_ms', type: 'integer' }, { name: 'attempt', type: 'integer' }
+          ]}
+        )
+      end,
+
+      # EXECUTE
+      execute: lambda do |connection, input, _in_schema, _out_schema, config_fields|
+        user_cfg = call('extract_user_config', input, config_fields['advanced_config'])
+        safe     = call('deep_copy', input) # never mutate Workato’s input
+        call('execute_behavior', connection, 'text.classify', safe, user_cfg)
+      end,
+
+      # SAMPLE 
+      sample_output: lambda do |_connection, _cfg|
+        {
+          "success"   => true,
+          "timestamp" => Time.now.utc.iso8601,
+          "metadata"  => { "operation" => "text.classify", "model" => "gemini-1.5-flash-002" },
+          "trace"     => { "correlation_id" => "abc", "duration_ms" => 42, "attempt" => 1 },
+          "category"  => "Support",
+          "confidence"=> 0.98
+        }
+      end
+    },
+
     find_neighbors: {
-      title: 'Find nearest neighbors',
+      title: 'VECTOR SEARCH - Find nearest neighbors',
       description: 'Query a deployed Vector Search index',
       input_fields: lambda do |_obj_defs, _connection, _cfg|
         call('get_behavior_input_fields', 'vector.find_neighbors', true)
@@ -423,7 +471,7 @@
     },
 
     generate_embeddings: {
-      title: 'Generate embeddings',
+      title: 'VECTOR SEARCH - Generate embeddings',
       description: 'Create dense embeddings for text',
       # CONFIG
       config_fields: [
@@ -465,7 +513,7 @@
     },
     
     generate_text: {
-      title: 'Generate Text',
+      title: 'AI - Generate Text',
       description: 'Gemini text generation',
 
       # CONFIG
@@ -475,9 +523,7 @@
       # INPUT
       input_fields: lambda do |_obj_defs, _connection, config_fields|
         cfg = config_fields.is_a?(Hash) ? config_fields : {}
-        # Fetch only fields relevant to this action
-        base = call('get_behavior_input_fields', 'text.generate', cfg['advanced_config'])
-        base 
+        call('get_behavior_input_fields', 'text.generate', cfg['advanced_config'])
       end,
       # OUTPUT
       output_fields: lambda do |_obj_defs, _connection, _cfg|
@@ -507,7 +553,7 @@
     },
 
     upsert_index_datapoints: {
-      title: 'Upsert index datapoints',
+      title: 'VECTOR SEARCH - Upsert index datapoints',
       description: 'Add or update datapoints in a Vector Search index',
       input_fields: lambda do |_obj_defs, _connection, _cfg|
         call('get_behavior_input_fields', 'vector.upsert_datapoints', true)
@@ -1432,7 +1478,7 @@
       # Map behavior to input fields
       fields = case behavior
       when 'text.generate'
-        [
+        fields =[
           { name: 'prompt', label: 'Prompt', control_type: 'text-area', optional: false }
         ]
         if show_advanced
