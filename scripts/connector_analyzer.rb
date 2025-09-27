@@ -216,6 +216,31 @@ module Balance
     end
   end
 
+  def extract_short_lambda_block(src, arrow_idx)
+    raise "Expected '->' at #{arrow_idx}" unless src[arrow_idx, 2] == '->'
+    i = arrow_idx + 2
+    i += 1 while i < src.length && src[i] =~ /\s/
+    # Skip optional parameter list: ->(a,b)
+    if src[i] == '('
+      paren = 1; i += 1
+      while i < src.length && paren > 0
+        paren += 1 if src[i] == '('
+        paren -= 1 if src[i] == ')'
+        i += 1
+      end
+      i += 1 while i < src.length && src[i] =~ /\s/
+    end
+    if src[i] == '{'
+      blk = extract_curly_block(src, i)
+      return src[arrow_idx...(i + blk.length)]
+    elsif src[i..] =~ /\A(do|def|class|module|begin|if|unless|case|while|until)\b/
+
+      return extract_do_end(src, arrow_idx)
+    else
+      raise "Short lambda without body at #{arrow_idx}"
+    end
+  end
+
   def extract_do_end(src, start_idx)
     i = start_idx
     in_s = false
@@ -254,9 +279,9 @@ module Balance
           i += 1
           next
         end
-        if src[i..] =~ /\Ado\b/
+        if src[i..] =~ /\A(do|def|class|module|begin|if|unless|case|while|until)\b/
           depth += 1
-          i += 2
+          i += Regexp.last_match(0).length
           next
         elsif src[i..] =~ /\Aend\b/
           depth -= 1
@@ -386,11 +411,17 @@ module Extractor
         if ch == "'"; in_s = true; i += 1; next; end
         if ch == '"'; in_d = true; i += 1; next; end
 
-        if inner[i..] =~ /\A([a-zA-Z_]\w*[!?]?)\s*:\s*lambda\b/
+        if inner[i..] =~ /\A([a-zA-Z_]\w*[!?]?)\s*:\s*(lambda\b|->)/
           m = Regexp.last_match
           name = m[1]
-          lambda_start = i + m[0].index('lambda')
-          block = Balance.extract_lambda_block(inner, lambda_start)
+          if m[2] == '->'
+            arrow_idx = i + m[0].rindex('->')
+            block = Balance.extract_short_lambda_block(inner, arrow_idx)
+            lambda_start = arrow_idx
+          else
+            lambda_start = i + m[0].index('lambda')
+            block = Balance.extract_lambda_block(inner, lambda_start)
+          end
           pairs[name] = block
           i = lambda_start + block.length
           i += 1 while i < inner.length && inner[i] =~ /[\s,]/
@@ -429,7 +460,7 @@ module Semantics
 
   def find_direct_http(body)
     hits = []
-    body.to_s.scan(/\b(post|get|put|delete)\s*\(/i) { |m| hits << m[0].downcase }
+    body.to_s.scan(/\b(get|post|put|patch|delete|head|options)\s*\(/i) { |m| hits << m[0].downcase }
     hits.uniq
   end
 

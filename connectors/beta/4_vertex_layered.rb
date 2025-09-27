@@ -244,13 +244,13 @@
     # Batch Operation Action
     batch_operation: {
       title: 'Batch AI Operation',
-      
+      # CONFIG
       config_fields: [
         { name: 'behavior', label: 'Operation Type', control_type: 'select', pick_list: 'batchable_behaviors', optional: false },
         { name: 'batch_strategy', label: 'Batch Strategy', control_type: 'select', default: 'count',
           options: [['By Count', 'count'], ['By Token Limit', 'tokens']] }
       ],
-      
+      # INPUT
       input_fields: lambda do |object_definitions|
         [
           { name: 'items', type: 'array', of: 'object', properties: [
@@ -260,7 +260,7 @@
           { name: 'batch_size', type: 'integer', default: 10, hint: 'Items per batch' }
         ]
       end,
-      
+      # EXECUTE
       execute: lambda do |connection, input, input_schema, output_schema, config_fields|
         call('execute_batch_behavior', 
           connection, 
@@ -270,6 +270,7 @@
           config_fields['batch_strategy']
         )
       end,
+      # OUTPUT
       output_fields: lambda do |_obj, _conn, _cfg|
         [
           { name: 'success', type: 'boolean' },
@@ -282,6 +283,7 @@
           { name: 'total_errors', type: 'integer' }
         ]
       end,
+      # SAMPLE
       sample_output: lambda do |_conn, cfg|
         if cfg['behavior'] == 'text.embed'
           {
@@ -308,7 +310,7 @@
     # Universal Action
     vertex_operation: {
       title: 'Vertex AI Operation',
-      
+      # CONFIG
       config_fields: [
         {
           name: 'behavior',
@@ -319,22 +321,17 @@
           extends_schema: true,
           hint: 'Select the AI operation to perform'
         },
-        {
-          name: 'advanced_config',
-          label: 'Show Advanced Configuration',
-          control_type: 'checkbox',
-          extends_schema: true
-        }
+        { name: 'advanced_config', label: 'Show Advanced Configuration', control_type: 'checkbox', extends_schema: true, optional: true, default: false }
       ],
-      
+      # INPUT
       input_fields: lambda do |object_definitions, connection, config_fields|
-        behavior = config_fields['behavior']
-        
-        # Get behavior-specific fields
-        call('get_behavior_input_fields', behavior, config_fields['advanced_config'])
+        cfg = config_fields.is_a?(Hash) ? config_fields : {}
+        behavior = cfg['behavior']
+        behavior ? call('get_behavior_input_fields', behavior, cfg['advanced_config']) : []
       end,
-      
+      # OUTPUT
       output_fields: lambda do |_object_definitions, _connection, config_fields|
+        cfg = config_fields.is_a?(Hash) ? config_fields : {}
         base = [
           { name: 'success', type: 'boolean' },
           { name: 'timestamp', type: 'datetime' },
@@ -348,11 +345,9 @@
             { name: 'attempt', type: 'integer' }
           ]}
         ]
-
-        behavior_fields = call('get_behavior_output_fields', config_fields['behavior'])
-        base + behavior_fields
+        base + (call('get_behavior_output_fields', cfg['behavior']) || [])
       end,
-      
+      # EXECUTE
       execute: lambda do |connection, input, _in_schema, _out_schema, config_fields|
         behavior     = config_fields['behavior']
         user_config  = call('extract_user_config', input, config_fields['advanced_config'])
@@ -361,9 +356,10 @@
         # Leave advanced fields in safe_input; pipeline reads only what it needs
         call('execute_behavior', connection, behavior, safe_input, user_config)
       end,
-
+      # SAMPLE
       sample_output: lambda do |_connection, config_fields|
-        case config_fields['behavior']
+        behavior = (config_fields.is_a?(Hash) ? config_fields : {})['behavior']
+        case behavior
         when 'text.generate'
           { "success"=>true, "timestamp"=>"2025-01-01T00:00:00Z",
             "metadata"=>{ "operation"=>"text.generate", "model"=>"gemini-1.5-flash" },
@@ -429,17 +425,20 @@
     generate_embeddings: {
       title: 'Generate embeddings',
       description: 'Create dense embeddings for text',
+      # CONFIG
       config_fields: [
-        { name: 'advanced_config', label: 'Show Advanced Configuration', control_type: 'checkbox', extends_schema: true, optional: true }
+        { name: 'advanced_config', label: 'Show Advanced Configuration', control_type: 'checkbox', extends_schema: true, optional: true, default: false }
       ],
+      # INPUT
       input_fields: lambda do |_obj_defs, _connection, config_fields|
+        cfg = config_fields.is_a?(Hash) ? config_fields : {}
         base = [
           { name: 'texts', label: 'Texts', type: 'array', of: 'string', optional: false },
           { name: 'task_type', label: 'Task type', control_type: 'select', pick_list: 'embedding_tasks', optional: true },
           { name: 'output_dimensionality', label: 'Output dimensionality', type: 'integer', optional: true, hint: 'Truncate vector length' },
           { name: 'auto_truncate', label: 'Auto-truncate long inputs', control_type: 'checkbox', optional: true }
         ]
-        if config_fields['advanced_config']
+        if cfg['advanced_config']
           base += [
             { name: 'model_override', label: 'Override Model', control_type: 'select',
               pick_list: 'models_dynamic_for_behavior', pick_list_params: { behavior: 'text.embed' }, optional: true },
@@ -469,19 +468,18 @@
       title: 'Generate Text',
       description: 'Gemini text generation',
 
-      # Configuration
+      # CONFIG
       config_fields: [
-        { name: 'advanced_config', label: 'Show Advanced Configuration', control_type: 'checkbox', extends_schema: true, optional: true }
+        { name: 'advanced_config', label: 'Show Advanced Configuration', control_type: 'checkbox', extends_schema: true, optional: true, default: false }
       ],
-
-      # Input
+      # INPUT
       input_fields: lambda do |_obj_defs, _connection, config_fields|
+        cfg = config_fields.is_a?(Hash) ? config_fields : {}
         # Fetch only fields relevant to this action
-        base = call('get_behavior_input_fields', 'text.generate', config_fields['advanced_config'])
+        base = call('get_behavior_input_fields', 'text.generate', cfg['advanced_config'])
         base 
       end,
-
-      # Output
+      # OUTPUT
       output_fields: lambda do |_obj_defs, _connection, _cfg|
         call('get_behavior_output_fields', 'text.generate').unshift(
           { name: 'success', type: 'boolean' },
@@ -491,15 +489,13 @@
             { name: 'correlation_id' }, { name: 'duration_ms', type: 'integer' }, { name: 'attempt', type: 'integer' } ]}
         )
       end,
-
-      # Execute
+      # EXECUTE
       execute: lambda do |connection, input, _in_schema, _out_schema, config_fields|
         user_cfg = call('extract_user_config', input, config_fields['advanced_config'])
         safe_input = call('deep_copy', input)
         call('execute_behavior', connection, 'text.generate', safe_input, user_cfg)
       end,
-
-      # Sample output
+      # SAMPLE OUT
       sample_output: lambda do |_connection, _cfg|
         {
           "success" => true, "timestamp" => Time.now.utc.iso8601,
@@ -1428,13 +1424,15 @@
   
     # Get behavior input fields dynamically
     get_behavior_input_fields: lambda do |behavior, show_advanced|
+      show_advanced = !!show_advanced
+
       behavior_def = call('behavior_registry')[behavior]
       return [] unless behavior_def
       
       # Map behavior to input fields
       fields = case behavior
       when 'text.generate'
-        fields = [
+        [
           { name: 'prompt', label: 'Prompt', control_type: 'text-area', optional: false }
         ]
         if show_advanced
