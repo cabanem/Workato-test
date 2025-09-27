@@ -38,7 +38,7 @@
       { name: 'version', label: 'API version', group: 'Google Cloud Platform', optional: false, default: 'v1', hint: 'e.g. v1beta1' },
       
       # Optional Configurations
-      { name: 'vector_search_endpoint', label: 'Vector Search Endpoint', optional: true, hint: 'Required only for vector search operations' },
+      { name: 'vector_search_endpoint', label: 'Vector Search Endpoint', optional: true, hint: 'Public Vector Search domain host for queries' },
       
       # Default Behaviors
       { name: 'default_model', label: 'Default Model', control_type: 'select',
@@ -348,6 +348,67 @@
     # ------------------------------------------
     # THIN WRAPPERS
     # ------------------------------------------
+    
+    find_neighbors: {
+      title: 'Find nearest neighbors',
+      description: 'Query a deployed Vector Search index',
+      input_fields: lambda do |_obj_defs, _connection, _cfg|
+        call('get_behavior_input_fields', 'vector.find_neighbors', true)
+      end,
+      output_fields: lambda do |_obj_defs, _connection, _cfg|
+        call('get_behavior_output_fields', 'vector.find_neighbors').unshift(
+          { name: 'success', type: 'boolean' },
+          { name: 'timestamp', type: 'datetime' },
+          { name: 'metadata', type: 'object', properties: [{ name: 'operation' }, { name: 'model' }] },
+          { name: 'trace', type: 'object', properties: [
+            { name: 'correlation_id' }, { name: 'duration_ms', type: 'integer' }, { name: 'attempt', type: 'integer' }
+          ]}
+        )
+      end,
+      execute: lambda do |connection, input, _in_schema, _out_schema, _cfg|
+        call('execute_behavior', connection, 'vector.find_neighbors', call('deep_copy', input))
+      end
+    },
+
+    generate_embeddings: {
+      title: 'Generate embeddings',
+      description: 'Create dense embeddings for text',
+      config_fields: [
+        { name: 'advanced_config', label: 'Show Advanced Configuration', control_type: 'checkbox', extends_schema: true, optional: true }
+      ],
+      input_fields: lambda do |_obj_defs, _connection, config_fields|
+        base = [
+          { name: 'texts', label: 'Texts', type: 'array', of: 'string', optional: false },
+          { name: 'task_type', label: 'Task type', control_type: 'select', pick_list: 'embedding_tasks', optional: true },
+          { name: 'output_dimensionality', label: 'Output dimensionality', type: 'integer', optional: true, hint: 'Truncate vector length' },
+          { name: 'auto_truncate', label: 'Auto-truncate long inputs', control_type: 'checkbox', optional: true }
+        ]
+        if config_fields['advanced_config']
+          base += [
+            { name: 'model_override', label: 'Override Model', control_type: 'select',
+              pick_list: 'models_dynamic_for_behavior', pick_list_params: { behavior: 'text.embed' }, optional: true },
+            { name: 'cache_ttl', label: 'Cache TTL (seconds)', type: 'integer', default: 300 }
+          ]
+        end
+        base
+      end,
+      output_fields: lambda do |_obj_defs, _connection, _cfg|
+        [
+          { name: 'success', type: 'boolean' }, { name: 'timestamp', type: 'datetime' },
+          { name: 'metadata', type: 'object', properties: [{ name: 'operation' }, { name: 'model' }] },
+          { name: 'trace', type: 'object', properties: [
+            { name: 'correlation_id' }, { name: 'duration_ms', type: 'integer' }, { name: 'attempt', type: 'integer' }
+          ]},
+          { name: 'embeddings', type: 'array', of: 'array' }
+        ]
+      end,
+      execute: lambda do |connection, input, _in_schema, _out_schema, config_fields|
+        user_cfg = call('extract_user_config', input, config_fields['advanced_config'])
+        safe     = call('deep_copy', input)
+        call('execute_behavior', connection, 'text.embed', safe, user_cfg)
+      end
+    },
+    
     generate_text: {
       title: 'Generate Text',
       description: 'Gemini text generation',
@@ -392,6 +453,27 @@
         }
       end
     },
+
+    upsert_index_datapoints: {
+      title: 'Upsert index datapoints',
+      description: 'Add or update datapoints in a Vector Search index',
+      input_fields: lambda do |_obj_defs, _connection, _cfg|
+        call('get_behavior_input_fields', 'vector.upsert_datapoints', true)
+      end,
+      output_fields: lambda do |_obj_defs, _connection, _cfg|
+        call('get_behavior_output_fields', 'vector.upsert_datapoints').unshift(
+          { name: 'success', type: 'boolean' },
+          { name: 'timestamp', type: 'datetime' },
+          { name: 'metadata', type: 'object', properties: [{ name: 'operation' }, { name: 'model' }] },
+          { name: 'trace', type: 'object', properties: [
+            { name: 'correlation_id' }, { name: 'duration_ms', type: 'integer' }, { name: 'attempt', type: 'integer' }
+          ]}
+        )
+      end,
+      execute: lambda do |connection, input, _in_schema, _out_schema, _cfg|
+        call('execute_behavior', connection, 'vector.upsert_datapoints', call('deep_copy', input))
+      end
+    }
     
   },
 
@@ -439,13 +521,60 @@
 
       # Embedding
       when 'embedding'
-        {
+        body = {
           'instances' => variables['texts'].map { |text|
             {
-              'content' => text,
-              'task_type' => variables['task_type'] || 'RETRIEVAL_DOCUMENT'
-            }
+              'content'   => text,
+              'task_type' => variables['task_type'] || 'RETRIEVAL_DOCUMENT',
+              'title'     => variables['title']
+            }.compact
           }
+        }
+        params = {}
+        params['autoTruncate']          = variables['auto_truncate'] unless variables['auto_truncate'].nil?
+        params['outputDimensionality']  = variables['output_dimensionality'] if variables['output_dimensionality']
+        body['parameters'] = params unless params.empty? 
+        body
+
+      when 'find_neighbors'
+        queries = Array(variables['queries']).map do |q|
+          dp =
+            if q['feature_vector']
+              { 'feature_vector' => Array(q['feature_vector']).map(&:to_f) }
+            elsif q['vector'] # alias
+              { 'feature_vector' => Array(q['vector']).map(&:to_f) }
+            elsif q['datapoint_id']
+              { 'datapoint_id' => q['datapoint_id'] }
+            else
+              {}
+            end
+          {
+            'datapoint'        => dp,
+            'neighbor_count'   => (q['neighbor_count'] || variables['neighbor_count'] || 10).to_i,
+            'restricts'        => q['restricts'],
+            'numeric_restricts'=> q['numeric_restricts']
+          }.compact
+        end
+
+        {
+          'deployed_index_id'     => variables['deployed_index_id'],
+          'queries'               => queries,
+          'return_full_datapoint' => variables['return_full_datapoint']
+        }.compact
+
+      when 'upsert_datapoints'
+        {
+          'datapoints' => Array(variables['datapoints']).map do |d|
+            {
+              'datapointId'      => d['datapoint_id'] || d['id'],
+              'featureVector'    => Array(d['feature_vector'] || d['vector']).map(&:to_f),
+              'sparseEmbedding'  => d['sparse_embedding'],
+              'restricts'        => d['restricts'],
+              'numericRestricts' => d['numeric_restricts'],
+              'crowdingTag'      => d['crowding_tag'],
+              'embeddingMetadata'=> d['embedding_metadata']
+            }.compact
+          end
         }
 
       # Multimodal
@@ -926,9 +1055,53 @@
               'format' => 'vertex_text'
             }
           }
-        }
+        },
         
-        # Add more behaviors as needed...
+        # Vector Operations
+        'vector.upsert_datapoints' => {
+          description: 'Upsert datapoints into a Vector Search index',
+          capability: 'vector',
+          supported_models: [], # not model-driven
+          config_template: {
+            'validate' => {
+              'schema' => [
+                { 'name' => 'index',      'required' => true },
+                { 'name' => 'datapoints', 'required' => true }
+              ]
+            },
+            'payload'  => { 'format' => 'upsert_datapoints' },
+            'endpoint' => {
+              'family' => 'vector_indexes',
+              'path'   => ':upsertDatapoints',
+              'method' => 'POST'
+            },
+            'extract'  => { 'format' => 'raw' }, # empty body on success
+            'post_process' => 'add_upsert_ack'
+          }
+        },
+
+        'vector.find_neighbors' => {
+          description: 'Find nearest neighbors from a deployed index',
+          capability: 'vector',
+          supported_models: [], # not model-driven
+          config_template: {
+            'validate' => {
+              'schema' => [
+                { 'name' => 'index_endpoint',    'required' => true },
+                { 'name' => 'deployed_index_id', 'required' => true },
+                { 'name' => 'queries',           'required' => true }
+              ]
+            },
+            'payload'  => { 'format' => 'find_neighbors' },
+            'endpoint' => {
+              'family' => 'vector_index_endpoints',
+              'path'   => ':findNeighbors',
+              'method' => 'POST'
+            },
+            'extract'  => { 'format' => 'raw' },
+            'post_process' => 'normalize_find_neighbors'
+          }
+        }        
       }
     end,
     
@@ -1032,6 +1205,16 @@
     # ============================================
     
     # Post-processing methods
+    add_upsert_ack: lambda do |response, input|
+      # response is empty on success; return a useful ack
+      {
+        'ack'         => 'upserted',
+        'count'       => Array(input['datapoints']).size,
+        'index'       => input['index'],
+        'empty_body'  => (response.nil? || response == {})
+      }
+    end,
+
     add_word_count: lambda do |response, input|
       if response.is_a?(String)
         { 
@@ -1058,28 +1241,44 @@
     # Build endpoint URL
     build_endpoint_url: lambda do |connection, endpoint_config, input|
       api_version = connection['version'].presence || 'v1'
-      base_url = "https://#{connection['region']}-aiplatform.googleapis.com/#{api_version}"
+      region = connection['region']
+      base_regional = "https://#{region}-aiplatform.googleapis.com/#{api_version}"
 
-      # Prefer model on input (propogated by execution_pipeline); else use connection default
-      model = input['model'] || connection['default_model'] || 'gemini-1.5-flash'
+      family = endpoint_config['family']
 
-      # Resolve short alias to newest -NNN version using publisher catalog
-      model_id = if model.match?(/-\d{3,}$/)
-                    model
-                else
-                  call('resolve_model_version', connection, model)
-                end
-      
-      model_path = "projects/#{connection['project']}/locations/#{connection['region']}/publishers/google/models/#{model_id}"
+      case family
+      when 'vector_indexes' # admin/data-plane ops on Index resources
+        index = call('qualify_resource', connection, 'index', input['index'] || endpoint_config['index'])
+        "#{base_regional}/#{index}#{endpoint_config['path']}" # e.g., ':upsertDatapoints'
 
-      # If the user supplies a custom path, replace the the critical elements with those from the connection
-      if endpoint_config['custom_path']
-         endpoint_config['custom_path']
-          .gsub('{project}',  connection['project'])
-          .gsub('{region}',   connection['region'])
-          .gsub('{endpoint}', connection['vector_search_endpoint'] || '')
+      when 'vector_index_endpoints' # query via MatchService (vbd host)
+        base  = call('vector_search_base', connection, input)
+        ie    = call('qualify_resource', connection, 'index_endpoint',
+                      input['index_endpoint'] || endpoint_config['index_endpoint'])
+        "#{base}/#{ie}#{endpointconfig['path']}" # e.g., ':findNeighbors'
+
       else
-        "#{base_url}/#{model_path}#{endpoint_config['path'] || ':generateContent'}"
+        # model/publisher logic and custom path
+        base_url = "https://#{connection['region']}-aiplatform.googleapis.com/#{api_version}"
+        # Prefer model on input (propogated by execution_pipeline); else use connection default
+        model = input['model'] || connection['default_model'] || 'gemini-1.5-flash'
+
+        # Resolve short alias to newest -NNN version using publisher catalog
+        model_id  = if model.match?(/-\d{3,}$/) then model
+                    else
+                      call('resolve_model_version', connection, model)
+                    end
+        
+        model_path = "projects/#{connection['project']}/locations/#{connection['region']}/publishers/google/models/#{model_id}"
+        # If the user supplies a custom path, replace the the critical elements with those from the connection
+        if endpoint_config['custom_path']
+          endpoint_config['custom_path']
+            .gsub('{project}',  connection['project'])
+            .gsub('{region}',   connection['region'])
+            .gsub('{endpoint}', connection['vector_search_endpoint'] || '')
+        else
+          "#{base_url}/#{model_path}#{endpoint_config['path'] || ':generateContent'}"
+        end
       end
     end,
     
@@ -1207,6 +1406,41 @@
           { name: 'texts', label: 'Texts to Embed', type: 'array', of: 'string' },
           { name: 'task_type', label: 'Task Type', control_type: 'select', pick_list: 'embedding_tasks' }
         ]
+      when 'vector.upsert_datapoints'
+        [
+          { name: 'index', label: 'Index', hint: 'Index resource or ID (e.g. projects/.../indexes/IDX or IDX)', optional: false },
+          { name: 'datapoints', label: 'Datapoints', type: 'array', of: 'object', properties: [
+            { name: 'datapoint_id', label: 'Datapoint ID', optional: false },
+            { name: 'feature_vector', label: 'Feature vector', type: 'array', of: 'number', optional: false },
+            { name: 'restricts', type: 'array', of: 'object', properties: [
+              { name: 'namespace' }, { name: 'allowList', type: 'array', of: 'string' }, { name: 'denyList', type: 'array', of: 'string' }
+            ]},
+            { name: 'numeric_restricts', type: 'array', of: 'object', properties: [
+              { name: 'namespace' }, { name: 'op' }, { name: 'valueInt' }, { name: 'valueFloat', type: 'number' }, { name: 'valueDouble', type: 'number' }
+            ]},
+            { name: 'crowding_tag', type: 'object', properties: [{ name: 'crowdingAttribute' }] },
+            { name: 'embedding_metadata', type: 'object' }
+          ]}
+        ]
+      when 'vector.find_neighbors'
+        [
+          { name: 'endpoint_host', label: 'Public endpoint host (vdb)', hint: 'Overrides connection host just for this call (e.g. 123...vdb.vertexai.goog)', optional: true },
+          { name: 'index_endpoint', label: 'Index Endpoint', hint: 'Resource or ID (e.g. projects/.../indexEndpoints/IEP or IEP)', optional: false },
+          { name: 'deployed_index_id', label: 'Deployed Index ID', optional: false },
+          { name: 'neighbor_count', label: 'Neighbors per query', type: 'integer', default: 10 },
+          { name: 'return_full_datapoint', label: 'Return full datapoint', control_type: 'checkbox' },
+          { name: 'queries', label: 'Queries', type: 'array', of: 'object', properties: [
+            { name: 'datapoint_id', label: 'Query datapoint ID' },
+            { name: 'feature_vector', label: 'Query vector', type: 'array', of: 'number', hint: 'Use either vector or datapoint_id' },
+            { name: 'neighbor_count', label: 'Override neighbors for this query', type: 'integer' },
+            { name: 'restricts', type: 'array', of: 'object', properties: [
+              { name: 'namespace' }, { name: 'allowList', type: 'array', of: 'string' }, { name: 'denyList', type: 'array', of: 'string' }
+            ]},
+            { name: 'numeric_restricts', type: 'array', of: 'object', properties: [
+              { name: 'namespace' }, { name: 'op' }, { name: 'valueInt' }, { name: 'valueFloat', type: 'number' }, { name: 'valueDouble', type: 'number' }
+            ]}
+          ]}
+        ]
       when 'multimodal.analyze'
         [
           { name: 'prompt', label: 'Analysis Prompt', control_type: 'text-area', optional: false },
@@ -1255,6 +1489,21 @@
         ]
       when 'text.embed'
         [{ name: 'embeddings', type: 'array', of: 'array' }]
+      when 'vector.upsert_datapoints'
+        [
+          { name: 'ack' }, { name: 'count', type: 'integer' }, { name: 'index' }, { name: 'empty_body', type: 'boolean' }
+        ]
+      when 'vector.find_neighbors'
+        [
+          { name: 'groups', type: 'array', of: 'object', properties: [
+            { name: 'query_id' },
+            { name: 'neighbors', type: 'array', of: 'object', properties: [
+              { name: 'datapoint_id' }, { name: 'distance', type: 'number' }, { name: 'score', type: 'number' },
+              { name: 'datapoint', type: 'object' }
+            ]}
+          ]}
+        ]
+
       when 'multimodal.analyze'
         [{ name: 'result', label: 'Analysis' }]
       else
@@ -1279,6 +1528,39 @@
         models = (resp['publisherModels'] || [])
         workato.cache.set(cache_key, models, 3600) # cache x 60m
         models
+      end
+    end,
+
+    # Normalize FindNeighbors response into a stable, recipe-friendly shape
+    normalize_find_neighbors: lambda do |resp, _input|
+      # Expected: { "nearestNeighbors": [ { "id": "...?", "neighbors": [ { "datapoint": {...}, "distance": n } ] } ] }
+      groups = (resp['nearestNeighbors'] || []).map do |nn|
+        {
+          'query_id' => nn['id'],
+          'neighbors' => (nn['neighbors'] || []).map do |n|
+            did  = n.dig('datapoint', 'datapointId')
+            dist = n['distance']
+            {
+              'datapoint_id' => did,
+              'distance'     => dist,
+              'score'        => call('transform_data', input: dist, from_format: 'distance', to_format: 'similarity'),
+              'datapoint'    => n['datapoint']
+            }.compact
+          end
+        }
+      end
+      { 'groups' => groups }
+    end,
+
+    # Resolve full resource names from short IDs, without mutating caller input
+    qualify_resource: lambda do |connection, type, value|
+      return value if value.to_s.start_with?('projects/')
+      project = connection['project']
+      region  = connection['region']
+      case type.to_s
+      when 'index'          then "projects/#{project}/locations/#{region}/indexes/#{value}"
+      when 'index_endpoint' then "projects/#{project}/locations/#{region}/indexEndpoints/#{value}"
+      else value
       end
     end,
 
@@ -1325,6 +1607,22 @@
       end
     end,
 
+    # Build base for vector *query* calls. Prefer the public vdb host when provided.
+    vector_search_base: lambda do |connection, input|
+      host = (input['endpoint_host'] || connection['vector_search_endpoint']).to_s.strip
+      version = connection['version'].presence || 'v1'
+      if host.empty?
+        # Fallback to regional API host (works for admin ops; query should use public vdb host)
+        "https://#{connection['region']}-aiplatform.googleapis.com/#{version}"
+      elsif host.include?('vdb.vertexai.goog')
+        "https://#{host}/#{version}"
+      else
+        # Allow passing a full https://... custom host
+        host = host.sub(%r{\Ahttps?://}i, '')
+        "https://#{host}/#{version}"
+      end
+    end
+
   },
 
   # ============================================
@@ -1336,7 +1634,9 @@
       [
         ['Gemini 1.5 Flash', 'gemini-1.5-flash'],
         ['Gemini 1.5 Pro', 'gemini-1.5-pro'],
-        ['Text Embedding 004', 'text-embedding-004'],
+        ['Gemini Embedding 001',  'gemini-embedding-001'],
+        ['Text Embedding 005',    'text-embedding-005'],
+        ['Text Embedding 004',    'text-embedding-004'],
         ['Text Embedding Gecko', 'textembedding-gecko']
       ]
     end,
